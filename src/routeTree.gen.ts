@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MovieIdRouteImport } from './routes/movie.$id'
+import { Route as CinemaIdRouteImport } from './routes/cinema.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MovieIdRoute = MovieIdRouteImport.update({
+  id: '/movie/$id',
+  path: '/movie/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CinemaIdRoute = CinemaIdRouteImport.update({
+  id: '/cinema/$id',
+  path: '/cinema/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cinema/$id': typeof CinemaIdRoute
+  '/movie/$id': typeof MovieIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cinema/$id': typeof CinemaIdRoute
+  '/movie/$id': typeof MovieIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cinema/$id': typeof CinemaIdRoute
+  '/movie/$id': typeof MovieIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/cinema/$id' | '/movie/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/cinema/$id' | '/movie/$id'
+  id: '__root__' | '/' | '/cinema/$id' | '/movie/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CinemaIdRoute: typeof CinemaIdRoute
+  MovieIdRoute: typeof MovieIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/movie/$id': {
+      id: '/movie/$id'
+      path: '/movie/$id'
+      fullPath: '/movie/$id'
+      preLoaderRoute: typeof MovieIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cinema/$id': {
+      id: '/cinema/$id'
+      path: '/cinema/$id'
+      fullPath: '/cinema/$id'
+      preLoaderRoute: typeof CinemaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CinemaIdRoute: CinemaIdRoute,
+  MovieIdRoute: MovieIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

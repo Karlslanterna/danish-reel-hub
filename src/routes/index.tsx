@@ -2,23 +2,37 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { movies, cinemas } from "@/lib/cinema-data";
+import { fetchMovies, fetchCinemas } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
+  loader: async () => {
+    const [movies, cinemas] = await Promise.all([fetchMovies(), fetchCinemas()]);
+    return { movies, cinemas };
+  },
   head: () => ({
     meta: [
       { title: "lanterna.dk — Find film og spilletider i Danmark" },
       { name: "description", content: "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg." },
     ],
   }),
+  errorComponent: ({ reset }) => (
+    <div className="p-12">
+      <button onClick={reset} className="text-primary">Prøv igen</button>
+    </div>
+  ),
+  notFoundComponent: () => <div className="p-12">Siden findes ikke</div>,
   component: HomePage,
 });
 
-const allGenres = Array.from(new Set(movies.flatMap((m) => m.genre))).sort();
-
 function HomePage() {
+  const { movies, cinemas } = Route.useLoaderData();
   const [query, setQuery] = useState("");
   const [activeGenre, setActiveGenre] = useState<string | null>(null);
+
+  const allGenres = useMemo(
+    () => Array.from(new Set(movies.flatMap((m) => m.genre))).sort(),
+    [movies],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -31,13 +45,12 @@ function HomePage() {
       const matchesGenre = !activeGenre || m.genre.includes(activeGenre);
       return matchesQuery && matchesGenre;
     });
-  }, [query, activeGenre]);
+  }, [query, activeGenre, movies]);
 
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
-      {/* Hero / search */}
       <section className="border-b border-border/60">
         <div className="mx-auto max-w-[1400px] px-8 pb-14 pt-20">
           <div className="flex items-end justify-between gap-12">
@@ -55,11 +68,10 @@ function HomePage() {
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
               <div>{movies.length} film i programmet</div>
-              <div className="mt-1">{cinemas.length} biografer · 5 byer</div>
+              <div className="mt-1">{cinemas.length} biografer</div>
             </div>
           </div>
 
-          {/* Search */}
           <div className="mt-12">
             <div className="group relative">
               <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -84,7 +96,6 @@ function HomePage() {
               )}
             </div>
 
-            {/* Genre chips */}
             <div className="mt-5 flex flex-wrap gap-2">
               <Chip active={activeGenre === null} onClick={() => setActiveGenre(null)}>
                 Alle
@@ -99,14 +110,13 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Movie grid */}
       <section className="mx-auto max-w-[1400px] px-8 py-14">
         <div className="mb-8 flex items-baseline justify-between">
           <h2 className="font-display text-2xl tracking-tight">
             {activeGenre ? activeGenre : "Aktuelt i biograferne"}
           </h2>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {filtered.length} {filtered.length === 1 ? "film" : "film"}
+            {filtered.length} film
           </div>
         </div>
 
@@ -124,13 +134,12 @@ function HomePage() {
         )}
       </section>
 
-      {/* Cinemas */}
       <section id="cinemas" className="border-t border-border/60 bg-card/30">
         <div className="mx-auto max-w-[1400px] px-8 py-16">
           <div className="mb-8 flex items-baseline justify-between">
             <h2 className="font-display text-2xl tracking-tight">Biografer</h2>
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              5 byer i Danmark
+              {cinemas.length} steder
             </div>
           </div>
           <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md bg-border md:grid-cols-2 lg:grid-cols-3">
@@ -147,7 +156,7 @@ function HomePage() {
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.description}</p>
                 </div>
                 <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{c.screens} sale · {c.movieIds.length} film</span>
+                  <span>{c.screens} sale</span>
                   <span className="text-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary">→</span>
                 </div>
               </Link>
@@ -158,7 +167,7 @@ function HomePage() {
 
       <footer className="border-t border-border/60">
         <div className="mx-auto max-w-[1400px] px-8 py-8 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          lanterna.dk · Mock data · 2026
+          lanterna.dk · 2026
         </div>
       </footer>
     </div>

@@ -1,13 +1,14 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { getCinema, getMoviesByIds, type Movie } from "@/lib/cinema-data";
+import { fetchCinema, fetchMoviesForCinema, type Cinema, type Movie } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/cinema/$id")({
-  loader: ({ params }) => {
-    const cinema = getCinema(params.id);
+  loader: async ({ params }) => {
+    const cinema = await fetchCinema(params.id);
     if (!cinema) throw notFound();
-    return { cinema, movies: getMoviesByIds(cinema.movieIds) };
+    const movies = await fetchMoviesForCinema(cinema.id);
+    return { cinema, movies };
   },
   head: ({ loaderData }) => ({
     meta: loaderData
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/cinema/$id")({
 });
 
 function CinemaPage() {
-  const { cinema, movies } = Route.useLoaderData();
+  const { cinema, movies } = Route.useLoaderData() as { cinema: Cinema; movies: Movie[] };
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,7 +62,7 @@ function CinemaPage() {
             <div className="space-y-px overflow-hidden rounded-md bg-border self-start">
               <InfoRow label="Adresse" value={cinema.address} />
               <InfoRow label="Antal sale" value={`${cinema.screens}`} />
-              <InfoRow label="Film på plakaten" value={`${cinema.movieIds.length}`} />
+              <InfoRow label="Film på plakaten" value={`${movies.length}`} />
               <InfoRow label="Telefon" value="+45 33 15 16 11" />
               <InfoRow label="Åbningstider" value="Dagligt 14:00 — 23:30" />
             </div>
@@ -77,7 +78,7 @@ function CinemaPage() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {movies.map((m: Movie) => (
+          {movies.map((m) => (
             <MovieCard key={m.id} movie={m} />
           ))}
         </div>

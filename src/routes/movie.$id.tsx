@@ -3,17 +3,23 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Poster } from "@/components/Poster";
 import {
   formatRuntime,
-  getCinema,
-  getCinemasForMovie,
-  getMovie,
-  getShowtimes,
+  fetchMovie,
+  fetchCinemasForMovie,
+  fetchShowtimesForMovie,
+  type Movie,
+  type Cinema,
+  type Showtime,
 } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/movie/$id")({
-  loader: ({ params }) => {
-    const movie = getMovie(params.id);
+  loader: async ({ params }) => {
+    const movie = await fetchMovie(params.id);
     if (!movie) throw notFound();
-    return { movie };
+    const [cinemas, showtimes] = await Promise.all([
+      fetchCinemasForMovie(movie.id),
+      fetchShowtimesForMovie(movie.id),
+    ]);
+    return { movie, cinemas, showtimes };
   },
   head: ({ loaderData }) => ({
     meta: loaderData
@@ -41,11 +47,12 @@ export const Route = createFileRoute("/movie/$id")({
 });
 
 function MoviePage() {
-  const { movie } = Route.useLoaderData();
-  const showtimes = getShowtimes(movie.id);
-  const cinemasShowing = getCinemasForMovie(movie.id);
+  const { movie, cinemas: cinemasShowing, showtimes } = Route.useLoaderData() as {
+    movie: Movie;
+    cinemas: Cinema[];
+    showtimes: Showtime[];
+  };
 
-  // group showtimes by cinema
   const byCinema = cinemasShowing.map((c) => ({
     cinema: c,
     days: showtimes.filter((s) => s.cinemaId === c.id),
@@ -55,9 +62,7 @@ function MoviePage() {
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
-      {/* Hero */}
       <section className="relative overflow-hidden border-b border-border/60">
-        {/* Blurred backdrop */}
         <div
           aria-hidden
           style={{
@@ -114,7 +119,6 @@ function MoviePage() {
         </div>
       </section>
 
-      {/* Showtimes */}
       <section id="showtimes" className="mx-auto max-w-[1400px] px-8 py-16">
         <div className="mb-8 flex items-baseline justify-between">
           <h2 className="font-display text-2xl tracking-tight">Spilletider</h2>

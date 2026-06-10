@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { fetchMovies, fetchCinemas } from "@/lib/cinema-data";
+import { fetchMovies, fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
   loader: async () => {

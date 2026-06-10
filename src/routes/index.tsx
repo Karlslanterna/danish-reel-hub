@@ -7,7 +7,7 @@ import { movies, cinemas } from "@/lib/cinema-data";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Biograf DK — Find film og spilletider i Danmark" },
+      { title: "lanterna.dk — Find film og spilletider i Danmark" },
       { name: "description", content: "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg." },
     ],
   }),
@@ -158,7 +158,7 @@ function HomePage() {
 
       <footer className="border-t border-border/60">
         <div className="mx-auto max-w-[1400px] px-8 py-8 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Biograf DK · Mock data · 2026
+          lanterna.dk · Mock data · 2026
         </div>
       </footer>
     </div>

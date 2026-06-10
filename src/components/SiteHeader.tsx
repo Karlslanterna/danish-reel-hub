@@ -1,15 +1,35 @@
 import { Link } from "@tanstack/react-router";
 
+function LanternIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 20h12" />
+      <path d="M8 20v-4a4 4 0 1 1 8 0v4" />
+      <path d="M9.5 9.5a1 1 0 0 1 5 0" />
+      <path d="M8 12h8" />
+      <path d="M9.5 8.5L8 5h8l-1.5 3.5" />
+      <path d="M12 2v3" />
+    </svg>
+  );
+}
+
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-8">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <span className="font-display text-base leading-none">B</span>
+            <LanternIcon className="h-4 w-4" />
           </div>
-          <span className="font-display text-lg tracking-tight">Biograf</span>
-          <span className="ml-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">DK</span>
+          <span className="font-display text-lg tracking-tight">lanterna.dk</span>
         </Link>
         <nav className="flex items-center gap-7 text-sm text-muted-foreground">
           <Link to="/" className="transition-colors hover:text-foreground" activeOptions={{ exact: true }} activeProps={{ className: "text-foreground" }}>

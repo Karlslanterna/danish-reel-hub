@@ -12,7 +12,7 @@ export const Route = createFileRoute("/cinema/$id")({
   head: ({ loaderData }) => ({
     meta: loaderData
       ? [
-          { title: `${loaderData.cinema.name}, ${loaderData.cinema.city} — Biograf DK` },
+          { title: `${loaderData.cinema.name}, ${loaderData.cinema.city} — lanterna.dk` },
           { name: "description", content: loaderData.cinema.description.slice(0, 155) },
         ]
       : [],

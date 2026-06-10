@@ -25,7 +25,7 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { movies, cinemas } = Route.useLoaderData();
+  const { movies, cinemas } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[] };
   const [query, setQuery] = useState("");
   const [activeGenre, setActiveGenre] = useState<string | null>(null);
 

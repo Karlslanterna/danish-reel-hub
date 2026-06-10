@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { getCinema, getMoviesByIds } from "@/lib/cinema-data";
+import { getCinema, getMoviesByIds, type Movie } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/cinema/$id")({
   loader: ({ params }) => {
@@ -77,7 +77,7 @@ function CinemaPage() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {movies.map((m) => (
+          {movies.map((m: Movie) => (
             <MovieCard key={m.id} movie={m} />
           ))}
         </div>

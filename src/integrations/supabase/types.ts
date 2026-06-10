@@ -14,7 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cinemas: {
+        Row: {
+          address: string
+          city: string
+          created_at: string
+          description: string
+          id: string
+          name: string
+          screens: number
+        }
+        Insert: {
+          address: string
+          city: string
+          created_at?: string
+          description: string
+          id: string
+          name: string
+          screens: number
+        }
+        Update: {
+          address?: string
+          city?: string
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          screens?: number
+        }
+        Relationships: []
+      }
+      movies: {
+        Row: {
+          created_at: string
+          director: string
+          genre: string[]
+          id: string
+          original_title: string | null
+          poster: Json
+          rating: string
+          runtime: number
+          synopsis: string
+          title: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          director: string
+          genre?: string[]
+          id: string
+          original_title?: string | null
+          poster?: Json
+          rating: string
+          runtime: number
+          synopsis: string
+          title: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          director?: string
+          genre?: string[]
+          id?: string
+          original_title?: string | null
+          poster?: Json
+          rating?: string
+          runtime?: number
+          synopsis?: string
+          title?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      showtimes: {
+        Row: {
+          cinema_id: string
+          created_at: string
+          date: string
+          hall: string
+          id: string
+          movie_id: string
+          times: string[]
+        }
+        Insert: {
+          cinema_id: string
+          created_at?: string
+          date: string
+          hall: string
+          id?: string
+          movie_id: string
+          times?: string[]
+        }
+        Update: {
+          cinema_id?: string
+          created_at?: string
+          date?: string
+          hall?: string
+          id?: string
+          movie_id?: string
+          times?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "showtimes_cinema_id_fkey"
+            columns: ["cinema_id"]
+            isOneToOne: false
+            referencedRelation: "cinemas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "showtimes_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

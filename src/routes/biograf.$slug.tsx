@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { fetchCinema, fetchMoviesForCinema, type Cinema, type Movie } from "@/lib/cinema-data";
 
-export const Route = createFileRoute("/cinema/$id")({
+export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
     const cinema = await fetchCinema(params.id);
     if (!cinema) throw notFound();

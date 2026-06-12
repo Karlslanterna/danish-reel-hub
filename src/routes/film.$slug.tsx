@@ -11,7 +11,7 @@ import {
   type Showtime,
 } from "@/lib/cinema-data";
 
-export const Route = createFileRoute("/movie/$id")({
+export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {
     const movie = await fetchMovie(params.id);
     if (!movie) throw notFound();

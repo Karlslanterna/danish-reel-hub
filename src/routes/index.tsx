@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { fetchMovies, fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
@@ -24,19 +24,101 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
+type Suggestion =
+  | { kind: "movie"; label: string; sub: string; slug: string }
+  | { kind: "cinema"; label: string; sub: string; slug: string }
+  | { kind: "city"; label: string; sub: string; city: string };
+
 function HomePage() {
   const { movies, cinemas } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[] };
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const navigate = useNavigate();
+  const boxRef = useRef<HTMLDivElement>(null);
 
-  const filtered = (() => {
+  const cities = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of cinemas) {
+      const key = c.city;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return Array.from(map, ([city, count]) => ({ city, count }));
+  }, [cinemas]);
+
+  const suggestions = useMemo<Suggestion[]>(() => {
     const q = query.trim().toLowerCase();
-    return movies.filter((m: Movie) =>
-      !q ||
-      m.title.toLowerCase().includes(q) ||
-      m.director.toLowerCase().includes(q) ||
-      m.genre.some((g) => g.toLowerCase().includes(q))
+    if (!q) return [];
+    const out: Suggestion[] = [];
+
+    for (const c of cities) {
+      if (c.city.toLowerCase().includes(q)) {
+        out.push({
+          kind: "city",
+          label: c.city,
+          sub: `${c.count} ${c.count === 1 ? "biograf" : "biografer"}`,
+          city: c.city,
+        });
+      }
+    }
+    for (const m of movies) {
+      if (m.title.toLowerCase().includes(q) || m.director.toLowerCase().includes(q)) {
+        out.push({ kind: "movie", label: m.title, sub: m.director, slug: m.slug });
+      }
+    }
+    for (const c of cinemas) {
+      if (c.name.toLowerCase().includes(q)) {
+        out.push({ kind: "cinema", label: c.name, sub: c.city, slug: c.slug });
+      }
+    }
+    return out.slice(0, 8);
+  }, [query, movies, cinemas, cities]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return movies.filter(
+      (m) =>
+        !q ||
+        m.title.toLowerCase().includes(q) ||
+        m.director.toLowerCase().includes(q) ||
+        m.genre.some((g) => g.toLowerCase().includes(q)),
     );
-  })();
+  }, [query, movies]);
+
+  useEffect(() => {
+    setActive(0);
+  }, [query]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const go = (s: Suggestion) => {
+    setOpen(false);
+    if (s.kind === "movie") navigate({ to: "/film/$slug", params: { slug: s.slug } });
+    else if (s.kind === "cinema") navigate({ to: "/biograf/$slug", params: { slug: s.slug } });
+    else navigate({ to: "/by/$city", params: { city: s.city.toLowerCase() } });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((a) => (a + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((a) => (a - 1 + suggestions.length) % suggestions.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      go(suggestions[active]);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,9 +142,9 @@ function HomePage() {
             </div>
           </div>
 
-          <div className="mt-12">
+          <div className="mt-12" ref={boxRef}>
             <div className="group relative">
-              <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <div className="pointer-events-none absolute left-5 top-[2rem] -translate-y-1/2 text-muted-foreground">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="7" />
                   <path d="m20 20-3.5-3.5" />
@@ -70,17 +152,55 @@ function HomePage() {
               </div>
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setOpen(true);
+                }}
+                onFocus={() => setOpen(true)}
+                onKeyDown={onKeyDown}
                 placeholder="Søg på by, titel eller biograf..."
                 className="h-16 w-full rounded-md border border-border/80 bg-card/60 pl-14 pr-6 font-display text-xl text-foreground placeholder:font-sans placeholder:text-base placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
+                aria-autocomplete="list"
+                aria-expanded={open && suggestions.length > 0}
               />
               {query && (
                 <button
-                  onClick={() => setQuery("")}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  onClick={() => {
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                  className="absolute right-4 top-[2rem] -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:bg-secondary hover:text-foreground"
                 >
                   Ryd
                 </button>
+              )}
+
+              {open && suggestions.length > 0 && (
+                <ul
+                  role="listbox"
+                  className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 max-h-[28rem] overflow-y-auto rounded-md border border-border/80 bg-card shadow-2xl shadow-black/40"
+                >
+                  {suggestions.map((s, i) => (
+                    <li key={`${s.kind}-${s.label}-${i}`} role="option" aria-selected={i === active}>
+                      <button
+                        type="button"
+                        onMouseEnter={() => setActive(i)}
+                        onClick={() => go(s)}
+                        className={`flex w-full items-center justify-between gap-4 px-5 py-3 text-left transition-colors ${
+                          i === active ? "bg-secondary" : "hover:bg-secondary/60"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate font-display text-base text-foreground">{s.label}</div>
+                          <div className="truncate text-xs text-muted-foreground">{s.sub}</div>
+                        </div>
+                        <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-primary">
+                          {s.kind === "movie" ? "Film" : s.kind === "cinema" ? "Biograf" : "By"}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>

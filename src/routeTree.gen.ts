@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
+import { Route as ByCityRouteImport } from './routes/by.$city'
 import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const FilmSlugRoute = FilmSlugRouteImport.update({
   path: '/film/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ByCityRoute = ByCityRouteImport.update({
+  id: '/by/$city',
+  path: '/by/$city',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BiografSlugRoute = BiografSlugRouteImport.update({
   id: '/biograf/$slug',
   path: '/biograf/$slug',
@@ -32,30 +38,34 @@ const BiografSlugRoute = BiografSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/biograf/$slug': typeof BiografSlugRoute
+  '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/biograf/$slug': typeof BiografSlugRoute
+  '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/biograf/$slug': typeof BiografSlugRoute
+  '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/biograf/$slug' | '/film/$slug'
+  fullPaths: '/' | '/biograf/$slug' | '/by/$city' | '/film/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/biograf/$slug' | '/film/$slug'
-  id: '__root__' | '/' | '/biograf/$slug' | '/film/$slug'
+  to: '/' | '/biograf/$slug' | '/by/$city' | '/film/$slug'
+  id: '__root__' | '/' | '/biograf/$slug' | '/by/$city' | '/film/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BiografSlugRoute: typeof BiografSlugRoute
+  ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilmSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/by/$city': {
+      id: '/by/$city'
+      path: '/by/$city'
+      fullPath: '/by/$city'
+      preLoaderRoute: typeof ByCityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/biograf/$slug': {
       id: '/biograf/$slug'
       path: '/biograf/$slug'
@@ -88,18 +105,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BiografSlugRoute: BiografSlugRoute,
+  ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

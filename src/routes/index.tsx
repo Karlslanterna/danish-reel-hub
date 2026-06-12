@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { fetchMovies, fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
@@ -27,25 +27,16 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const { movies, cinemas } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[] };
   const [query, setQuery] = useState("");
-  const [activeGenre, setActiveGenre] = useState<string | null>(null);
 
-  const allGenres = useMemo(
-    () => Array.from(new Set(movies.flatMap((m) => m.genre))).sort(),
-    [movies],
-  );
-
-  const filtered = useMemo(() => {
+  const filtered = (() => {
     const q = query.trim().toLowerCase();
-    return movies.filter((m) => {
-      const matchesQuery =
-        !q ||
-        m.title.toLowerCase().includes(q) ||
-        m.director.toLowerCase().includes(q) ||
-        m.genre.some((g) => g.toLowerCase().includes(q));
-      const matchesGenre = !activeGenre || m.genre.includes(activeGenre);
-      return matchesQuery && matchesGenre;
-    });
-  }, [query, activeGenre, movies]);
+    return movies.filter((m: Movie) =>
+      !q ||
+      m.title.toLowerCase().includes(q) ||
+      m.director.toLowerCase().includes(q) ||
+      m.genre.some((g) => g.toLowerCase().includes(q))
+    );
+  })();
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,19 +46,16 @@ function HomePage() {
         <div className="mx-auto max-w-[1400px] px-8 pb-14 pt-20">
           <div className="flex items-end justify-between gap-12">
             <div className="max-w-2xl">
-              <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                Onsdag · 10. juni
-              </div>
-              <h1 className="mt-4 font-display text-6xl leading-[0.95] tracking-tight text-foreground">
-                Hvad ser du<br />
-                <span className="text-primary italic">i aften?</span>
+              <h1 className="mt-4 font-display text-6xl font-bold leading-[0.95] tracking-tight text-foreground">
+                En hurtigere vej<br />
+                <span className="text-primary italic">til biografen</span>
               </h1>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Alle danske biografer, ét sted. Søg blandt aktuelle film, find spilletider og opdag noget nyt på din lokale biograf.
+                Alle danske biografer, ét sted.
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
-              <div>{movies.length} film i programmet</div>
+              <div>{movies.length} film</div>
               <div className="mt-1">{cinemas.length} biografer</div>
             </div>
           </div>
@@ -83,7 +71,7 @@ function HomePage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Søg på titel, instruktør eller genre…"
+                placeholder="Søg på by, titel eller biograf..."
                 className="h-16 w-full rounded-md border border-border/80 bg-card/60 pl-14 pr-6 font-display text-xl text-foreground placeholder:font-sans placeholder:text-base placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
               />
               {query && (
@@ -95,17 +83,6 @@ function HomePage() {
                 </button>
               )}
             </div>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Chip active={activeGenre === null} onClick={() => setActiveGenre(null)}>
-                Alle
-              </Chip>
-              {allGenres.map((g) => (
-                <Chip key={g} active={activeGenre === g} onClick={() => setActiveGenre(g)}>
-                  {g}
-                </Chip>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -113,7 +90,7 @@ function HomePage() {
       <section className="mx-auto max-w-[1400px] px-8 py-14">
         <div className="mb-8 flex items-baseline justify-between">
           <h2 className="font-display text-2xl tracking-tight">
-            {activeGenre ? activeGenre : "Aktuelt i biograferne"}
+            Aktuelt i biograferne
           </h2>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {filtered.length} film
@@ -123,7 +100,7 @@ function HomePage() {
         {filtered.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-24 text-center">
             <p className="font-display text-xl text-foreground">Ingen film matcher</p>
-            <p className="mt-2 text-sm text-muted-foreground">Prøv et andet søgeord eller en anden genre.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Prøv et andet søgeord.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -171,20 +148,5 @@ function HomePage() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function Chip({ children, active, onClick }: { children: React.ReactNode; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full border px-3.5 py-1.5 text-xs transition-colors ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

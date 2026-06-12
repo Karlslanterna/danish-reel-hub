@@ -34,7 +34,7 @@ export const Route = createFileRoute("/film/$slug")({
       <SiteHeader />
       <div className="mx-auto max-w-2xl px-8 py-24 text-center">
         <h1 className="font-display text-4xl">Filmen findes ikke</h1>
-        <Link to="/" className="mt-6 inline-block text-sm text-primary underline-offset-4 hover:underline">Tilbage til programmet</Link>
+        <Link to="/" className="mt-6 inline-block text-sm text-primary underline-offset-4 hover:underline">Tilbage</Link>
       </div>
     </div>
   ),

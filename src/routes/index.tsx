@@ -129,8 +129,7 @@ function HomePage() {
           <div className="flex items-end justify-between gap-12">
             <div className="max-w-2xl">
               <h1 className="mt-4 font-display text-6xl font-bold leading-[0.95] tracking-tight text-foreground">
-                En hurtigere vej<br />
-                <span className="text-primary italic">i biografen</span>
+                En hurtigere vej i biografen
               </h1>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
                 Alle danske biografer, ét sted.

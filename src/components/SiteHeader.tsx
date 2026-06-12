@@ -19,7 +19,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-8">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <LanternIcon className="h-4 w-4" />
+            <LogoIcon className="h-4 w-4" />
           </div>
           <span className="font-display text-lg tracking-tight">lanterna.dk</span>
         </Link>

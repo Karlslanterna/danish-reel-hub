@@ -72,7 +72,7 @@ function CinemaPage() {
 
       <section className="mx-auto max-w-[1400px] px-8 py-16">
         <div className="mb-8 flex items-baseline justify-between">
-          <h2 className="font-display text-2xl tracking-tight">På programmet nu</h2>
+          <h2 className="font-display text-2xl tracking-tight">Film på plakaten</h2>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {movies.length} film
           </div>

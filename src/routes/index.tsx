@@ -64,7 +64,7 @@ function HomePage() {
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
-              <div>{movies.length} film i programmet</div>
+              <div>{movies.length} film</div>
               <div className="mt-1">{cinemas.length} biografer</div>
             </div>
           </div>
@@ -93,16 +93,6 @@ function HomePage() {
               )}
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Chip active={activeGenre === null} onClick={() => setActiveGenre(null)}>
-                Alle
-              </Chip>
-              {allGenres.map((g) => (
-                <Chip key={g} active={activeGenre === g} onClick={() => setActiveGenre(g)}>
-                  {g}
-                </Chip>
-              ))}
-            </div>
           </div>
         </div>
       </section>

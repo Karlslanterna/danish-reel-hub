@@ -130,7 +130,7 @@ function HomePage() {
             <div className="max-w-2xl">
               <h1 className="mt-4 font-display text-6xl font-bold leading-[0.95] tracking-tight text-foreground">
                 En hurtigere vej<br />
-                <span className="text-primary italic">til biografen</span>
+                <span className="text-primary italic">i biografen</span>
               </h1>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
                 Alle danske biografer, ét sted.

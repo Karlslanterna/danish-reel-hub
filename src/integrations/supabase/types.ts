@@ -21,9 +21,12 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          latitude: number | null
+          longitude: number | null
           name: string
           screens: number
           slug: string
+          website: string | null
         }
         Insert: {
           address: string
@@ -31,9 +34,12 @@ export type Database = {
           created_at?: string
           description: string
           id: string
+          latitude?: number | null
+          longitude?: number | null
           name: string
           screens: number
           slug: string
+          website?: string | null
         }
         Update: {
           address?: string
@@ -41,9 +47,12 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           screens?: number
           slug?: string
+          website?: string | null
         }
         Relationships: []
       }
@@ -51,43 +60,52 @@ export type Database = {
         Row: {
           created_at: string
           director: string
+          external_id: string | null
           genre: string[]
           id: string
           original_title: string | null
           poster: Json
           rating: string
+          release_date: string | null
           runtime: number
           slug: string
           synopsis: string
           title: string
+          trailer_url: string | null
           year: number
         }
         Insert: {
           created_at?: string
           director: string
+          external_id?: string | null
           genre?: string[]
           id: string
           original_title?: string | null
           poster?: Json
           rating: string
+          release_date?: string | null
           runtime: number
           slug: string
           synopsis: string
           title: string
+          trailer_url?: string | null
           year: number
         }
         Update: {
           created_at?: string
           director?: string
+          external_id?: string | null
           genre?: string[]
           id?: string
           original_title?: string | null
           poster?: Json
           rating?: string
+          release_date?: string | null
           runtime?: number
           slug?: string
           synopsis?: string
           title?: string
+          trailer_url?: string | null
           year?: number
         }
         Relationships: []
@@ -98,9 +116,11 @@ export type Database = {
           cinema_id: string
           created_at: string
           date: string
+          external_id: string | null
           hall: string
           id: string
           movie_id: string
+          start_time: string | null
           times: string[]
         }
         Insert: {
@@ -108,9 +128,11 @@ export type Database = {
           cinema_id: string
           created_at?: string
           date: string
+          external_id?: string | null
           hall: string
           id?: string
           movie_id: string
+          start_time?: string | null
           times?: string[]
         }
         Update: {
@@ -118,9 +140,11 @@ export type Database = {
           cinema_id?: string
           created_at?: string
           date?: string
+          external_id?: string | null
           hall?: string
           id?: string
           movie_id?: string
+          start_time?: string | null
           times?: string[]
         }
         Relationships: [

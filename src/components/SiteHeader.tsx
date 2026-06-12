@@ -1,23 +1,15 @@
 import { Link } from "@tanstack/react-router";
+import lanternaIcon from "@/assets/lanterna-icon.png.asset.json";
 
-function LanternIcon({ className }: { className?: string }) {
+function LogoIcon({ className }: { className?: string }) {
   return (
-    <svg
+    <img
+      src={lanternaIcon.url}
+      alt="Lanterna Magica"
       className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M6 20h12" />
-      <path d="M8 20v-4a4 4 0 1 1 8 0v4" />
-      <path d="M9.5 9.5a1 1 0 0 1 5 0" />
-      <path d="M8 12h8" />
-      <path d="M9.5 8.5L8 5h8l-1.5 3.5" />
-      <path d="M12 2v3" />
-    </svg>
+      width={28}
+      height={28}
+    />
   );
 }
 
@@ -27,7 +19,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-8">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <LanternIcon className="h-4 w-4" />
+            <LogoIcon className="h-4 w-4" />
           </div>
           <span className="font-display text-lg tracking-tight">lanterna.dk</span>
         </Link>

@@ -168,7 +168,7 @@ function HomePage() {
                     setQuery("");
                     setOpen(false);
                   }}
-                  className="absolute right-4 top-[2rem] -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  className="absolute right-4 top-10 -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:bg-secondary hover:text-foreground"
                 >
                   Ryd
                 </button>

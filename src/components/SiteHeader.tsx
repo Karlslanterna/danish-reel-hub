@@ -28,7 +28,7 @@ export function SiteHeader() {
             Film
           </Link>
           <a href="#cinemas" className="transition-colors hover:text-foreground">Biografer</a>
-          <a href="#" className="transition-colors hover:text-foreground">Program</a>
+          
           <a href="#" className="hidden rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary md:inline-block">
             Log ind
           </a>

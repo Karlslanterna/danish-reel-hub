@@ -55,15 +55,12 @@ function HomePage() {
         <div className="mx-auto max-w-[1400px] px-8 pb-14 pt-20">
           <div className="flex items-end justify-between gap-12">
             <div className="max-w-2xl">
-              <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                Onsdag · 10. juni
-              </div>
-              <h1 className="mt-4 font-display text-6xl leading-[0.95] tracking-tight text-foreground">
-                Hvad ser du<br />
-                <span className="text-primary italic">i aften?</span>
+              <h1 className="mt-4 font-display text-6xl font-bold leading-[0.95] tracking-tight text-foreground">
+                En hurtigere vej<br />
+                <span className="text-primary italic">til biografen</span>
               </h1>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Alle danske biografer, ét sted. Søg blandt aktuelle film, find spilletider og opdag noget nyt på din lokale biograf.
+                Alle danske biografer, ét sted.
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
@@ -83,7 +80,7 @@ function HomePage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Søg på titel, instruktør eller genre…"
+                placeholder="Søg på by, titel eller biograf..."
                 className="h-16 w-full rounded-md border border-border/80 bg-card/60 pl-14 pr-6 font-display text-xl text-foreground placeholder:font-sans placeholder:text-base placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
               />
               {query && (

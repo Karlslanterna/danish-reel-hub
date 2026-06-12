@@ -134,8 +134,8 @@ function MoviePage() {
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city}</div>
                   <Link
-                    to="/cinema/$id"
-                    params={{ id: cinema.id }}
+                    to="/biograf/$slug"
+                    params={{ slug: cinema.slug }}
                     className="mt-1 inline-block font-display text-2xl tracking-tight text-foreground hover:text-primary"
                   >
                     {cinema.name}

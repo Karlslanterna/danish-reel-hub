@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Poster } from "@/components/Poster";
 import {
   formatRuntime,
-  fetchMovie,
+  fetchMovieBySlug,
   fetchCinemasForMovie,
   fetchShowtimesForMovie,
   type Movie,
@@ -13,7 +13,7 @@ import {
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {
-    const movie = await fetchMovie(params.id);
+    const movie = await fetchMovieBySlug(params.slug);
     if (!movie) throw notFound();
     const [cinemas, showtimes] = await Promise.all([
       fetchCinemasForMovie(movie.id),

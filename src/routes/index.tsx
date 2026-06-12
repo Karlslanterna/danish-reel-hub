@@ -129,8 +129,7 @@ function HomePage() {
           <div className="flex items-end justify-between gap-12">
             <div className="max-w-2xl">
               <h1 className="mt-4 font-display text-6xl font-bold leading-[0.95] tracking-tight text-foreground">
-                En hurtigere vej<br />
-                <span className="text-primary italic">i biografen</span>
+                En hurtigere vej i biografen
               </h1>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
                 Alle danske biografer, ét sted.
@@ -144,8 +143,8 @@ function HomePage() {
 
           <div className="mt-12" ref={boxRef}>
             <div className="group relative">
-              <div className="pointer-events-none absolute left-5 top-[2rem] -translate-y-1/2 text-muted-foreground">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <div className="pointer-events-none absolute left-5 top-10 -translate-y-1/2 text-muted-foreground">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="7" />
                   <path d="m20 20-3.5-3.5" />
                 </svg>
@@ -159,7 +158,7 @@ function HomePage() {
                 onFocus={() => setOpen(true)}
                 onKeyDown={onKeyDown}
                 placeholder="Søg på by, titel eller biograf..."
-                className="h-16 w-full rounded-md border border-border/80 bg-card/60 pl-14 pr-6 font-display text-xl text-foreground placeholder:font-sans placeholder:text-base placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
+                className="h-20 w-full rounded-md border border-border/80 bg-card/60 pl-16 pr-6 font-display text-2xl text-foreground placeholder:font-sans placeholder:text-lg placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
                 aria-autocomplete="list"
                 aria-expanded={open && suggestions.length > 0}
               />
@@ -169,7 +168,7 @@ function HomePage() {
                     setQuery("");
                     setOpen(false);
                   }}
-                  className="absolute right-4 top-[2rem] -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  className="absolute right-4 top-10 -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:bg-secondary hover:text-foreground"
                 >
                   Ryd
                 </button>

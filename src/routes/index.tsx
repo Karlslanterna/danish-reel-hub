@@ -27,25 +27,16 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const { movies, cinemas } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[] };
   const [query, setQuery] = useState("");
-  const [activeGenre, setActiveGenre] = useState<string | null>(null);
 
-  const allGenres = useMemo(
-    () => Array.from(new Set(movies.flatMap((m) => m.genre))).sort(),
-    [movies],
-  );
-
-  const filtered = useMemo(() => {
+  const filtered = (() => {
     const q = query.trim().toLowerCase();
-    return movies.filter((m) => {
-      const matchesQuery =
-        !q ||
-        m.title.toLowerCase().includes(q) ||
-        m.director.toLowerCase().includes(q) ||
-        m.genre.some((g) => g.toLowerCase().includes(q));
-      const matchesGenre = !activeGenre || m.genre.includes(activeGenre);
-      return matchesQuery && matchesGenre;
-    });
-  }, [query, activeGenre, movies]);
+    return movies.filter((m: Movie) =>
+      !q ||
+      m.title.toLowerCase().includes(q) ||
+      m.director.toLowerCase().includes(q) ||
+      m.genre.some((g) => g.toLowerCase().includes(q))
+    );
+  })();
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,7 +83,6 @@ function HomePage() {
                 </button>
               )}
             </div>
-
           </div>
         </div>
       </section>
@@ -100,7 +90,7 @@ function HomePage() {
       <section className="mx-auto max-w-[1400px] px-8 py-14">
         <div className="mb-8 flex items-baseline justify-between">
           <h2 className="font-display text-2xl tracking-tight">
-            {activeGenre ? activeGenre : "Aktuelt i biograferne"}
+            Aktuelt i biograferne
           </h2>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {filtered.length} film
@@ -160,4 +150,3 @@ function HomePage() {
     </div>
   );
 }
-

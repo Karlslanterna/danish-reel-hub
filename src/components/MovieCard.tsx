@@ -6,8 +6,8 @@ import { Poster } from "./Poster";
 export function MovieCard({ movie }: { movie: Movie }) {
   return (
     <Link
-      to="/movie/$id"
-      params={{ id: movie.id }}
+      to="/film/$slug"
+      params={{ slug: movie.slug }}
       className="group block"
     >
       <Poster

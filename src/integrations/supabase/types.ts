@@ -23,6 +23,7 @@ export type Database = {
           id: string
           name: string
           screens: number
+          slug: string
         }
         Insert: {
           address: string
@@ -32,6 +33,7 @@ export type Database = {
           id: string
           name: string
           screens: number
+          slug: string
         }
         Update: {
           address?: string
@@ -41,6 +43,7 @@ export type Database = {
           id?: string
           name?: string
           screens?: number
+          slug?: string
         }
         Relationships: []
       }
@@ -54,6 +57,7 @@ export type Database = {
           poster: Json
           rating: string
           runtime: number
+          slug: string
           synopsis: string
           title: string
           year: number
@@ -67,6 +71,7 @@ export type Database = {
           poster?: Json
           rating: string
           runtime: number
+          slug: string
           synopsis: string
           title: string
           year: number
@@ -80,6 +85,7 @@ export type Database = {
           poster?: Json
           rating?: string
           runtime?: number
+          slug?: string
           synopsis?: string
           title?: string
           year?: number
@@ -136,7 +142,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      slugify: { Args: { value: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

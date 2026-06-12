@@ -4,6 +4,7 @@ export type Poster = { a: string; b: string; c: string; d: string };
 
 export type Movie = {
   id: string;
+  slug: string;
   title: string;
   originalTitle?: string | null;
   runtime: number;
@@ -17,6 +18,7 @@ export type Movie = {
 
 export type Cinema = {
   id: string;
+  slug: string;
   name: string;
   city: string;
   address: string;
@@ -34,6 +36,7 @@ export type Showtime = {
 
 type MovieRow = {
   id: string;
+  slug: string;
   title: string;
   original_title: string | null;
   runtime: number;
@@ -47,6 +50,7 @@ type MovieRow = {
 
 type CinemaRow = {
   id: string;
+  slug: string;
   name: string;
   city: string;
   address: string;
@@ -64,6 +68,7 @@ type ShowtimeRow = {
 
 const mapMovie = (r: MovieRow): Movie => ({
   id: r.id,
+  slug: r.slug,
   title: r.title,
   originalTitle: r.original_title,
   runtime: r.runtime,
@@ -77,6 +82,7 @@ const mapMovie = (r: MovieRow): Movie => ({
 
 const mapCinema = (r: CinemaRow): Cinema => ({
   id: r.id,
+  slug: r.slug,
   name: r.name,
   city: r.city,
   address: r.address,
@@ -95,25 +101,25 @@ const mapShowtime = (r: ShowtimeRow): Showtime => ({
 export async function fetchMovies(): Promise<Movie[]> {
   const { data, error } = await supabase.from("movies").select("*").order("title");
   if (error) throw error;
-  return (data ?? []).map(mapMovie);
+  return (data ?? []).map((r) => mapMovie(r as MovieRow));
 }
 
 export async function fetchCinemas(): Promise<Cinema[]> {
   const { data, error } = await supabase.from("cinemas").select("*").order("name");
   if (error) throw error;
-  return (data ?? []).map(mapCinema);
+  return (data ?? []).map((r) => mapCinema(r as CinemaRow));
 }
 
-export async function fetchMovie(id: string): Promise<Movie | null> {
-  const { data, error } = await supabase.from("movies").select("*").eq("id", id).maybeSingle();
+export async function fetchMovieBySlug(slug: string): Promise<Movie | null> {
+  const { data, error } = await supabase.from("movies").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
-  return data ? mapMovie(data) : null;
+  return data ? mapMovie(data as MovieRow) : null;
 }
 
-export async function fetchCinema(id: string): Promise<Cinema | null> {
-  const { data, error } = await supabase.from("cinemas").select("*").eq("id", id).maybeSingle();
+export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
+  const { data, error } = await supabase.from("cinemas").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
-  return data ? mapCinema(data) : null;
+  return data ? mapCinema(data as CinemaRow) : null;
 }
 
 export async function fetchShowtimesForMovie(movieId: string): Promise<Showtime[]> {

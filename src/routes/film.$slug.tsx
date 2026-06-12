@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Poster } from "@/components/Poster";
 import {
   formatRuntime,
-  fetchMovie,
+  fetchMovieBySlug,
   fetchCinemasForMovie,
   fetchShowtimesForMovie,
   type Movie,
@@ -11,9 +11,9 @@ import {
   type Showtime,
 } from "@/lib/cinema-data";
 
-export const Route = createFileRoute("/movie/$id")({
+export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {
-    const movie = await fetchMovie(params.id);
+    const movie = await fetchMovieBySlug(params.slug);
     if (!movie) throw notFound();
     const [cinemas, showtimes] = await Promise.all([
       fetchCinemasForMovie(movie.id),
@@ -134,8 +134,8 @@ function MoviePage() {
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city}</div>
                   <Link
-                    to="/cinema/$id"
-                    params={{ id: cinema.id }}
+                    to="/biograf/$slug"
+                    params={{ slug: cinema.slug }}
                     className="mt-1 inline-block font-display text-2xl tracking-tight text-foreground hover:text-primary"
                   >
                     {cinema.name}

@@ -1,11 +1,11 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { fetchCinema, fetchMoviesForCinema, type Cinema, type Movie } from "@/lib/cinema-data";
+import { fetchCinemaBySlug, fetchMoviesForCinema, type Cinema, type Movie } from "@/lib/cinema-data";
 
-export const Route = createFileRoute("/cinema/$id")({
+export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
-    const cinema = await fetchCinema(params.id);
+    const cinema = await fetchCinemaBySlug(params.slug);
     if (!cinema) throw notFound();
     const movies = await fetchMoviesForCinema(cinema.id);
     return { cinema, movies };

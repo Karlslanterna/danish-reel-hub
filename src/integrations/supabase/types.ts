@@ -94,6 +94,7 @@ export type Database = {
       }
       showtimes: {
         Row: {
+          booking_url: string | null
           cinema_id: string
           created_at: string
           date: string
@@ -103,6 +104,7 @@ export type Database = {
           times: string[]
         }
         Insert: {
+          booking_url?: string | null
           cinema_id: string
           created_at?: string
           date: string
@@ -112,6 +114,7 @@ export type Database = {
           times?: string[]
         }
         Update: {
+          booking_url?: string | null
           cinema_id?: string
           created_at?: string
           date?: string

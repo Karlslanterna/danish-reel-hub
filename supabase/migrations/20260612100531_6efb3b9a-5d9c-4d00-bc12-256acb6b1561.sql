@@ -1,0 +1,1 @@
+ALTER TABLE public.showtimes ADD COLUMN booking_url text;

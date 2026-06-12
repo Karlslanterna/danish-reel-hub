@@ -144,22 +144,45 @@ function MoviePage() {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {days.map((d, i) => (
                   <div key={i}>
                     <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                       {d.date} · {d.hall}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {d.times.map((t) => (
-                        <button
-                          key={t}
-                          className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
-                        >
-                          {t}
-                        </button>
-                      ))}
+                      {d.times.map((t) =>
+                        d.bookingUrl ? (
+                          <a
+                            key={t}
+                            href={d.bookingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
+                          >
+                            {t}
+                          </a>
+                        ) : (
+                          <span
+                            key={t}
+                            className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
+                          >
+                            {t}
+                          </span>
+                        ),
+                      )}
                     </div>
+                    {d.bookingUrl && (
+                      <a
+                        href={d.bookingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
+                      >
+                        Køb billet
+                        <span aria-hidden>→</span>
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>

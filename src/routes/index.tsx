@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { fetchMovies, fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
@@ -110,7 +110,7 @@ function HomePage() {
         {filtered.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-24 text-center">
             <p className="font-display text-xl text-foreground">Ingen film matcher</p>
-            <p className="mt-2 text-sm text-muted-foreground">Prøv et andet søgeord eller en anden genre.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Prøv et andet søgeord.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -161,17 +161,3 @@ function HomePage() {
   );
 }
 
-function Chip({ children, active, onClick }: { children: React.ReactNode; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full border px-3.5 py-1.5 text-xs transition-colors ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}

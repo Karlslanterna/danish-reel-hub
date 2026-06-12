@@ -146,8 +146,8 @@ function HomePage() {
             {cinemas.map((c) => (
               <Link
                 key={c.id}
-                to="/cinema/$id"
-                params={{ id: c.id }}
+                to="/biograf/$slug"
+                params={{ slug: c.slug }}
                 className="group flex flex-col justify-between bg-background p-6 transition-colors hover:bg-card"
               >
                 <div>

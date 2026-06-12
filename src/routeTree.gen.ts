@@ -11,7 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
-import { Route as CinemaIdRouteImport } from './routes/cinema.$id'
+import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -23,39 +23,39 @@ const FilmSlugRoute = FilmSlugRouteImport.update({
   path: '/film/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CinemaIdRoute = CinemaIdRouteImport.update({
-  id: '/cinema/$id',
-  path: '/cinema/$id',
+const BiografSlugRoute = BiografSlugRouteImport.update({
+  id: '/biograf/$slug',
+  path: '/biograf/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/cinema/$id': typeof CinemaIdRoute
+  '/biograf/$slug': typeof BiografSlugRoute
   '/film/$slug': typeof FilmSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/cinema/$id': typeof CinemaIdRoute
+  '/biograf/$slug': typeof BiografSlugRoute
   '/film/$slug': typeof FilmSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/cinema/$id': typeof CinemaIdRoute
+  '/biograf/$slug': typeof BiografSlugRoute
   '/film/$slug': typeof FilmSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cinema/$id' | '/film/$slug'
+  fullPaths: '/' | '/biograf/$slug' | '/film/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cinema/$id' | '/film/$slug'
-  id: '__root__' | '/' | '/cinema/$id' | '/film/$slug'
+  to: '/' | '/biograf/$slug' | '/film/$slug'
+  id: '__root__' | '/' | '/biograf/$slug' | '/film/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CinemaIdRoute: typeof CinemaIdRoute
+  BiografSlugRoute: typeof BiografSlugRoute
   FilmSlugRoute: typeof FilmSlugRoute
 }
 
@@ -75,11 +75,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilmSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/cinema/$id': {
-      id: '/cinema/$id'
-      path: '/cinema/$id'
-      fullPath: '/cinema/$id'
-      preLoaderRoute: typeof CinemaIdRouteImport
+    '/biograf/$slug': {
+      id: '/biograf/$slug'
+      path: '/biograf/$slug'
+      fullPath: '/biograf/$slug'
+      preLoaderRoute: typeof BiografSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -87,7 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CinemaIdRoute: CinemaIdRoute,
+  BiografSlugRoute: BiografSlugRoute,
   FilmSlugRoute: FilmSlugRoute,
 }
 export const routeTree = rootRouteImport

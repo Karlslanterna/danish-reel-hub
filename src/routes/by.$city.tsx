@@ -17,7 +17,7 @@ export const Route = createFileRoute("/by/$city")({
   head: ({ loaderData }) => ({
     meta: loaderData
       ? [
-          { title: `Biografer i ${loaderData.city} — lanterna.dk` },
+          { title: `Biografer i ${loaderData.city} — Lanterna` },
           { name: "description", content: `Find biografer og film i ${loaderData.city}.` },
         ]
       : [],

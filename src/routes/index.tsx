@@ -11,7 +11,7 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "lanterna.dk — Find film og spilletider i Danmark" },
+      { title: "Lanterna — Find film og spilletider i Danmark" },
       { name: "description", content: "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg." },
     ],
   }),
@@ -263,7 +263,7 @@ function HomePage() {
 
       <footer className="border-t border-border/60">
         <div className="mx-auto max-w-[1400px] px-8 py-8 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          lanterna.dk · 2026
+          Lanterna · 2026
         </div>
       </footer>
     </div>

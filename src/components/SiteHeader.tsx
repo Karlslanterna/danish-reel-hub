@@ -21,7 +21,7 @@ export function SiteHeader() {
           <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-primary text-primary-foreground">
             <LogoIcon className="h-4 w-4" />
           </div>
-          <span className="font-display text-lg tracking-tight">lanterna.dk</span>
+          <span className="font-display text-lg tracking-tight">Lanterna</span>
         </Link>
         <nav className="flex items-center gap-7 text-sm text-muted-foreground">
           <Link to="/" className="transition-colors hover:text-foreground" activeOptions={{ exact: true }} activeProps={{ className: "text-foreground" }}>

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/biograf/$slug")({
   head: ({ loaderData }) => ({
     meta: loaderData
       ? [
-          { title: `${loaderData.cinema.name}, ${loaderData.cinema.city} — lanterna.dk` },
+          { title: `${loaderData.cinema.name}, ${loaderData.cinema.city} — Lanterna` },
           { name: "description", content: loaderData.cinema.description.slice(0, 155) },
         ]
       : [],

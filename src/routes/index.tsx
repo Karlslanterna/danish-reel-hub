@@ -132,7 +132,7 @@ function HomePage() {
                 En hurtigere vej i biografen
               </h1>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Alle danske biografer, ét sted.
+                Alle danske biografer og aktuelle film, ét sted.
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">

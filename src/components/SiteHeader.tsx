@@ -1,17 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import lanternaIcon from "@/assets/lanterna-icon.png.asset.json";
-
-function LogoIcon({ className }: { className?: string }) {
-  return (
-    <img
-      src={lanternaIcon.url}
-      alt="Lanterna Magica"
-      className={className}
-      width={28}
-      height={28}
-    />
-  );
-}
 
 export function SiteHeader() {
   return (

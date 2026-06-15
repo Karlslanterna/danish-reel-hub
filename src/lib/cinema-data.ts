@@ -184,3 +184,9 @@ export function formatRuntime(min: number) {
   const m = min % 60;
   return `${h}t ${m}m`;
 }
+
+export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; cinemaId: string }>> {
+  const { data, error } = await supabase.from("showtimes").select("movie_id, cinema_id");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ movieId: (r as ShowtimeRow).movie_id, cinemaId: (r as ShowtimeRow).cinema_id }));
+}

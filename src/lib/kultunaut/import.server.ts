@@ -180,7 +180,8 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
   >();
 
   for (const st of parsed.showtimes) {
-    const movieKnownId = idFor("kn", st.movie_external_id);
+    const canonicalExt = remapExternal.get(st.movie_external_id) ?? st.movie_external_id;
+    const movieKnownId = idFor("kn", canonicalExt);
     const cinemaKnownId = idFor("kn", st.cinema_external_id);
     const key = `${movieKnownId}|${cinemaKnownId}|${st.date}|${st.hall}`;
     const existing = grouped.get(key);

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
 import { Route as ByCityRouteImport } from './routes/by.$city'
 import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
+import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,26 @@ const BiografSlugRoute = BiografSlugRouteImport.update({
   path: '/biograf/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicKultunautImportRoute =
+  ApiPublicKultunautImportRouteImport.update({
+    id: '/api/public/kultunaut-import',
+    path: '/api/public/kultunaut-import',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
+  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
+  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +62,30 @@ export interface FileRoutesById {
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
+  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/biograf/$slug' | '/by/$city' | '/film/$slug'
+  fullPaths:
+    | '/'
+    | '/biograf/$slug'
+    | '/by/$city'
+    | '/film/$slug'
+    | '/api/public/kultunaut-import'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/biograf/$slug' | '/by/$city' | '/film/$slug'
-  id: '__root__' | '/' | '/biograf/$slug' | '/by/$city' | '/film/$slug'
+  to:
+    | '/'
+    | '/biograf/$slug'
+    | '/by/$city'
+    | '/film/$slug'
+    | '/api/public/kultunaut-import'
+  id:
+    | '__root__'
+    | '/'
+    | '/biograf/$slug'
+    | '/by/$city'
+    | '/film/$slug'
+    | '/api/public/kultunaut-import'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +93,7 @@ export interface RootRouteChildren {
   BiografSlugRoute: typeof BiografSlugRoute
   ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
+  ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BiografSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/kultunaut-import': {
+      id: '/api/public/kultunaut-import'
+      path: '/api/public/kultunaut-import'
+      fullPath: '/api/public/kultunaut-import'
+      preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,17 +141,8 @@ const rootRouteChildren: RootRouteChildren = {
   BiografSlugRoute: BiografSlugRoute,
   ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
+  ApiPublicKultunautImportRoute: ApiPublicKultunautImportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

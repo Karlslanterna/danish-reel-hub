@@ -9,6 +9,17 @@ export type ImportResult = {
 
 const idFor = (prefix: string, externalId: string) => `${prefix}-${externalId}`;
 
+const slugify = (value: string): string =>
+  value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[æø]/g, (c) => (c === "æ" ? "ae" : "oe"))
+    .replace(/å/g, "aa")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "item";
+
+
 /**
  * Import a Kultunaut XML payload into Lovable Cloud.
  *

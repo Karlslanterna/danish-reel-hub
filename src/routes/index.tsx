@@ -91,14 +91,6 @@ function HomePage() {
     setRadiusOpen(false);
   };
 
-  const openRadiusPanel = () => {
-    if (!userLoc) {
-      requestLocation(() => setRadiusOpen(true));
-    } else {
-      setRadiusOpen(true);
-    }
-  };
-
   const nearbyCinemaIds = useMemo(() => {
     if (radius === "all" || !userLoc) return null;
     const ids = new Set<string>();

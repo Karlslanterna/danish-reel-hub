@@ -259,9 +259,19 @@ export async function processJobBatch(
     }
 
     if (job.phase === "cinemas") {
-      const payload = (job.payload ?? {}) as {
-        cinemaRows?: Array<Record<string, unknown>>;
+      type CinemaRow = {
+        id: string;
+        slug: string;
+        external_id: string;
+        name: string;
+        city: string;
+        address: string;
+        description: string;
+        screens: number;
+        latitude: number | null;
+        longitude: number | null;
       };
+      const payload = (job.payload ?? {}) as { cinemaRows?: CinemaRow[] };
       const cinemaRows = payload.cinemaRows ?? [];
       const errors: string[] = [];
       const CHUNK = 500;

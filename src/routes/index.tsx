@@ -3,6 +3,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, fetchShowtimes, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({

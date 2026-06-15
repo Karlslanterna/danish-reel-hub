@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, type Movie, type Cinema } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({

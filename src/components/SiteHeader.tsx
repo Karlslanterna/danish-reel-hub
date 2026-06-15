@@ -9,9 +9,7 @@ export function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-7 text-sm text-muted-foreground">
           <a href="#" className="hidden rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary md:inline-block">
-
-
-Log ind
+            Log ind
           </a>
         </nav>
       </div>

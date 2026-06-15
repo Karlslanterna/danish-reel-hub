@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Poster } from "@/components/Poster";
+import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import {
   formatRuntime,
   fetchMovieBySlug,
@@ -11,45 +12,7 @@ import {
   type Showtime,
 } from "@/lib/cinema-data";
 
-type FilmSearch = {
-  date?: string;
-  radius?: number | "all";
-  lat?: number;
-  lng?: number;
-};
-
-function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const la1 = (a.lat * Math.PI) / 180;
-  const la2 = (b.lat * Math.PI) / 180;
-  const x = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(x));
-}
-
-const TODAY = new Date().toISOString().split("T")[0];
-const TOMORROW = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-
-function fmtDateLabel(date: string) {
-  if (date === TODAY) return "I dag";
-  if (date === TOMORROW) return "I morgen";
-  return new Date(date + "T12:00:00").toLocaleDateString("da-DK", { day: "numeric", month: "short" });
-}
-
 export const Route = createFileRoute("/film/$slug")({
-  validateSearch: (s: Record<string, unknown>): FilmSearch => {
-    const out: FilmSearch = {};
-    if (typeof s.date === "string") out.date = s.date;
-    if (s.radius === "all") out.radius = "all";
-    else if (typeof s.radius === "number") out.radius = s.radius;
-    else if (typeof s.radius === "string" && !isNaN(Number(s.radius))) out.radius = Number(s.radius);
-    if (typeof s.lat === "number") out.lat = s.lat;
-    else if (typeof s.lat === "string" && !isNaN(Number(s.lat))) out.lat = Number(s.lat);
-    if (typeof s.lng === "number") out.lng = s.lng;
-    else if (typeof s.lng === "string" && !isNaN(Number(s.lng))) out.lng = Number(s.lng);
-    return out;
-  },
   loader: async ({ params }) => {
     const movie = await fetchMovieBySlug(params.slug);
     if (!movie) throw notFound();
@@ -90,18 +53,17 @@ function MoviePage() {
     cinemas: Cinema[];
     showtimes: Showtime[];
   };
-  const search = Route.useSearch();
-  const { date, radius, lat, lng } = search;
-  const hasGeo = radius && radius !== "all" && typeof lat === "number" && typeof lng === "number";
+  const { radius, userLoc, selectedDate, clear } = useFilters();
+  const hasGeo = radius !== "all" && userLoc !== null;
 
   const filteredCinemas = hasGeo
     ? cinemasShowing.filter((c) => {
         if (c.latitude == null || c.longitude == null) return false;
-        return haversineKm({ lat: lat!, lng: lng! }, { lat: c.latitude, lng: c.longitude }) <= (radius as number);
+        return haversineKm(userLoc!, { lat: c.latitude, lng: c.longitude }) <= (radius as number);
       })
     : cinemasShowing;
 
-  const filteredShowtimes = date ? showtimes.filter((s) => s.date === date) : showtimes;
+  const filteredShowtimes = selectedDate ? showtimes.filter((s) => s.date === selectedDate) : showtimes;
 
   const byCinema = filteredCinemas
     .map((c) => ({
@@ -110,7 +72,7 @@ function MoviePage() {
     }))
     .filter((x) => x.days.length > 0);
 
-  const hasFilters = Boolean(date) || hasGeo;
+  const hasFilters = Boolean(selectedDate) || hasGeo;
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,7 +105,7 @@ function MoviePage() {
           </div>
 
           <div className="flex flex-col">
-            <Link to="/" search={search} className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
+            <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
               ← Tilbage
             </Link>
             <div className="mt-6 text-xs uppercase tracking-[0.25em] text-primary">
@@ -182,46 +144,35 @@ function MoviePage() {
       </section>
 
       <section id="showtimes" className="mx-auto max-w-[1400px] px-8 py-16">
-        <div className="mb-8 flex flex-wrap items-baseline justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Spilletider</h2>
-            {date && (
-              <span className="inline-flex items-center gap-2 rounded-full border border-primary bg-primary px-3 py-1 text-[10px] uppercase tracking-[0.15em] text-primary-foreground">
-                {fmtDateLabel(date)}
-              </span>
-            )}
-            {hasGeo && (
-              <span className="inline-flex items-center gap-2 rounded-full border border-primary bg-primary px-3 py-1 text-[10px] uppercase tracking-[0.15em] text-primary-foreground">
-                Inden for {radius} km
-              </span>
-            )}
+            <FilterBar />
             {hasFilters && (
-              <Link
-                to="/film/$slug"
-                params={{ slug: movie.slug }}
-                search={{}}
+              <button
+                type="button"
+                onClick={clear}
                 className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
                 Ryd filtre
-              </Link>
+              </button>
             )}
           </div>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {byCinema.length} biografer
+            {byCinema.length} biografer{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{hasGeo ? ` · inden for ${radius} km` : ""}
           </div>
         </div>
 
         {byCinema.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-16 text-center">
             <p className="font-display text-xl text-foreground">Ingen spilletider matcher dine filtre</p>
-            <Link
-              to="/film/$slug"
-              params={{ slug: movie.slug }}
-              search={{}}
+            <button
+              type="button"
+              onClick={clear}
               className="mt-3 inline-block text-sm text-primary underline-offset-4 hover:underline"
             >
               Ryd filtre
-            </Link>
+            </button>
           </div>
         ) : (
           <div className="space-y-px overflow-hidden rounded-md bg-border">

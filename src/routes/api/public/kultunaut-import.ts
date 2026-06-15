@@ -8,7 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
  *
  * Auth: requires header `x-kultunaut-secret: <KULTUNAUT_IMPORT_SECRET>`.
  * Content: raw XML body (Content-Type: application/xml or text/xml).
- * Limit:   1 MB per request to protect the Worker runtime.
+ * Limit:   20 MB per request to protect the Worker runtime.
  *
  * Example:
  *   curl -X POST https://<host>/api/public/kultunaut-import \
@@ -34,8 +34,8 @@ export const Route = createFileRoute("/api/public/kultunaut-import")({
         if (!body) {
           return new Response("Empty body", { status: 400 });
         }
-        if (body.length > 1_000_000) {
-          return new Response("Payload too large (max 1MB)", { status: 413 });
+        if (body.length > 20_000_000) {
+          return new Response("Payload too large (max 20MB)", { status: 413 });
         }
 
         try {

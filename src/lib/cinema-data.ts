@@ -42,6 +42,7 @@ export type Showtime = {
   times: string[];
   hall: string;
   bookingUrl: string | null;
+  ticketUrls: string[];
 };
 
 type MovieRow = {

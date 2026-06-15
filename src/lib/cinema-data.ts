@@ -31,6 +31,8 @@ export type Cinema = {
   address: string;
   description: string;
   screens: number;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type Showtime = {
@@ -64,6 +66,8 @@ type CinemaRow = {
   address: string;
   description: string;
   screens: number;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type ShowtimeRow = {
@@ -97,6 +101,8 @@ const mapCinema = (r: CinemaRow): Cinema => ({
   address: r.address,
   description: r.description,
   screens: r.screens,
+  latitude: r.latitude,
+  longitude: r.longitude,
 });
 
 const mapShowtime = (r: ShowtimeRow): Showtime => ({
@@ -177,4 +183,10 @@ export function formatRuntime(min: number) {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return `${h}t ${m}m`;
+}
+
+export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; cinemaId: string }>> {
+  const { data, error } = await supabase.from("showtimes").select("movie_id, cinema_id");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ movieId: (r as ShowtimeRow).movie_id, cinemaId: (r as ShowtimeRow).cinema_id }));
 }

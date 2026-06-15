@@ -2,12 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { fetchMovies, fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
+import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, type Movie, type Cinema } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [movies, cinemas] = await Promise.all([fetchMovies(), fetchCinemas()]);
-    return { movies, cinemas };
+    const [movies, cinemas, pairs] = await Promise.all([fetchMovies(), fetchCinemas(), fetchMovieCinemaPairs()]);
+    return { movies, cinemas, pairs };
   },
   head: () => ({
     meta: [
@@ -24,18 +24,89 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
+type Radius = 5 | 10 | 25 | 50 | "all";
+
+const RADIUS_OPTIONS: Array<{ value: Radius; label: string }> = [
+  { value: 5, label: "5 km" },
+  { value: 10, label: "10 km" },
+  { value: 25, label: "25 km" },
+  { value: 50, label: "50 km" },
+  { value: "all", label: "Hele Danmark" },
+];
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
 type Suggestion =
   | { kind: "movie"; label: string; sub: string; slug: string }
   | { kind: "cinema"; label: string; sub: string; slug: string }
   | { kind: "city"; label: string; sub: string; city: string };
 
 function HomePage() {
-  const { movies, cinemas } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[] };
+  const { movies, cinemas, pairs } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; pairs: Array<{ movieId: string; cinemaId: string }> };
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [radius, setRadius] = useState<Radius>("all");
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
   const navigate = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
+
+  const requestLocation = () => {
+    if (!("geolocation" in navigator)) {
+      setGeoError("Geolokation understøttes ikke");
+      return;
+    }
+    setGeoLoading(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoLoading(false);
+      },
+      (err) => {
+        setGeoError(err.code === err.PERMISSION_DENIED ? "Adgang nægtet" : "Kunne ikke finde dig");
+        setGeoLoading(false);
+        setRadius("all");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  };
+
+  const handleRadiusChange = (r: Radius) => {
+    setRadius(r);
+    if (r !== "all" && !userLoc) requestLocation();
+  };
+
+  const nearbyCinemaIds = useMemo(() => {
+    if (radius === "all" || !userLoc) return null;
+    const ids = new Set<string>();
+    for (const c of cinemas) {
+      if (c.latitude == null || c.longitude == null) continue;
+      const d = haversineKm(userLoc, { lat: c.latitude, lng: c.longitude });
+      if (d <= radius) ids.add(c.id);
+    }
+    return ids;
+  }, [radius, userLoc, cinemas]);
+
+  const nearbyMovieIds = useMemo(() => {
+    if (!nearbyCinemaIds) return null;
+    const ids = new Set<string>();
+    for (const p of pairs) {
+      if (nearbyCinemaIds.has(p.cinemaId)) ids.add(p.movieId);
+    }
+    return ids;
+  }, [nearbyCinemaIds, pairs]);
+
 
   const cities = useMemo(() => {
     const map = new Map<string, number>();
@@ -77,13 +148,19 @@ function HomePage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return movies.filter(
-      (m) =>
-        !q ||
-        m.title.toLowerCase().includes(q) ||
-        m.director.toLowerCase().includes(q) ||
-        m.genre.some((g) => g.toLowerCase().includes(q)),
+      (m) => {
+        if (nearbyMovieIds && !nearbyMovieIds.has(m.id)) return false;
+        return (
+          !q ||
+          m.title.toLowerCase().includes(q) ||
+          m.director.toLowerCase().includes(q) ||
+          m.genre.some((g) => g.toLowerCase().includes(q))
+        );
+      },
     );
-  }, [query, movies]);
+  }, [query, movies, nearbyMovieIds]);
+
+  const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 
   useEffect(() => {
     setActive(0);
@@ -207,19 +284,50 @@ function HomePage() {
       </section>
 
       <section className="mx-auto max-w-[1400px] px-8 py-14">
-        <div className="mb-8 flex items-baseline justify-between">
-          <h2 className="font-display text-2xl tracking-tight">
-            Aktuelt i biograferne
-          </h2>
-          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {filtered.length} film
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <h2 className="font-display text-2xl tracking-tight">Aktuelt i biograferne</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                <span aria-hidden>📍</span> Nær mig
+              </span>
+              {RADIUS_OPTIONS.map((opt) => {
+                const selected = radius === opt.value;
+                return (
+                  <button
+                    key={String(opt.value)}
+                    type="button"
+                    onClick={() => handleRadiusChange(opt.value)}
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            {geoLoading && <div>Finder din placering…</div>}
+            {geoError && <div className="text-destructive">{geoError}</div>}
+            {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
+              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km</div>
+            )}
+            {(radius === "all" || (!userLoc && !geoLoading)) && (
+              <div>{filtered.length} film</div>
+            )}
           </div>
         </div>
 
         {filtered.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-24 text-center">
             <p className="font-display text-xl text-foreground">Ingen film matcher</p>
-            <p className="mt-2 text-sm text-muted-foreground">Prøv et andet søgeord.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {radius !== "all" && userLoc ? "Prøv en større radius." : "Prøv et andet søgeord."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -229,6 +337,7 @@ function HomePage() {
           </div>
         )}
       </section>
+
 
       <section id="cinemas" className="border-t border-border/60 bg-card/30">
         <div className="mx-auto max-w-[1400px] px-8 py-16">

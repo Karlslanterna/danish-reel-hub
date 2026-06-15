@@ -66,6 +66,8 @@ type CinemaRow = {
   address: string;
   description: string;
   screens: number;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type ShowtimeRow = {
@@ -99,6 +101,8 @@ const mapCinema = (r: CinemaRow): Cinema => ({
   address: r.address,
   description: r.description,
   screens: r.screens,
+  latitude: r.latitude,
+  longitude: r.longitude,
 });
 
 const mapShowtime = (r: ShowtimeRow): Showtime => ({

@@ -31,6 +31,8 @@ export type Cinema = {
   address: string;
   description: string;
   screens: number;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type Showtime = {

@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 
 export const Route = createFileRoute("/admin/import/$jobId")({
@@ -46,19 +48,24 @@ function ImportStatusPage() {
   const { jobId } = Route.useParams();
   const [job, setJob] = useState<JobStatus | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string>("");
+  const [secretInput, setSecretInput] = useState<string>("");
+  const [needsSecret, setNeedsSecret] = useState(false);
   const processingRef = useRef(false);
   const stoppedRef = useRef(false);
 
-  const secret =
-    typeof window !== "undefined"
-      ? window.sessionStorage.getItem(SECRET_STORAGE_KEY) ?? ""
-      : "";
+  // Hydrate secret from sessionStorage on the client
+  useEffect(() => {
+    const stored = window.sessionStorage.getItem(SECRET_STORAGE_KEY) ?? "";
+    if (stored) {
+      setSecret(stored);
+    } else {
+      setNeedsSecret(true);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!secret) {
-      setFatal("Mangler import-hemmelighed. Gå tilbage og upload igen.");
-      return;
-    }
+    if (!secret) return;
     stoppedRef.current = false;
 
     const fetchStatus = async () => {
@@ -66,6 +73,11 @@ function ImportStatusPage() {
         `/api/public/kultunaut-import/status?jobId=${encodeURIComponent(jobId)}`,
         { headers: { "x-kultunaut-secret": secret } },
       );
+      if (res.status === 401) {
+        setNeedsSecret(true);
+        window.sessionStorage.removeItem(SECRET_STORAGE_KEY);
+        throw new Error("Forkert hemmelighed (401). Indtast igen.");
+      }
       if (!res.ok) throw new Error(`Status HTTP ${res.status}`);
       return (await res.json()) as JobStatus;
     };
@@ -83,9 +95,9 @@ function ImportStatusPage() {
       try {
         const initial = await fetchStatus();
         setJob(initial);
+        setFatal(null);
         if (initial.status === "completed" || initial.status === "failed") return;
 
-        // Drive batches from the client so we don't rely on Worker lifetime.
         while (!stoppedRef.current) {
           if (processingRef.current) {
             await new Promise((r) => setTimeout(r, 500));
@@ -111,7 +123,6 @@ function ImportStatusPage() {
 
     loop();
 
-    // Background poll as a safety net (and shows progress even if a batch is mid-flight)
     const poll = window.setInterval(async () => {
       try {
         const s = await fetchStatus();
@@ -130,6 +141,16 @@ function ImportStatusPage() {
       window.clearInterval(poll);
     };
   }, [jobId, secret]);
+
+  const submitSecret = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secretInput.trim()) return;
+    window.sessionStorage.setItem(SECRET_STORAGE_KEY, secretInput.trim());
+    setSecret(secretInput.trim());
+    setNeedsSecret(false);
+    setFatal(null);
+  };
+
 
   const statusColor =
     job?.status === "completed"

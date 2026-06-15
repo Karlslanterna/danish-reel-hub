@@ -38,21 +38,73 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
 
   const errors: string[] = [];
 
+  // --- Deduplicate movies that share the same title -------------------
+  // Some Kultunaut entries appear multiple times (different external IDs)
+  // for the same film. Keep the most complete profile and remap showtimes
+  // from the discarded ones to the canonical entry.
+  const titleKey = (title: string) => slugify(title);
+
+  const scoreMovie = (m: {
+    runtime: number;
+    director: string;
+    rating: string;
+    synopsis: string;
+    genre: string[];
+    poster: { a: string; b: string; c: string; d: string; url?: string };
+    original_title: string | null;
+  }): number => {
+    let s = 0;
+    const posterVals = [m.poster.a, m.poster.b, m.poster.c, m.poster.d, m.poster.url];
+    if (posterVals.some((v) => v && v.trim() !== "")) s += 10;
+    if (m.runtime > 0) s += 5;
+    if (m.synopsis && m.synopsis.trim().length > 20) s += 3;
+    if (m.director && m.director.trim() !== "") s += 2;
+    if (m.rating && m.rating.trim() !== "") s += 1;
+    if (m.genre && m.genre.length > 0) s += 1;
+    if (m.original_title && m.original_title.trim() !== "") s += 1;
+    return s;
+  };
+
+  // Group parsed movies by normalized title and pick a canonical external_id.
+  const byTitle = new Map<string, string[]>();
+  for (const m of parsed.movies.values()) {
+    const k = titleKey(m.title);
+    const arr = byTitle.get(k) ?? [];
+    arr.push(m.external_id);
+    byTitle.set(k, arr);
+  }
+
+  const remapExternal = new Map<string, string>();
+  for (const [, extIds] of byTitle) {
+    if (extIds.length === 1) {
+      remapExternal.set(extIds[0], extIds[0]);
+      continue;
+    }
+    const ranked = extIds
+      .map((eid) => ({ eid, m: parsed.movies.get(eid)! }))
+      .sort((a, b) => scoreMovie(b.m) - scoreMovie(a.m));
+    const canonical = ranked[0].eid;
+    for (const { eid } of ranked) remapExternal.set(eid, canonical);
+  }
+  const canonicalExternalIds = new Set(remapExternal.values());
+
   // Movies --------------------------------------------------------------
-  const movieRows = Array.from(parsed.movies.values()).map((m) => ({
-    id: idFor("kn", m.external_id),
-    slug: slugify(m.title) || `kn-${m.external_id}`,
-    external_id: m.external_id,
-    title: m.title,
-    original_title: m.original_title,
-    runtime: m.runtime,
-    genre: m.genre,
-    year: m.year,
-    director: m.director,
-    rating: m.rating,
-    synopsis: m.synopsis,
-    poster: m.poster,
-  }));
+  const movieRows = Array.from(parsed.movies.values())
+    .filter((m) => canonicalExternalIds.has(m.external_id))
+    .map((m) => ({
+      id: idFor("kn", m.external_id),
+      slug: slugify(m.title) || `kn-${m.external_id}`,
+      external_id: m.external_id,
+      title: m.title,
+      original_title: m.original_title,
+      runtime: m.runtime,
+      genre: m.genre,
+      year: m.year,
+      director: m.director,
+      rating: m.rating,
+      synopsis: m.synopsis,
+      poster: m.poster,
+    }));
 
 
   if (movieRows.length > 0) {
@@ -60,6 +112,33 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
       .from("movies")
       .upsert(movieRows, { onConflict: "id" });
     if (error) errors.push(`movies: ${error.message}`);
+  }
+
+  // Merge pre-existing DB duplicates sharing this title into the canonical
+  // entry: re-point their showtimes, then delete the duplicate movie row.
+  for (const m of movieRows) {
+    const canonicalId = m.id;
+    const { data: dupes } = await supabaseAdmin
+      .from("movies")
+      .select("id")
+      .ilike("title", m.title)
+      .neq("id", canonicalId);
+    if (!dupes || dupes.length === 0) continue;
+    for (const dup of dupes) {
+      const { error: updErr } = await supabaseAdmin
+        .from("showtimes")
+        .update({ movie_id: canonicalId })
+        .eq("movie_id", dup.id);
+      if (updErr) {
+        errors.push(`merge showtimes ${dup.id}->${canonicalId}: ${updErr.message}`);
+        continue;
+      }
+      const { error: delErr } = await supabaseAdmin
+        .from("movies")
+        .delete()
+        .eq("id", dup.id);
+      if (delErr) errors.push(`delete duplicate movie ${dup.id}: ${delErr.message}`);
+    }
   }
 
   // Cinemas -------------------------------------------------------------
@@ -101,7 +180,8 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
   >();
 
   for (const st of parsed.showtimes) {
-    const movieKnownId = idFor("kn", st.movie_external_id);
+    const canonicalExt = remapExternal.get(st.movie_external_id) ?? st.movie_external_id;
+    const movieKnownId = idFor("kn", canonicalExt);
     const cinemaKnownId = idFor("kn", st.cinema_external_id);
     const key = `${movieKnownId}|${cinemaKnownId}|${st.date}|${st.hall}`;
     const existing = grouped.get(key);

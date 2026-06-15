@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +22,7 @@ type FileStats = {
   times: number;
 };
 
-type ImportResult = {
-  movies: { upserted: number };
-  cinemas: { upserted: number };
-  showtimes: { upserted: number };
-  errors: string[];
-};
-
 function countTag(xml: string, tag: string): number {
-  // Counts opening tags like <movie ...> or <movie> (not </movie>).
   const re = new RegExp(`<${tag}(\\s|>|/)`, "gi");
   return (xml.match(re) ?? []).length;
 }
@@ -44,18 +36,22 @@ function computeStats(xml: string): FileStats {
   };
 }
 
+const SECRET_STORAGE_KEY = "kultunaut-import-secret";
+
 function AdminImportPage() {
-  const [secret, setSecret] = useState("");
+  const navigate = useNavigate();
+  const [secret, setSecret] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.sessionStorage.getItem(SECRET_STORAGE_KEY) ?? "";
+  });
   const [fileName, setFileName] = useState<string | null>(null);
   const [xml, setXml] = useState<string>("");
   const [stats, setStats] = useState<FileStats | null>(null);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<ImportResult | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
-    setResult(null);
     const file = e.target.files?.[0];
     if (!file) {
       setFileName(null);
@@ -70,18 +66,12 @@ function AdminImportPage() {
   };
 
   const onRunImport = async () => {
-    if (!xml) {
-      setError("Vælg en XML-fil først.");
-      return;
-    }
-    if (!secret) {
-      setError("Indtast import-hemmeligheden (x-kultunaut-secret).");
-      return;
-    }
-    setRunning(true);
+    if (!xml) return setError("Vælg en XML-fil først.");
+    if (!secret) return setError("Indtast import-hemmeligheden (x-kultunaut-secret).");
+    setUploading(true);
     setError(null);
-    setResult(null);
     try {
+      window.sessionStorage.setItem(SECRET_STORAGE_KEY, secret);
       const res = await fetch("/api/public/kultunaut-import", {
         method: "POST",
         headers: {
@@ -90,24 +80,17 @@ function AdminImportPage() {
         },
         body: xml,
       });
-      const text = await res.text();
-      let parsed: ImportResult | null = null;
-      try {
-        parsed = JSON.parse(text) as ImportResult;
-      } catch {
-        // not JSON — fall through to error display
-      }
-      if (!res.ok && res.status !== 207) {
+      if (!res.ok && res.status !== 202) {
+        const text = await res.text();
         setError(`HTTP ${res.status}: ${text || res.statusText}`);
-        if (parsed) setResult(parsed);
         return;
       }
-      if (parsed) setResult(parsed);
-      else setError("Uventet svar fra serveren.");
+      const { jobId } = (await res.json()) as { jobId: string };
+      navigate({ to: "/admin/import/$jobId", params: { jobId } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ukendt fejl");
     } finally {
-      setRunning(false);
+      setUploading(false);
     }
   };
 
@@ -119,11 +102,8 @@ function AdminImportPage() {
           Kultunaut Import
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Upload en Kultunaut-XML-fil og kør import via{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            POST /api/public/kultunaut-import
-          </code>
-          .
+          Upload en Kultunaut-XML-fil. Import køres som baggrundsjob — du
+          omdirigeres til en status-side.
         </p>
       </header>
 
@@ -154,10 +134,6 @@ function AdminImportPage() {
               onChange={(e) => setSecret(e.target.value)}
               autoComplete="off"
             />
-            <p className="text-xs text-muted-foreground">
-              Værdien sendes som headeren <code>x-kultunaut-secret</code> og
-              gemmes ikke.
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -174,17 +150,13 @@ function AdminImportPage() {
               <Stat label="<theater>" value={stats.theaters} />
               <Stat label="<time>" value={stats.times} />
             </dl>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Tallene tælles fra rå XML-tags og er en hurtig forhåndsvisning —
-              det endelige importresultat kan afvige.
-            </p>
           </CardContent>
         </Card>
       )}
 
       <div className="mt-6">
-        <Button onClick={onRunImport} disabled={running || !xml}>
-          {running ? "Importerer…" : "3. Kør import"}
+        <Button onClick={onRunImport} disabled={uploading || !xml}>
+          {uploading ? "Uploader…" : "3. Start import"}
         </Button>
       </div>
 
@@ -197,41 +169,6 @@ function AdminImportPage() {
             <pre className="whitespace-pre-wrap break-words text-sm text-destructive">
               {error}
             </pre>
-          </CardContent>
-        </Card>
-      )}
-
-      {result && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Importresultat</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-3 gap-4">
-              <Stat label="Film" value={result.movies.upserted} />
-              <Stat label="Biografer" value={result.cinemas.upserted} />
-              <Stat label="Visninger" value={result.showtimes.upserted} />
-            </dl>
-
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-foreground">
-                Fejl ({result.errors.length})
-              </h3>
-              {result.errors.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">Ingen fejl.</p>
-              ) : (
-                <ul className="mt-2 space-y-1 rounded border border-border bg-muted/30 p-3">
-                  {result.errors.map((e, i) => (
-                    <li
-                      key={i}
-                      className="font-mono text-xs text-destructive"
-                    >
-                      {e}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           </CardContent>
         </Card>
       )}

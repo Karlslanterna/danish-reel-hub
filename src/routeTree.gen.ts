@@ -15,6 +15,8 @@ import { Route as ByCityRouteImport } from './routes/by.$city'
 import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
 import { Route as AdminImportRouteImport } from './routes/admin.import'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
+import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
+import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -47,6 +49,18 @@ const ApiPublicKultunautImportRoute =
     path: '/api/public/kultunaut-import',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicKultunautImportStatusRoute =
+  ApiPublicKultunautImportStatusRouteImport.update({
+    id: '/status',
+    path: '/status',
+    getParentRoute: () => ApiPublicKultunautImportRoute,
+  } as any)
+const ApiPublicKultunautImportProcessRoute =
+  ApiPublicKultunautImportProcessRouteImport.update({
+    id: '/process',
+    path: '/process',
+    getParentRoute: () => ApiPublicKultunautImportRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,7 +68,9 @@ export interface FileRoutesByFullPath {
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
-  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRoute
+  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
+  '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,7 +78,9 @@ export interface FileRoutesByTo {
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
-  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRoute
+  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
+  '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,7 +89,9 @@ export interface FileRoutesById {
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
-  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRoute
+  '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
+  '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -82,6 +102,8 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/api/public/kultunaut-import'
+    | '/api/public/kultunaut-import/process'
+    | '/api/public/kultunaut-import/status'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -90,6 +112,8 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/api/public/kultunaut-import'
+    | '/api/public/kultunaut-import/process'
+    | '/api/public/kultunaut-import/status'
   id:
     | '__root__'
     | '/'
@@ -98,6 +122,8 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/api/public/kultunaut-import'
+    | '/api/public/kultunaut-import/process'
+    | '/api/public/kultunaut-import/status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,7 +132,7 @@ export interface RootRouteChildren {
   BiografSlugRoute: typeof BiografSlugRoute
   ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
-  ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRoute
+  ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -153,8 +179,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/kultunaut-import/status': {
+      id: '/api/public/kultunaut-import/status'
+      path: '/status'
+      fullPath: '/api/public/kultunaut-import/status'
+      preLoaderRoute: typeof ApiPublicKultunautImportStatusRouteImport
+      parentRoute: typeof ApiPublicKultunautImportRoute
+    }
+    '/api/public/kultunaut-import/process': {
+      id: '/api/public/kultunaut-import/process'
+      path: '/process'
+      fullPath: '/api/public/kultunaut-import/process'
+      preLoaderRoute: typeof ApiPublicKultunautImportProcessRouteImport
+      parentRoute: typeof ApiPublicKultunautImportRoute
+    }
   }
 }
+
+interface ApiPublicKultunautImportRouteChildren {
+  ApiPublicKultunautImportProcessRoute: typeof ApiPublicKultunautImportProcessRoute
+  ApiPublicKultunautImportStatusRoute: typeof ApiPublicKultunautImportStatusRoute
+}
+
+const ApiPublicKultunautImportRouteChildren: ApiPublicKultunautImportRouteChildren =
+  {
+    ApiPublicKultunautImportProcessRoute: ApiPublicKultunautImportProcessRoute,
+    ApiPublicKultunautImportStatusRoute: ApiPublicKultunautImportStatusRoute,
+  }
+
+const ApiPublicKultunautImportRouteWithChildren =
+  ApiPublicKultunautImportRoute._addFileChildren(
+    ApiPublicKultunautImportRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -162,7 +218,7 @@ const rootRouteChildren: RootRouteChildren = {
   BiografSlugRoute: BiografSlugRoute,
   ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
-  ApiPublicKultunautImportRoute: ApiPublicKultunautImportRoute,
+  ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

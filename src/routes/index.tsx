@@ -50,12 +50,63 @@ type Suggestion =
   | { kind: "city"; label: string; sub: string; city: string };
 
 function HomePage() {
-  const { movies, cinemas } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[] };
+  const { movies, cinemas, pairs } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; pairs: Array<{ movieId: string; cinemaId: string }> };
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [radius, setRadius] = useState<Radius>("all");
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
   const navigate = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
+
+  const requestLocation = () => {
+    if (!("geolocation" in navigator)) {
+      setGeoError("Geolokation understøttes ikke");
+      return;
+    }
+    setGeoLoading(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoLoading(false);
+      },
+      (err) => {
+        setGeoError(err.code === err.PERMISSION_DENIED ? "Adgang nægtet" : "Kunne ikke finde dig");
+        setGeoLoading(false);
+        setRadius("all");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  };
+
+  const handleRadiusChange = (r: Radius) => {
+    setRadius(r);
+    if (r !== "all" && !userLoc) requestLocation();
+  };
+
+  const nearbyCinemaIds = useMemo(() => {
+    if (radius === "all" || !userLoc) return null;
+    const ids = new Set<string>();
+    for (const c of cinemas) {
+      if (c.latitude == null || c.longitude == null) continue;
+      const d = haversineKm(userLoc, { lat: c.latitude, lng: c.longitude });
+      if (d <= radius) ids.add(c.id);
+    }
+    return ids;
+  }, [radius, userLoc, cinemas]);
+
+  const nearbyMovieIds = useMemo(() => {
+    if (!nearbyCinemaIds) return null;
+    const ids = new Set<string>();
+    for (const p of pairs) {
+      if (nearbyCinemaIds.has(p.cinemaId)) ids.add(p.movieId);
+    }
+    return ids;
+  }, [nearbyCinemaIds, pairs]);
+
 
   const cities = useMemo(() => {
     const map = new Map<string, number>();

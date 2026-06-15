@@ -77,9 +77,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lanterna" },
+      { title: "Lanterna - Danmarks nye biografportal" },
       { name: "description", content: "Find film og spilletider i Danmark" },
-      { property: "og:title", content: "Lanterna" },
+      { property: "og:title", content: "Lanterna - Danmarks nye biografportal" },
       { property: "og:description", content: "Find film og spilletider i Danmark" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

@@ -20,6 +20,7 @@ export type Database = {
           city: string
           created_at: string
           description: string
+          external_id: string | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -33,6 +34,7 @@ export type Database = {
           city: string
           created_at?: string
           description: string
+          external_id?: string | null
           id: string
           latitude?: number | null
           longitude?: number | null
@@ -46,6 +48,7 @@ export type Database = {
           city?: string
           created_at?: string
           description?: string
+          external_id?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -121,6 +124,7 @@ export type Database = {
           id: string
           movie_id: string
           start_time: string | null
+          ticket_url: string | null
           times: string[]
         }
         Insert: {
@@ -133,6 +137,7 @@ export type Database = {
           id?: string
           movie_id: string
           start_time?: string | null
+          ticket_url?: string | null
           times?: string[]
         }
         Update: {
@@ -145,6 +150,7 @@ export type Database = {
           id?: string
           movie_id?: string
           start_time?: string | null
+          ticket_url?: string | null
           times?: string[]
         }
         Relationships: [

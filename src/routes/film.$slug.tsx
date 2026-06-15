@@ -199,11 +199,12 @@ function MoviePage() {
                         {d.date} · {d.hall}
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {d.times.map((t) =>
-                          d.bookingUrl ? (
+                        {d.times.map((t, idx) => {
+                          const url = d.ticketUrls?.[idx] || d.bookingUrl;
+                          return url ? (
                             <a
                               key={t}
-                              href={d.bookingUrl}
+                              href={url}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
@@ -217,8 +218,8 @@ function MoviePage() {
                             >
                               {t}
                             </span>
-                          ),
-                        )}
+                          );
+                        })}
                       </div>
                       {d.bookingUrl && (
                         <a

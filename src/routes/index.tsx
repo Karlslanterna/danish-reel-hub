@@ -24,9 +24,10 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-type Radius = 5 | 10 | 25 | 50 | "all";
+type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
 const RADIUS_OPTIONS: Array<{ value: Radius; label: string }> = [
+  { value: 2, label: "2 km" },
   { value: 5, label: "5 km" },
   { value: 10, label: "10 km" },
   { value: 25, label: "25 km" },

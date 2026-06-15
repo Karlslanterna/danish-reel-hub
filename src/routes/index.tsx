@@ -3,12 +3,12 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, type Movie, type Cinema } from "@/lib/cinema-data";
+import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, fetchShowtimes, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [movies, cinemas, pairs] = await Promise.all([fetchMovies(), fetchCinemas(), fetchMovieCinemaPairs()]);
-    return { movies, cinemas, pairs };
+    const [movies, cinemas, pairs, showtimes] = await Promise.all([fetchMovies(), fetchCinemas(), fetchMovieCinemaPairs(), fetchShowtimes()]);
+    return { movies, cinemas, pairs, showtimes };
   },
   head: () => ({
     meta: [
@@ -51,8 +51,18 @@ type Suggestion =
   | { kind: "cinema"; label: string; sub: string; slug: string }
   | { kind: "city"; label: string; sub: string; city: string };
 
+const TODAY = new Date().toISOString().split("T")[0];
+const TOMORROW = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
+function fmtDateLabel(date: string | null) {
+  if (!date) return "Dato";
+  if (date === TODAY) return "I dag";
+  if (date === TOMORROW) return "I morgen";
+  return new Date(date).toLocaleDateString("da-DK", { day: "numeric", month: "short" });
+}
+
 function HomePage() {
-  const { movies, cinemas, pairs } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; pairs: Array<{ movieId: string; cinemaId: string }> };
+  const { movies, cinemas, pairs, showtimes } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; pairs: Array<{ movieId: string; cinemaId: string }>; showtimes: Showtime[] };
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -61,6 +71,8 @@ function HomePage() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [radiusOpen, setRadiusOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dateOpen, setDateOpen] = useState(false);
   const navigate = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -111,6 +123,14 @@ function HomePage() {
     return ids;
   }, [nearbyCinemaIds, pairs]);
 
+  const dateMovieIds = useMemo(() => {
+    if (!selectedDate) return null;
+    const ids = new Set<string>();
+    for (const s of showtimes) {
+      if (s.date === selectedDate) ids.add(s.movieId);
+    }
+    return ids;
+  }, [selectedDate, showtimes]);
 
   const cities = useMemo(() => {
     const map = new Map<string, number>();
@@ -154,6 +174,7 @@ function HomePage() {
     return movies.filter(
       (m) => {
         if (nearbyMovieIds && !nearbyMovieIds.has(m.id)) return false;
+        if (dateMovieIds && !dateMovieIds.has(m.id)) return false;
         return (
           !q ||
           m.title.toLowerCase().includes(q) ||
@@ -162,7 +183,7 @@ function HomePage() {
         );
       },
     );
-  }, [query, movies, nearbyMovieIds]);
+  }, [query, movies, nearbyMovieIds, dateMovieIds]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 
@@ -340,15 +361,62 @@ function HomePage() {
                 </div>
               </PopoverContent>
             </Popover>
+
+            <Popover open={dateOpen} onOpenChange={setDateOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
+                    selectedDate
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                  }`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  {fmtDateLabel(selectedDate)}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedDate(TODAY); setDateOpen(false); }}
+                    className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TODAY ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
+                  >
+                    I dag
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedDate(TOMORROW); setDateOpen(false); }}
+                    className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TOMORROW ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
+                  >
+                    I morgen
+                  </button>
+                  <div className="px-4 py-2">
+                    <input
+                      type="date"
+                      value={selectedDate ?? ""}
+                      onChange={(e) => { setSelectedDate(e.target.value || null); setDateOpen(false); }}
+                      className="w-full rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>Finder din placering…</div>}
             {geoError && <div className="text-destructive">{geoError}</div>}
             {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
-              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km</div>
+              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}</div>
             )}
             {(radius === "all" || (!userLoc && !geoLoading)) && (
-              <div>{filtered.length} film</div>
+              <div>{filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}</div>
             )}
           </div>
         </div>
@@ -384,7 +452,7 @@ function HomePage() {
                 key={c.id}
                 to="/biograf/$slug"
                 params={{ slug: c.slug }}
-                className="group flex flex-col justify-between bg-background p-6 transition-colors hover:bg-card"
+                className="group flex items-center justify-between bg-background p-6 transition-colors hover:bg-card"
               >
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{c.city}</div>

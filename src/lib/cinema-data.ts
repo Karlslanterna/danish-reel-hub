@@ -190,3 +190,9 @@ export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; 
   if (error) throw error;
   return (data ?? []).map((r) => ({ movieId: (r as ShowtimeRow).movie_id, cinemaId: (r as ShowtimeRow).cinema_id }));
 }
+
+export async function fetchShowtimes(): Promise<Showtime[]> {
+  const { data, error } = await supabase.from("showtimes").select("*");
+  if (error) throw error;
+  return (data ?? []).map(mapShowtime);
+}

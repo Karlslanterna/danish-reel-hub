@@ -180,6 +180,29 @@ function ImportStatusPage() {
         </Button>
       </header>
 
+      {needsSecret && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Indtast import-hemmelighed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submitSecret} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="status-secret">x-kultunaut-secret</Label>
+                <Input
+                  id="status-secret"
+                  type="password"
+                  value={secretInput}
+                  onChange={(e) => setSecretInput(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <Button type="submit">Fortsæt</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       {fatal && (
         <Card className="mb-6 border-destructive">
           <CardContent className="pt-6">
@@ -187,6 +210,7 @@ function ImportStatusPage() {
           </CardContent>
         </Card>
       )}
+
 
       <Card>
         <CardHeader>

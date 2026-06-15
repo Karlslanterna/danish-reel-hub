@@ -2,12 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { fetchMovies, fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
+import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, type Movie, type Cinema } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [movies, cinemas] = await Promise.all([fetchMovies(), fetchCinemas()]);
-    return { movies, cinemas };
+    const [movies, cinemas, pairs] = await Promise.all([fetchMovies(), fetchCinemas(), fetchMovieCinemaPairs()]);
+    return { movies, cinemas, pairs };
   },
   head: () => ({
     meta: [
@@ -23,6 +23,26 @@ export const Route = createFileRoute("/")({
   notFoundComponent: () => <div className="p-12">Siden findes ikke</div>,
   component: HomePage,
 });
+
+type Radius = 5 | 10 | 25 | 50 | "all";
+
+const RADIUS_OPTIONS: Array<{ value: Radius; label: string }> = [
+  { value: 5, label: "5 km" },
+  { value: 10, label: "10 km" },
+  { value: 25, label: "25 km" },
+  { value: 50, label: "50 km" },
+  { value: "all", label: "Hele Danmark" },
+];
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
 
 type Suggestion =
   | { kind: "movie"; label: string; sub: string; slug: string }

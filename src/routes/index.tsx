@@ -60,10 +60,11 @@ function HomePage() {
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
+  const [radiusOpen, setRadiusOpen] = useState(false);
   const navigate = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const requestLocation = () => {
+  const requestLocation = (onSuccess?: () => void) => {
     if (!("geolocation" in navigator)) {
       setGeoError("Geolokation understøttes ikke");
       return;
@@ -74,6 +75,7 @@ function HomePage() {
       (pos) => {
         setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setGeoLoading(false);
+        onSuccess?.();
       },
       (err) => {
         setGeoError(err.code === err.PERMISSION_DENIED ? "Adgang nægtet" : "Kunne ikke finde dig");
@@ -86,7 +88,15 @@ function HomePage() {
 
   const handleRadiusChange = (r: Radius) => {
     setRadius(r);
-    if (r !== "all" && !userLoc) requestLocation();
+    setRadiusOpen(false);
+  };
+
+  const openRadiusPanel = () => {
+    if (!userLoc) {
+      requestLocation(() => setRadiusOpen(true));
+    } else {
+      setRadiusOpen(true);
+    }
   };
 
   const nearbyCinemaIds = useMemo(() => {

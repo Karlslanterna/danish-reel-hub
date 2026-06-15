@@ -41,6 +41,7 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
   // Movies --------------------------------------------------------------
   const movieRows = Array.from(parsed.movies.values()).map((m) => ({
     id: idFor("kn", m.external_id),
+    slug: slugify(m.title) || `kn-${m.external_id}`,
     external_id: m.external_id,
     title: m.title,
     original_title: m.original_title,
@@ -53,6 +54,7 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
     poster: m.poster,
   }));
 
+
   if (movieRows.length > 0) {
     const { error } = await supabaseAdmin
       .from("movies")
@@ -63,6 +65,7 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
   // Cinemas -------------------------------------------------------------
   const cinemaRows = Array.from(parsed.cinemas.values()).map((c) => ({
     id: idFor("kn", c.external_id),
+    slug: slugify(c.name) || `kn-${c.external_id}`,
     external_id: c.external_id,
     name: c.name,
     city: c.city,
@@ -72,6 +75,7 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
     latitude: c.latitude,
     longitude: c.longitude,
   }));
+
 
   if (cinemaRows.length > 0) {
     const { error } = await supabaseAdmin

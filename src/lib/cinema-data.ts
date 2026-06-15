@@ -42,6 +42,7 @@ export type Showtime = {
   times: string[];
   hall: string;
   bookingUrl: string | null;
+  ticketUrls: string[];
 };
 
 type MovieRow = {
@@ -77,6 +78,8 @@ type ShowtimeRow = {
   times: string[];
   hall: string;
   booking_url: string | null;
+  ticket_url: string | null;
+  ticket_urls: string[] | null;
 };
 
 const mapMovie = (r: MovieRow): Movie => ({
@@ -111,7 +114,8 @@ const mapShowtime = (r: ShowtimeRow): Showtime => ({
   date: r.date,
   times: r.times,
   hall: r.hall,
-  bookingUrl: r.booking_url,
+  bookingUrl: r.booking_url ?? r.ticket_url ?? null,
+  ticketUrls: r.ticket_urls ?? [],
 });
 
 export async function fetchMovies(): Promise<Movie[]> {

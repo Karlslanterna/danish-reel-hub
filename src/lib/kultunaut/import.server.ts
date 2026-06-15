@@ -174,8 +174,8 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
       cinema_id: string;
       date: string;
       hall: string;
-      times: Set<string>;
-      ticket_url: string | null;
+      // time -> ticket_url (per-time URL preserved so each chip links to its own showing)
+      timeUrls: Map<string, string | null>;
     }
   >();
 
@@ -185,27 +185,24 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
     const cinemaKnownId = idFor("kn", st.cinema_external_id);
     const key = `${movieKnownId}|${cinemaKnownId}|${st.date}|${st.hall}`;
     const existing = grouped.get(key);
-    if (existing) {
-      st.times.forEach((t) => existing.times.add(t));
-      if (!existing.ticket_url && st.ticket_url) existing.ticket_url = st.ticket_url;
-    } else {
-      grouped.set(key, {
-        movie_id: movieKnownId,
-        cinema_id: cinemaKnownId,
-        date: st.date,
-        hall: st.hall,
-        times: new Set(st.times),
-        ticket_url: st.ticket_url,
-      });
+    const target = existing ?? {
+      movie_id: movieKnownId,
+      cinema_id: cinemaKnownId,
+      date: st.date,
+      hall: st.hall,
+      timeUrls: new Map<string, string | null>(),
+    };
+    for (const t of st.times) {
+      // Prefer the first non-empty URL seen for a given time.
+      if (!target.timeUrls.get(t) && st.ticket_url) target.timeUrls.set(t, st.ticket_url);
+      else if (!target.timeUrls.has(t)) target.timeUrls.set(t, st.ticket_url);
     }
+    if (!existing) grouped.set(key, target);
   }
 
   let showtimesUpserted = 0;
   for (const row of grouped.values()) {
-    // Skip showtimes that reference unknown movies/cinemas. The DB has FK
-    // constraints (cinema_id, movie_id) so an unknown reference would 500.
     if (!parsed.movies.has(row.movie_id.replace(/^kn-/, ""))) {
-      // movie wasn't in this XML — verify it exists in the DB before insert
       const { data } = await supabaseAdmin
         .from("movies")
         .select("id")
@@ -228,13 +225,13 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
       }
     }
 
-    const times = Array.from(row.times).sort();
+    const times = Array.from(row.timeUrls.keys()).sort();
+    const ticketUrls = times.map((t) => row.timeUrls.get(t) ?? "");
+    const primaryTicketUrl = ticketUrls.find((u) => u) ?? null;
     const startTimeIso = times[0]
       ? new Date(`${row.date}T${times[0]}`).toISOString()
       : null;
 
-    // Match an existing showtime on (movie, cinema, date, hall) to keep this
-    // import idempotent without relying on a DB unique constraint.
     const { data: existing } = await supabaseAdmin
       .from("showtimes")
       .select("id")
@@ -249,7 +246,9 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
         .from("showtimes")
         .update({
           times,
-          ticket_url: row.ticket_url,
+          ticket_url: primaryTicketUrl,
+          ticket_urls: ticketUrls,
+          booking_url: primaryTicketUrl,
           start_time: startTimeIso,
         })
         .eq("id", existing.id);
@@ -264,7 +263,9 @@ export async function importKultunautXml(xml: string): Promise<ImportResult> {
         date: row.date,
         hall: row.hall,
         times,
-        ticket_url: row.ticket_url,
+        ticket_url: primaryTicketUrl,
+        ticket_urls: ticketUrls,
+        booking_url: primaryTicketUrl,
         start_time: startTimeIso,
       });
       if (error) {

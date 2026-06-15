@@ -125,6 +125,7 @@ export type Database = {
           movie_id: string
           start_time: string | null
           ticket_url: string | null
+          ticket_urls: string[]
           times: string[]
         }
         Insert: {
@@ -138,6 +139,7 @@ export type Database = {
           movie_id: string
           start_time?: string | null
           ticket_url?: string | null
+          ticket_urls?: string[]
           times?: string[]
         }
         Update: {
@@ -151,6 +153,7 @@ export type Database = {
           movie_id?: string
           start_time?: string | null
           ticket_url?: string | null
+          ticket_urls?: string[]
           times?: string[]
         }
         Relationships: [

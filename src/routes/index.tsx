@@ -3,6 +3,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, fetchShowtimes, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
@@ -397,12 +398,27 @@ function HomePage() {
                   >
                     I morgen
                   </button>
-                  <div className="px-4 py-2">
-                    <input
-                      type="date"
-                      value={selectedDate ?? ""}
-                      onChange={(e) => { setSelectedDate(e.target.value || null); setDateOpen(false); }}
-                      className="w-full rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+                  <div className="px-2 py-2">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate ? new Date(selectedDate + "T12:00:00") : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const y = date.getFullYear();
+                          const m = String(date.getMonth() + 1).padStart(2, "0");
+                          const d = String(date.getDate()).padStart(2, "0");
+                          setSelectedDate(`${y}-${m}-${d}`);
+                          setDateOpen(false);
+                        }
+                      }}
+                      disabled={(date) => {
+                        const check = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        return check < today;
+                      }}
+                      initialFocus
+                      className="pointer-events-auto"
                     />
                   </div>
                 </div>

@@ -15,7 +15,7 @@ import { Route as ByCityRouteImport } from './routes/by.$city'
 import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
 import { Route as AdminImportRouteImport } from './routes/admin.import'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
-import { Route as AdminImportJobIdRouteImport } from './routes/admin.import.$jobId'
+import { Route as AdminImportJobIdRouteImport } from './routes/admin.import_.$jobId'
 import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
 import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
 
@@ -51,9 +51,9 @@ const ApiPublicKultunautImportRoute =
     getParentRoute: () => rootRouteImport,
   } as any)
 const AdminImportJobIdRoute = AdminImportJobIdRouteImport.update({
-  id: '/$jobId',
-  path: '/$jobId',
-  getParentRoute: () => AdminImportRoute,
+  id: '/admin/import_/$jobId',
+  path: '/admin/import/$jobId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicKultunautImportStatusRoute =
   ApiPublicKultunautImportStatusRouteImport.update({
@@ -70,7 +70,7 @@ const ApiPublicKultunautImportProcessRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin/import': typeof AdminImportRouteWithChildren
+  '/admin/import': typeof AdminImportRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
@@ -81,7 +81,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin/import': typeof AdminImportRouteWithChildren
+  '/admin/import': typeof AdminImportRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
@@ -93,11 +93,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin/import': typeof AdminImportRouteWithChildren
+  '/admin/import': typeof AdminImportRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
-  '/admin/import/$jobId': typeof AdminImportJobIdRoute
+  '/admin/import_/$jobId': typeof AdminImportJobIdRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
@@ -132,7 +132,7 @@ export interface FileRouteTypes {
     | '/biograf/$slug'
     | '/by/$city'
     | '/film/$slug'
-    | '/admin/import/$jobId'
+    | '/admin/import_/$jobId'
     | '/api/public/kultunaut-import'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
@@ -140,10 +140,11 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminImportRoute: typeof AdminImportRouteWithChildren
+  AdminImportRoute: typeof AdminImportRoute
   BiografSlugRoute: typeof BiografSlugRoute
   ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
+  AdminImportJobIdRoute: typeof AdminImportJobIdRoute
   ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
 }
 
@@ -191,12 +192,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/import/$jobId': {
-      id: '/admin/import/$jobId'
-      path: '/$jobId'
+    '/admin/import_/$jobId': {
+      id: '/admin/import_/$jobId'
+      path: '/admin/import/$jobId'
       fullPath: '/admin/import/$jobId'
       preLoaderRoute: typeof AdminImportJobIdRouteImport
-      parentRoute: typeof AdminImportRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/kultunaut-import/status': {
       id: '/api/public/kultunaut-import/status'
@@ -214,18 +215,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface AdminImportRouteChildren {
-  AdminImportJobIdRoute: typeof AdminImportJobIdRoute
-}
-
-const AdminImportRouteChildren: AdminImportRouteChildren = {
-  AdminImportJobIdRoute: AdminImportJobIdRoute,
-}
-
-const AdminImportRouteWithChildren = AdminImportRoute._addFileChildren(
-  AdminImportRouteChildren,
-)
 
 interface ApiPublicKultunautImportRouteChildren {
   ApiPublicKultunautImportProcessRoute: typeof ApiPublicKultunautImportProcessRoute
@@ -245,10 +234,11 @@ const ApiPublicKultunautImportRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminImportRoute: AdminImportRouteWithChildren,
+  AdminImportRoute: AdminImportRoute,
   BiografSlugRoute: BiografSlugRoute,
   ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
+  AdminImportJobIdRoute: AdminImportJobIdRoute,
   ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,
 }
 export const routeTree = rootRouteImport

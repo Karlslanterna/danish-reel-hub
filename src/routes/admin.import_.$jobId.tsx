@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 
-export const Route = createFileRoute("/admin/import/$jobId")({
+export const Route = createFileRoute("/admin/import_/$jobId")({
   head: () => ({
     meta: [
       { title: "Import status — Admin" },

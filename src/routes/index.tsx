@@ -284,19 +284,50 @@ function HomePage() {
       </section>
 
       <section className="mx-auto max-w-[1400px] px-8 py-14">
-        <div className="mb-8 flex items-baseline justify-between">
-          <h2 className="font-display text-2xl tracking-tight">
-            Aktuelt i biograferne
-          </h2>
-          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {filtered.length} film
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <h2 className="font-display text-2xl tracking-tight">Aktuelt i biograferne</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                <span aria-hidden>📍</span> Nær mig
+              </span>
+              {RADIUS_OPTIONS.map((opt) => {
+                const selected = radius === opt.value;
+                return (
+                  <button
+                    key={String(opt.value)}
+                    type="button"
+                    onClick={() => handleRadiusChange(opt.value)}
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            {geoLoading && <div>Finder din placering…</div>}
+            {geoError && <div className="text-destructive">{geoError}</div>}
+            {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
+              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km</div>
+            )}
+            {(radius === "all" || (!userLoc && !geoLoading)) && (
+              <div>{filtered.length} film</div>
+            )}
           </div>
         </div>
 
         {filtered.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-24 text-center">
             <p className="font-display text-xl text-foreground">Ingen film matcher</p>
-            <p className="mt-2 text-sm text-muted-foreground">Prøv et andet søgeord.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {radius !== "all" && userLoc ? "Prøv en større radius." : "Prøv et andet søgeord."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -306,6 +337,7 @@ function HomePage() {
           </div>
         )}
       </section>
+
 
       <section id="cinemas" className="border-t border-border/60 bg-card/30">
         <div className="mx-auto max-w-[1400px] px-8 py-16">

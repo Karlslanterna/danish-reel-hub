@@ -447,7 +447,16 @@ function HomePage() {
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((m) => (
-              <MovieCard key={m.id} movie={m} />
+              <MovieCard
+                key={m.id}
+                movie={m}
+                search={{
+                  ...(selectedDate ? { date: selectedDate } : {}),
+                  ...(radius !== "all" && userLoc
+                    ? { radius, lat: userLoc.lat, lng: userLoc.lng }
+                    : {}),
+                }}
+              />
             ))}
           </div>
         )}

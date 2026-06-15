@@ -468,11 +468,11 @@ function HomePage() {
           <div className="mb-8 flex items-baseline justify-between">
             <h2 className="font-display text-2xl tracking-tight">Biografer</h2>
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {cinemas.length} steder
+              {nearbyCinemaIds ? `${nearbyCinemaIds.size} inden for ${radius} km` : `${cinemas.length} steder`}
             </div>
           </div>
           <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md bg-border md:grid-cols-2 lg:grid-cols-3">
-            {cinemas.map((c) => (
+            {cinemas.filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id)).map((c) => (
               <Link
                 key={c.id}
                 to="/biograf/$slug"

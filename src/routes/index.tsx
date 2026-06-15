@@ -40,34 +40,6 @@ function HomePage() {
   const navigate = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
 
-
-  const requestLocation = (onSuccess?: () => void) => {
-    if (!("geolocation" in navigator)) {
-      setGeoError("Geolokation understøttes ikke");
-      return;
-    }
-    setGeoLoading(true);
-    setGeoError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGeoLoading(false);
-        onSuccess?.();
-      },
-      (err) => {
-        setGeoError(err.code === err.PERMISSION_DENIED ? "Adgang nægtet" : "Kunne ikke finde dig");
-        setGeoLoading(false);
-        setRadius("all");
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
-    );
-  };
-
-  const handleRadiusChange = (r: Radius) => {
-    setRadius(r);
-    setRadiusOpen(false);
-  };
-
   const nearbyCinemaIds = useMemo(() => {
     if (radius === "all" || !userLoc) return null;
     const ids = new Set<string>();

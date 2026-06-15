@@ -1,6 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type Poster = { a: string; b: string; c: string; d: string };
+export type Poster = {
+  a?: string;
+  b?: string;
+  c?: string;
+  d?: string;
+  url?: string;
+  alt?: string;
+};
 
 export type Movie = {
   id: string;

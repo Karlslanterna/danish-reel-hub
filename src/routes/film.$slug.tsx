@@ -66,13 +66,21 @@ function MoviePage() {
         <div
           aria-hidden
           style={{
-            "--p-a": movie.poster.a,
-            "--p-b": movie.poster.b,
-            "--p-c": movie.poster.c,
-            "--p-d": movie.poster.d,
+            "--p-a": movie.poster.a ?? "#8f332d",
+            "--p-b": movie.poster.b ?? "#0b2545",
+            "--p-c": movie.poster.c ?? "#111111",
+            "--p-d": movie.poster.d ?? "#05070a",
           } as React.CSSProperties}
           className="poster-gradient absolute inset-0 scale-110 opacity-30 blur-3xl"
         />
+        {movie.poster.url && (
+          <img
+            src={movie.poster.url}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
 
         <div className="relative mx-auto grid max-w-[1400px] grid-cols-1 gap-12 px-8 py-16 lg:grid-cols-[340px_1fr]">

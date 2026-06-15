@@ -3,11 +3,19 @@ import type { Movie } from "@/lib/cinema-data";
 import { formatRuntime } from "@/lib/cinema-data";
 import { Poster } from "./Poster";
 
-export function MovieCard({ movie }: { movie: Movie }) {
+export type MovieCardSearch = {
+  date?: string;
+  radius?: number | "all";
+  lat?: number;
+  lng?: number;
+};
+
+export function MovieCard({ movie, search }: { movie: Movie; search?: MovieCardSearch }) {
   return (
     <Link
       to="/film/$slug"
       params={{ slug: movie.slug }}
+      search={search ?? {}}
       className="group block"
     >
       <Poster

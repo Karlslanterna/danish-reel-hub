@@ -59,6 +59,66 @@ export type Database = {
         }
         Relationships: []
       }
+      import_jobs: {
+        Row: {
+          created_at: string
+          cursor: number
+          errors: string[]
+          id: string
+          message: string | null
+          payload: Json | null
+          phase: string
+          processed_cinemas: number
+          processed_movies: number
+          processed_showtimes: number
+          source: string
+          status: string
+          total_cinemas: number
+          total_movies: number
+          total_showtimes: number
+          updated_at: string
+          xml: string
+        }
+        Insert: {
+          created_at?: string
+          cursor?: number
+          errors?: string[]
+          id?: string
+          message?: string | null
+          payload?: Json | null
+          phase?: string
+          processed_cinemas?: number
+          processed_movies?: number
+          processed_showtimes?: number
+          source?: string
+          status?: string
+          total_cinemas?: number
+          total_movies?: number
+          total_showtimes?: number
+          updated_at?: string
+          xml: string
+        }
+        Update: {
+          created_at?: string
+          cursor?: number
+          errors?: string[]
+          id?: string
+          message?: string | null
+          payload?: Json | null
+          phase?: string
+          processed_cinemas?: number
+          processed_movies?: number
+          processed_showtimes?: number
+          source?: string
+          status?: string
+          total_cinemas?: number
+          total_movies?: number
+          total_showtimes?: number
+          updated_at?: string
+          xml?: string
+        }
+        Relationships: []
+      }
       movies: {
         Row: {
           created_at: string

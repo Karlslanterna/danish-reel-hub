@@ -148,13 +148,19 @@ function HomePage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return movies.filter(
-      (m) =>
-        !q ||
-        m.title.toLowerCase().includes(q) ||
-        m.director.toLowerCase().includes(q) ||
-        m.genre.some((g) => g.toLowerCase().includes(q)),
+      (m) => {
+        if (nearbyMovieIds && !nearbyMovieIds.has(m.id)) return false;
+        return (
+          !q ||
+          m.title.toLowerCase().includes(q) ||
+          m.director.toLowerCase().includes(q) ||
+          m.genre.some((g) => g.toLowerCase().includes(q))
+        );
+      },
     );
-  }, [query, movies]);
+  }, [query, movies, nearbyMovieIds]);
+
+  const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 
   useEffect(() => {
     setActive(0);

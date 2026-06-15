@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, type Movie, type Cinema } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
@@ -24,9 +25,10 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-type Radius = 5 | 10 | 25 | 50 | "all";
+type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
 const RADIUS_OPTIONS: Array<{ value: Radius; label: string }> = [
+  { value: 2, label: "2 km" },
   { value: 5, label: "5 km" },
   { value: 10, label: "10 km" },
   { value: 25, label: "25 km" },
@@ -58,10 +60,11 @@ function HomePage() {
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
+  const [radiusOpen, setRadiusOpen] = useState(false);
   const navigate = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const requestLocation = () => {
+  const requestLocation = (onSuccess?: () => void) => {
     if (!("geolocation" in navigator)) {
       setGeoError("Geolokation understøttes ikke");
       return;
@@ -72,6 +75,7 @@ function HomePage() {
       (pos) => {
         setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setGeoLoading(false);
+        onSuccess?.();
       },
       (err) => {
         setGeoError(err.code === err.PERMISSION_DENIED ? "Adgang nægtet" : "Kunne ikke finde dig");
@@ -84,7 +88,7 @@ function HomePage() {
 
   const handleRadiusChange = (r: Radius) => {
     setRadius(r);
-    if (r !== "all" && !userLoc) requestLocation();
+    setRadiusOpen(false);
   };
 
   const nearbyCinemaIds = useMemo(() => {
@@ -287,28 +291,55 @@ function HomePage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Aktuelt i biograferne</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                <span aria-hidden>📍</span> Nær mig
-              </span>
-              {RADIUS_OPTIONS.map((opt) => {
-                const selected = radius === opt.value;
-                return (
-                  <button
-                    key={String(opt.value)}
-                    type="button"
-                    onClick={() => handleRadiusChange(opt.value)}
-                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
+            <Popover open={radiusOpen} onOpenChange={(open) => {
+              if (!open) {
+                setRadiusOpen(false);
+                return;
+              }
+              if (!userLoc) {
+                requestLocation(() => setRadiusOpen(true));
+              } else {
+                setRadiusOpen(true);
+              }
+            }}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
+                    radius !== "all"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                  }`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                  </svg>
+                  Afstand fra mig
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <div className="flex flex-col gap-1">
+                  {RADIUS_OPTIONS.map((opt) => {
+                    const selected = radius === opt.value;
+                    return (
+                      <button
+                        key={String(opt.value)}
+                        type="button"
+                        onClick={() => handleRadiusChange(opt.value)}
+                        className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${
+                          selected
+                            ? "bg-primary text-primary-foreground"
+                            : "text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>Finder din placering…</div>}

@@ -251,6 +251,15 @@ function HomePage() {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
             <FilterBar />
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clear}
+                className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Ryd filtre
+              </button>
+            )}
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>Finder din placering…</div>}

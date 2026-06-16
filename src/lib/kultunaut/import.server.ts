@@ -306,15 +306,21 @@ export async function processJobBatch(
       const movieTitles = payload.movieTitles ?? [];
       const errors: string[] = [];
 
-      // Merge DB duplicates sharing this title into the canonical entry.
+      // Merge DB duplicates sharing this title (ignoring trailing year suffix) into the canonical entry.
+      const escapeLike = (s: string) => s.replace(/[\\%_,]/g, (c) => `\\${c}`);
       for (const m of movieTitles) {
+        const base = stripYearSuffix(m.title);
+        const baseEsc = escapeLike(base);
         const { data: dupes } = await supabaseAdmin
           .from("movies")
-          .select("id")
-          .ilike("title", m.title)
+          .select("id,title")
+          .or(`title.ilike.${baseEsc},title.ilike.${baseEsc} (%),title.ilike.${baseEsc} [%`)
           .neq("id", m.id);
-        if (!dupes || dupes.length === 0) continue;
-        for (const dup of dupes) {
+        const realDupes = (dupes ?? []).filter(
+          (d) => stripYearSuffix(d.title ?? "").toLowerCase() === base.toLowerCase(),
+        );
+        if (realDupes.length === 0) continue;
+        for (const dup of realDupes) {
           const { error: updErr } = await supabaseAdmin
             .from("showtimes")
             .update({ movie_id: m.id })

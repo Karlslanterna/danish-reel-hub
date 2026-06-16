@@ -80,7 +80,7 @@ function CityPage() {
           <section key={cinema.id}>
             <div className="mb-6 flex items-baseline justify-between">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city}</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim()}</div>
                 <Link
                   to="/biograf/$slug"
                   params={{ slug: cinema.slug }}

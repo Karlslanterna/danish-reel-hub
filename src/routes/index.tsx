@@ -236,7 +236,7 @@ function HomePage() {
                 }}
                 onFocus={() => setOpen(true)}
                 onKeyDown={onKeyDown}
-                placeholder="Søg på by, titel eller biograf..."
+                placeholder="Søg på film, biograf eller by"
                 className="h-20 w-full rounded-md border border-border/80 bg-card/60 pl-16 pr-6 font-display text-2xl text-foreground placeholder:font-sans placeholder:text-lg placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
                 aria-autocomplete="list"
                 aria-expanded={open && suggestions.length > 0}

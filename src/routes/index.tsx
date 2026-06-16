@@ -70,7 +70,8 @@ function HomePage() {
     return ids;
   }, [selectedDate, showtimes]);
 
-  const baseCityOf = (s: string) => s.replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+  const baseCityOf = (s: string) =>
+    s.replace(/^\s*\d{3,4}\s+/u, "").replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
 
   const cities = useMemo(() => {
     const map = new Map<string, number>();

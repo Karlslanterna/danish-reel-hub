@@ -27,6 +27,11 @@ const SHOWTIME_BATCH_SIZE = 100;
 
 const idFor = (prefix: string, externalId: string) => `${prefix}-${externalId}`;
 
+// Strip a trailing year in brackets, e.g. "Michael (2025)" -> "Michael".
+// Handles parentheses, square brackets, and surrounding whitespace.
+const stripYearSuffix = (title: string): string =>
+  title.replace(/\s*[\(\[]\s*(?:19|20)\d{2}\s*[\)\]]\s*$/u, "").trim();
+
 const slugify = (value: string): string =>
   value
     .toLowerCase()

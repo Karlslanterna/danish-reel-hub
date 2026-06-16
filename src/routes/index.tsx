@@ -207,7 +207,7 @@ function HomePage() {
         <div className="mx-auto max-w-[1400px] px-8 pb-14 pt-20">
           <div className="flex items-end justify-between gap-12">
             <div className="max-w-2xl">
-              <h1 className="mt-4 font-display text-6xl leading-[0.95] tracking-tight text-foreground">
+              <h1 className="mt-4 font-display text-5xl leading-[0.95] tracking-tight text-foreground">
                 En hurtigere vej i biografen
               </h1>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">

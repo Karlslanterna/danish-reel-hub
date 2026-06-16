@@ -220,6 +220,7 @@ function MoviePage() {
                             </span>
                           );
                         })}
+                      </div>
                     </div>
                   ))}
                 </div>

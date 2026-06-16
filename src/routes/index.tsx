@@ -36,7 +36,8 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, geoError, geoLoading } = useFilters();
+  const { radius, userLoc, selectedDate, geoError, geoLoading, clear } = useFilters();
+  const hasFilters = Boolean(selectedDate) || radius !== "all";
   const navigate = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
 

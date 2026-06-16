@@ -248,7 +248,7 @@ function HomePage() {
       <section className="mx-auto max-w-[1400px] px-8 py-14">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <h2 className="font-display text-2xl tracking-tight">Aktuelt i biograferne</h2>
+            <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
             <FilterBar />
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">

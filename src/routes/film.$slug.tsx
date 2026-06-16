@@ -180,7 +180,7 @@ function MoviePage() {
               <div key={cinema.id} className="bg-background p-6 lg:p-8">
                 <div className="flex flex-wrap items-start justify-between gap-6">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city}</div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim()}</div>
                     <Link
                       to="/biograf/$slug"
                       params={{ slug: cinema.slug }}

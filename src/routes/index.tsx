@@ -70,6 +70,8 @@ function HomePage() {
     return ids;
   }, [selectedDate, showtimes]);
 
+  const baseCityOf = (s: string) => s.replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+
   const cities = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of cinemas) {
@@ -79,12 +81,38 @@ function HomePage() {
     return Array.from(map, ([city, count]) => ({ city, count }));
   }, [cinemas]);
 
+  const baseCities = useMemo(() => {
+    const map = new Map<string, { cinemas: number; variants: Set<string> }>();
+    for (const c of cinemas) {
+      const base = baseCityOf(c.city);
+      const entry = map.get(base) ?? { cinemas: 0, variants: new Set<string>() };
+      entry.cinemas += 1;
+      entry.variants.add(c.city);
+      map.set(base, entry);
+    }
+    return Array.from(map, ([city, v]) => ({ city, cinemas: v.cinemas, variants: v.variants.size }));
+  }, [cinemas]);
+
   const suggestions = useMemo<Suggestion[]>(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const out: Suggestion[] = [];
+    const seenCities = new Set<string>();
 
+    // Combined base-city suggestions first (when the base spans multiple areas/postcodes)
+    for (const b of baseCities) {
+      if (b.variants > 1 && b.city.toLowerCase().includes(q)) {
+        out.push({
+          kind: "city",
+          label: b.city,
+          sub: `${b.cinemas} ${b.cinemas === 1 ? "biograf" : "biografer"} · ${b.variants} områder`,
+          city: b.city,
+        });
+        seenCities.add(b.city.toLowerCase());
+      }
+    }
     for (const c of cities) {
+      if (seenCities.has(c.city.toLowerCase())) continue;
       if (c.city.toLowerCase().includes(q)) {
         out.push({
           kind: "city",
@@ -105,7 +133,7 @@ function HomePage() {
       }
     }
     return out.slice(0, 8);
-  }, [query, movies, cinemas, cities]);
+  }, [query, movies, cinemas, cities, baseCities]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

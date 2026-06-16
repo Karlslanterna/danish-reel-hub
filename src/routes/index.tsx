@@ -70,28 +70,33 @@ function HomePage() {
     return ids;
   }, [selectedDate, showtimes]);
 
+  const displayCityOf = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
   const baseCityOf = (s: string) =>
-    s.replace(/^\s*\d{3,4}\s+/u, "").replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+    displayCityOf(s).replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
 
   const cities = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; raws: string[] }>();
     for (const c of cinemas) {
-      const key = c.city;
-      map.set(key, (map.get(key) ?? 0) + 1);
+      const key = displayCityOf(c.city);
+      const e = map.get(key) ?? { count: 0, raws: [] };
+      e.count += 1;
+      e.raws.push(c.city);
+      map.set(key, e);
     }
-    return Array.from(map, ([city, count]) => ({ city, count }));
+    return Array.from(map, ([city, v]) => ({ city, count: v.count, raws: v.raws }));
   }, [cinemas]);
 
   const baseCities = useMemo(() => {
-    const map = new Map<string, { cinemas: number; variants: Set<string> }>();
+    const map = new Map<string, { cinemas: number; variants: Set<string>; raws: string[] }>();
     for (const c of cinemas) {
       const base = baseCityOf(c.city);
-      const entry = map.get(base) ?? { cinemas: 0, variants: new Set<string>() };
+      const entry = map.get(base) ?? { cinemas: 0, variants: new Set<string>(), raws: [] };
       entry.cinemas += 1;
-      entry.variants.add(c.city);
+      entry.variants.add(displayCityOf(c.city));
+      entry.raws.push(c.city);
       map.set(base, entry);
     }
-    return Array.from(map, ([city, v]) => ({ city, cinemas: v.cinemas, variants: v.variants.size }));
+    return Array.from(map, ([city, v]) => ({ city, cinemas: v.cinemas, variants: v.variants.size, raws: v.raws }));
   }, [cinemas]);
 
   const suggestions = useMemo<Suggestion[]>(() => {
@@ -102,7 +107,9 @@ function HomePage() {
 
     // Combined base-city suggestions first (when the base spans multiple areas/postcodes)
     for (const b of baseCities) {
-      if (b.variants > 1 && b.city.toLowerCase().includes(q)) {
+      const matches =
+        b.city.toLowerCase().includes(q) || b.raws.some((r) => r.toLowerCase().includes(q));
+      if (b.variants > 1 && matches) {
         out.push({
           kind: "city",
           label: b.city,
@@ -114,13 +121,16 @@ function HomePage() {
     }
     for (const c of cities) {
       if (seenCities.has(c.city.toLowerCase())) continue;
-      if (c.city.toLowerCase().includes(q)) {
+      const matches =
+        c.city.toLowerCase().includes(q) || c.raws.some((r) => r.toLowerCase().includes(q));
+      if (matches) {
         out.push({
           kind: "city",
           label: c.city,
           sub: `${c.count} ${c.count === 1 ? "biograf" : "biografer"}`,
           city: c.city,
         });
+        seenCities.add(c.city.toLowerCase());
       }
     }
     for (const m of movies) {
@@ -130,7 +140,7 @@ function HomePage() {
     }
     for (const c of cinemas) {
       if (c.name.toLowerCase().includes(q)) {
-        out.push({ kind: "cinema", label: c.name, sub: c.city, slug: c.slug });
+        out.push({ kind: "cinema", label: c.name, sub: displayCityOf(c.city), slug: c.slug });
       }
     }
     return out.slice(0, 8);

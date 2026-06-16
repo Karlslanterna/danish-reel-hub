@@ -27,6 +27,11 @@ const SHOWTIME_BATCH_SIZE = 100;
 
 const idFor = (prefix: string, externalId: string) => `${prefix}-${externalId}`;
 
+// Strip a trailing year in brackets, e.g. "Michael (2025)" -> "Michael".
+// Handles parentheses, square brackets, and surrounding whitespace.
+const stripYearSuffix = (title: string): string =>
+  title.replace(/\s*[\(\[]\s*(?:19|20)\d{2}\s*[\)\]]\s*$/u, "").trim();
+
 const slugify = (value: string): string =>
   value
     .toLowerCase()
@@ -143,7 +148,7 @@ export async function processJobBatch(
 
       const byTitle = new Map<string, string[]>();
       for (const m of parsed.movies.values()) {
-        const k = slugify(m.title);
+        const k = slugify(stripYearSuffix(m.title));
         const arr = byTitle.get(k) ?? [];
         arr.push(m.external_id);
         byTitle.set(k, arr);
@@ -301,15 +306,21 @@ export async function processJobBatch(
       const movieTitles = payload.movieTitles ?? [];
       const errors: string[] = [];
 
-      // Merge DB duplicates sharing this title into the canonical entry.
+      // Merge DB duplicates sharing this title (ignoring trailing year suffix) into the canonical entry.
+      const escapeLike = (s: string) => s.replace(/[\\%_,]/g, (c) => `\\${c}`);
       for (const m of movieTitles) {
+        const base = stripYearSuffix(m.title);
+        const baseEsc = escapeLike(base);
         const { data: dupes } = await supabaseAdmin
           .from("movies")
-          .select("id")
-          .ilike("title", m.title)
+          .select("id,title")
+          .or(`title.ilike.${baseEsc},title.ilike.${baseEsc} (%),title.ilike.${baseEsc} [%`)
           .neq("id", m.id);
-        if (!dupes || dupes.length === 0) continue;
-        for (const dup of dupes) {
+        const realDupes = (dupes ?? []).filter(
+          (d) => stripYearSuffix(d.title ?? "").toLowerCase() === base.toLowerCase(),
+        );
+        if (realDupes.length === 0) continue;
+        for (const dup of realDupes) {
           const { error: updErr } = await supabaseAdmin
             .from("showtimes")
             .update({ movie_id: m.id })

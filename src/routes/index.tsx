@@ -346,7 +346,7 @@ function HomePage() {
                 className="group flex items-center justify-between bg-background p-6 transition-colors hover:bg-card"
               >
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{c.city}</div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{displayCityOf(c.city)}</div>
                   <h3 className="mt-2 font-display text-2xl tracking-tight text-foreground group-hover:text-primary">{c.name}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.description}</p>
                 </div>

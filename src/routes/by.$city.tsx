@@ -7,12 +7,17 @@ export const Route = createFileRoute("/by/$city")({
   loader: async ({ params }) => {
     const all = await fetchCinemas();
     const citySlug = params.city.toLowerCase();
-    const cinemas = all.filter((c) => c.city.toLowerCase() === citySlug);
+    const baseOf = (s: string) => s.replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim().toLowerCase();
+    const cinemas = all.filter(
+      (c) => c.city.toLowerCase() === citySlug || baseOf(c.city) === citySlug,
+    );
     if (cinemas.length === 0) throw notFound();
     const programs = await Promise.all(
       cinemas.map(async (c) => ({ cinema: c, movies: await fetchMoviesForCinema(c.id) })),
     );
-    return { city: cinemas[0].city, programs };
+    const bases = new Set(cinemas.map((c) => baseOf(c.city)));
+    const displayCity = bases.size === 1 ? cinemas[0].city.replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim() : cinemas[0].city;
+    return { city: displayCity, programs };
   },
   head: ({ loaderData }) => ({
     meta: loaderData

@@ -148,7 +148,7 @@ export async function processJobBatch(
 
       const byTitle = new Map<string, string[]>();
       for (const m of parsed.movies.values()) {
-        const k = slugify(m.title);
+        const k = slugify(stripYearSuffix(m.title));
         const arr = byTitle.get(k) ?? [];
         arr.push(m.external_id);
         byTitle.set(k, arr);

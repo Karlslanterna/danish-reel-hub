@@ -50,7 +50,7 @@ function CinemaPage() {
 
           <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-[1.4fr_1fr]">
             <div>
-              <div className="text-xs uppercase tracking-[0.25em] text-primary">{cinema.city}</div>
+              <div className="text-xs uppercase tracking-[0.25em] text-primary">{cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim()}</div>
               <h1 className="mt-3 font-display text-7xl leading-[0.9] tracking-tight text-foreground">
                 {cinema.name}
               </h1>

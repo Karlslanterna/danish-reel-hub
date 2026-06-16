@@ -7,18 +7,20 @@ export const Route = createFileRoute("/by/$city")({
   loader: async ({ params }) => {
     const all = await fetchCinemas();
     const citySlug = params.city.toLowerCase();
+    const stripPostcode = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
     const stripBase = (s: string) =>
-      s.replace(/^\s*\d{3,4}\s+/u, "").replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+      stripPostcode(s).replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+    const displayOf = (s: string) => stripPostcode(s).toLowerCase();
     const baseOf = (s: string) => stripBase(s).toLowerCase();
     const cinemas = all.filter(
-      (c) => c.city.toLowerCase() === citySlug || baseOf(c.city) === citySlug,
+      (c) => displayOf(c.city) === citySlug || baseOf(c.city) === citySlug,
     );
     if (cinemas.length === 0) throw notFound();
     const programs = await Promise.all(
       cinemas.map(async (c) => ({ cinema: c, movies: await fetchMoviesForCinema(c.id) })),
     );
-    const bases = new Set(cinemas.map((c) => baseOf(c.city)));
-    const displayCity = bases.size === 1 ? stripBase(cinemas[0].city) : cinemas[0].city;
+    const displays = new Set(cinemas.map((c) => displayOf(c.city)));
+    const displayCity = displays.size === 1 ? stripPostcode(cinemas[0].city) : stripBase(cinemas[0].city);
     return { city: displayCity, programs };
   },
   head: ({ loaderData }) => ({
@@ -78,7 +80,7 @@ function CityPage() {
           <section key={cinema.id}>
             <div className="mb-6 flex items-baseline justify-between">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city}</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim()}</div>
                 <Link
                   to="/biograf/$slug"
                   params={{ slug: cinema.slug }}

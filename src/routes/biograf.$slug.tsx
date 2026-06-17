@@ -108,7 +108,7 @@ function CinemaPage() {
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Film på plakaten</h2>
-            <FilterBar />
+            <FilterBar hideRadius />
             {selectedDate && (
               <button
                 type="button"

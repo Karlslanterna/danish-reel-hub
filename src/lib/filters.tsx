@@ -137,7 +137,7 @@ export function useFilters() {
   return ctx;
 }
 
-export function FilterBar({ className = "" }: { className?: string }) {
+export function FilterBar({ className = "", hideRadius = false }: { className?: string; hideRadius?: boolean }) {
   const { radius, userLoc, selectedDate, setRadius, setSelectedDate, requestLocation } = useFilters();
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);

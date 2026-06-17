@@ -1,14 +1,25 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
-import { MovieCard } from "@/components/MovieCard";
-import { fetchCinemaBySlug, fetchMoviesForCinema, type Cinema, type Movie } from "@/lib/cinema-data";
+import { Poster } from "@/components/Poster";
+import { FilterBar, useFilters, fmtDateLabel } from "@/lib/filters";
+import {
+  fetchCinemaBySlug,
+  fetchMoviesForCinema,
+  fetchShowtimesForMovie,
+  formatRuntime,
+  type Cinema,
+  type Movie,
+  type Showtime,
+} from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
     const cinema = await fetchCinemaBySlug(params.slug);
     if (!cinema) throw notFound();
     const movies = await fetchMoviesForCinema(cinema.id);
-    return { cinema, movies };
+    const showtimeLists = await Promise.all(movies.map((m) => fetchShowtimesForMovie(m.id)));
+    const showtimes = showtimeLists.flat().filter((s) => s.cinemaId === cinema.id);
+    return { cinema, movies, showtimes };
   },
   head: ({ loaderData }) => ({
     meta: loaderData
@@ -35,8 +46,31 @@ export const Route = createFileRoute("/biograf/$slug")({
   component: CinemaPage,
 });
 
+const todayStr = () => new Date().toISOString().split("T")[0];
+
 function CinemaPage() {
-  const { cinema, movies } = Route.useLoaderData() as { cinema: Cinema; movies: Movie[] };
+  const { cinema, movies, showtimes } = Route.useLoaderData() as {
+    cinema: Cinema;
+    movies: Movie[];
+    showtimes: Showtime[];
+  };
+  const { selectedDate, clear } = useFilters();
+  const activeDate = selectedDate ?? todayStr();
+
+  const showtimesByMovie = new Map<string, Showtime[]>();
+  for (const s of showtimes) {
+    if (s.date !== activeDate) continue;
+    const arr = showtimesByMovie.get(s.movieId) ?? [];
+    arr.push(s);
+    showtimesByMovie.set(s.movieId, arr);
+  }
+
+  const rows = movies
+    .map((m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }))
+    .sort((a, b) => (b.shows.length > 0 ? 1 : 0) - (a.shows.length > 0 ? 1 : 0));
+
+  const withShows = rows.filter((r) => r.shows.length > 0);
+  const withoutShows = rows.filter((r) => r.shows.length === 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,18 +105,115 @@ function CinemaPage() {
       </section>
 
       <section className="mx-auto max-w-[1400px] px-8 py-16">
-        <div className="mb-8 flex items-baseline justify-between">
-          <h2 className="font-display text-2xl tracking-tight">Film på plakaten</h2>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <h2 className="font-display text-2xl tracking-tight">Film på plakaten</h2>
+            <FilterBar />
+            {selectedDate && (
+              <button
+                type="button"
+                onClick={clear}
+                className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Ryd filtre
+              </button>
+            )}
+          </div>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {movies.length} film
+            {withShows.length} film · {fmtDateLabel(activeDate)}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {movies.map((m) => (
-            <MovieCard key={m.id} movie={m} />
-          ))}
-        </div>
+
+        {rows.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border py-16 text-center">
+            <p className="font-display text-xl text-foreground">Ingen film på plakaten</p>
+          </div>
+        ) : (
+          <div className="space-y-px overflow-hidden rounded-md bg-border">
+            {withShows.map(({ movie, shows }) => (
+              <MovieRow key={movie.id} movie={movie} shows={shows} />
+            ))}
+            {withoutShows.length > 0 && (
+              <div className="bg-background px-6 py-4 lg:px-8">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  Ingen forestillinger {fmtDateLabel(activeDate).toLowerCase()}
+                </div>
+              </div>
+            )}
+            {withoutShows.map(({ movie }) => (
+              <MovieRow key={movie.id} movie={movie} shows={[]} dim />
+            ))}
+          </div>
+        )}
       </section>
+    </div>
+  );
+}
+
+function MovieRow({ movie, shows, dim = false }: { movie: Movie; shows: Showtime[]; dim?: boolean }) {
+  return (
+    <div className={`bg-background p-6 lg:p-8 ${dim ? "opacity-60" : ""}`}>
+      <div className="grid grid-cols-[88px_1fr] gap-6 md:grid-cols-[120px_1fr_minmax(0,1.2fr)] md:gap-8">
+        <Link to="/film/$slug" params={{ slug: movie.slug }} className="block">
+          <Poster movie={movie} showTitle={false} />
+        </Link>
+
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-primary">{movie.genre.join(" · ")}</div>
+          <Link
+            to="/film/$slug"
+            params={{ slug: movie.slug }}
+            className="mt-1 inline-block font-display text-2xl tracking-tight text-foreground hover:text-primary"
+          >
+            {movie.title}
+          </Link>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>{formatRuntime(movie.runtime)}</span>
+            <span className="text-foreground/20">·</span>
+            <span>{movie.year}</span>
+            <span className="text-foreground/20">·</span>
+            <span>Censur {movie.rating}</span>
+          </div>
+          <p className="mt-3 line-clamp-2 max-w-prose text-sm text-foreground/75">{movie.synopsis}</p>
+        </div>
+
+        <div className="col-span-2 md:col-span-1">
+          {shows.length === 0 ? (
+            <div className="text-xs text-muted-foreground">Ingen forestillinger denne dag</div>
+          ) : (
+            <div className="space-y-3">
+              {shows.map((s, i) => (
+                <div key={i}>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{s.hall}</div>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {s.times.map((t, idx) => {
+                      const url = s.ticketUrls?.[idx] || s.bookingUrl;
+                      return url ? (
+                        <a
+                          key={t + idx}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
+                        >
+                          {t}
+                        </a>
+                      ) : (
+                        <span
+                          key={t + idx}
+                          className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
+                        >
+                          {t}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

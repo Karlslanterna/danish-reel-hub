@@ -153,7 +153,7 @@ function CinemaPage() {
 function MovieRow({ movie, shows, dim = false }: { movie: Movie; shows: Showtime[]; dim?: boolean }) {
   return (
     <div className={`bg-background p-6 lg:p-8 ${dim ? "opacity-60" : ""}`}>
-      <div className="grid grid-cols-[88px_1fr] gap-6 md:grid-cols-[120px_1fr_minmax(0,1.2fr)] md:gap-8">
+      <div className="grid grid-cols-[120px_1fr] gap-6 md:grid-cols-[180px_1fr] md:gap-10">
         <Link to="/film/$slug" params={{ slug: movie.slug }} className="block">
           <Poster movie={movie} showTitle={false} />
         </Link>
@@ -175,43 +175,43 @@ function MovieRow({ movie, shows, dim = false }: { movie: Movie; shows: Showtime
             <span>Censur {movie.rating}</span>
           </div>
           <p className="mt-3 line-clamp-2 max-w-prose text-sm text-foreground/75">{movie.synopsis}</p>
-        </div>
 
-        <div className="col-span-2 md:col-span-1">
-          {shows.length === 0 ? (
-            <div className="text-xs text-muted-foreground">Ingen forestillinger denne dag</div>
-          ) : (
-            <div className="space-y-3">
-              {shows.map((s, i) => (
-                <div key={i}>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{s.hall}</div>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {s.times.map((t, idx) => {
-                      const url = s.ticketUrls?.[idx] || s.bookingUrl;
-                      return url ? (
-                        <a
-                          key={t + idx}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
-                        >
-                          {t}
-                        </a>
-                      ) : (
-                        <span
-                          key={t + idx}
-                          className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
-                        >
-                          {t}
-                        </span>
-                      );
-                    })}
+          <div className="mt-5">
+            {shows.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Ingen forestillinger denne dag</div>
+            ) : (
+              <div className="space-y-3">
+                {shows.map((s, i) => (
+                  <div key={i}>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{s.hall}</div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {s.times.map((t, idx) => {
+                        const url = s.ticketUrls?.[idx] || s.bookingUrl;
+                        return url ? (
+                          <a
+                            key={t + idx}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
+                          >
+                            {t}
+                          </a>
+                        ) : (
+                          <span
+                            key={t + idx}
+                            className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
+                          >
+                            {t}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

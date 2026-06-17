@@ -146,50 +146,52 @@ export function FilterBar({ className = "", hideRadius = false }: { className?: 
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      <Popover
-        open={radiusOpen}
-        onOpenChange={(open) => {
-          if (!open) { setRadiusOpen(false); return; }
-          if (!userLoc) requestLocation(() => setRadiusOpen(true));
-          else setRadiusOpen(true);
-        }}
-      >
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
-              radius !== "all"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-            </svg>
-            {radius === "all" ? "Afstand fra mig" : `Inden for ${radius} km`}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="start">
-          <div className="flex flex-col gap-1">
-            {RADIUS_OPTIONS.map((opt) => {
-              const selected = radius === opt.value;
-              return (
-                <button
-                  key={String(opt.value)}
-                  type="button"
-                  onClick={() => { setRadius(opt.value); setRadiusOpen(false); }}
-                  className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${
-                    selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </PopoverContent>
-      </Popover>
+      {!hideRadius && (
+        <Popover
+          open={radiusOpen}
+          onOpenChange={(open) => {
+            if (!open) { setRadiusOpen(false); return; }
+            if (!userLoc) requestLocation(() => setRadiusOpen(true));
+            else setRadiusOpen(true);
+          }}
+        >
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
+                radius !== "all"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+              </svg>
+              {radius === "all" ? "Afstand fra mig" : `Inden for ${radius} km`}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="start">
+            <div className="flex flex-col gap-1">
+              {RADIUS_OPTIONS.map((opt) => {
+                const selected = radius === opt.value;
+                return (
+                  <button
+                    key={String(opt.value)}
+                    type="button"
+                    onClick={() => { setRadius(opt.value); setRadiusOpen(false); }}
+                    className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${
+                      selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Popover open={dateOpen} onOpenChange={setDateOpen}>
         <PopoverTrigger asChild>

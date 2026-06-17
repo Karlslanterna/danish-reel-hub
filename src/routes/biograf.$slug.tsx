@@ -164,7 +164,9 @@ function MovieRow({ movie, shows, dim = false }: { movie: Movie; shows: Showtime
             to="/film/$slug"
             params={{ slug: movie.slug }}
             className="mt-1 inline-block font-display text-2xl tracking-tight text-foreground hover:text-primary"
-<parameter name="new_content">">          </Link>
+          >
+            {movie.title}
+          </Link>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span>{formatRuntime(movie.runtime)}</span>
             <span className="text-foreground/20">·</span>

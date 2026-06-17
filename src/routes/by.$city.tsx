@@ -1,7 +1,9 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { fetchCinemas, fetchMoviesForCinema, type Cinema, type Movie } from "@/lib/cinema-data";
+import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { fetchCinemas, fetchMoviesForCinema, fetchShowtimes, type Cinema, type Movie } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/by/$city")({
   loader: async ({ params }) => {
@@ -13,21 +15,26 @@ export const Route = createFileRoute("/by/$city")({
     const displayOf = (s: string) => stripPostcode(s).toLowerCase();
     const baseOf = (s: string) => stripBase(s).toLowerCase();
     const cinemas = all.filter(
-      (c) => displayOf(c.city) === citySlug || baseOf(c.city) === citySlug,
+      (c) =>
+        displayOf(c.city) === citySlug ||
+        baseOf(c.city) === citySlug ||
+        c.city.toLowerCase().includes(citySlug),
     );
     if (cinemas.length === 0) throw notFound();
-    const programs = await Promise.all(
-      cinemas.map(async (c) => ({ cinema: c, movies: await fetchMoviesForCinema(c.id) })),
-    );
+    const movieLists = await Promise.all(cinemas.map((c) => fetchMoviesForCinema(c.id)));
+    const showtimes = await fetchShowtimes();
+    const byId = new Map<string, Movie>();
+    movieLists.flat().forEach((m) => byId.set(m.id, m));
+    const movies = Array.from(byId.values());
     const displays = new Set(cinemas.map((c) => displayOf(c.city)));
     const displayCity = displays.size === 1 ? stripPostcode(cinemas[0].city) : stripBase(cinemas[0].city);
-    return { city: displayCity, programs };
+    return { city: displayCity, cinemas, movies, showtimes };
   },
   head: ({ loaderData }) => ({
     meta: loaderData
       ? [
-          { title: `Biografer i ${loaderData.city} — Lanterna` },
-          { name: "description", content: `Find biografer og film i ${loaderData.city}.` },
+          { title: `Film i ${loaderData.city} — Lanterna` },
+          { name: "description", content: `Find aktuelle film i ${loaderData.city}.` },
         ]
       : [],
   }),
@@ -51,10 +58,38 @@ export const Route = createFileRoute("/by/$city")({
 });
 
 function CityPage() {
-  const { city, programs } = Route.useLoaderData() as {
+  const { city, cinemas, movies, showtimes } = Route.useLoaderData() as {
     city: string;
-    programs: { cinema: Cinema; movies: Movie[] }[];
+    cinemas: Cinema[];
+    movies: Movie[];
+    showtimes: Awaited<ReturnType<typeof fetchShowtimes>>;
   };
+  const { radius, userLoc, selectedDate, geoLoading, geoError, clear } = useFilters();
+  const hasFilters = Boolean(selectedDate) || radius !== "all";
+
+  const cityCinemaIds = useMemo(() => new Set(cinemas.map((c) => c.id)), [cinemas]);
+
+  const nearbyCinemaIds = useMemo(() => {
+    if (radius === "all" || !userLoc) return null;
+    const ids = new Set<string>();
+    for (const c of cinemas) {
+      if (c.latitude == null || c.longitude == null) continue;
+      const d = haversineKm(userLoc, { lat: c.latitude, lng: c.longitude });
+      if (d <= radius) ids.add(c.id);
+    }
+    return ids;
+  }, [radius, userLoc, cinemas]);
+
+  const filtered = useMemo(() => {
+    const allowedCinemas = nearbyCinemaIds ?? cityCinemaIds;
+    const movieIds = new Set<string>();
+    for (const s of showtimes) {
+      if (!allowedCinemas.has(s.cinemaId)) continue;
+      if (selectedDate && s.date !== selectedDate) continue;
+      movieIds.add(s.movieId);
+    }
+    return movies.filter((m) => movieIds.has(m.id));
+  }, [movies, showtimes, selectedDate, nearbyCinemaIds, cityCinemaIds]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,39 +105,51 @@ function CityPage() {
             {city}
           </h1>
           <p className="mt-5 text-sm text-muted-foreground">
-            {programs.length} {programs.length === 1 ? "biograf" : "biografer"} · dagens program
+            {cinemas.length} {cinemas.length === 1 ? "biograf" : "biografer"} · {movies.length} film
           </p>
         </div>
       </section>
 
-      <div className="mx-auto max-w-[1400px] space-y-16 px-8 py-16">
-        {programs.map(({ cinema, movies }) => (
-          <section key={cinema.id}>
-            <div className="mb-6 flex items-baseline justify-between">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim()}</div>
-                <Link
-                  to="/biograf/$slug"
-                  params={{ slug: cinema.slug }}
-                  className="mt-1 inline-block font-display text-3xl tracking-tight text-foreground hover:text-primary"
-                >
-                  {cinema.name}
-                </Link>
-              </div>
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{movies.length} film</div>
-            </div>
-            {movies.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Ingen film på plakaten lige nu.</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {movies.map((m) => (
-                  <MovieCard key={m.id} movie={m} />
-                ))}
-              </div>
+      <section className="mx-auto max-w-[1400px] px-8 py-14">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <h2 className="font-display text-2xl tracking-tight">Film i {city}</h2>
+            <FilterBar />
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clear}
+                className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Ryd filtre
+              </button>
             )}
-          </section>
-        ))}
-      </div>
+          </div>
+          <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            {geoLoading && <div>Finder din placering…</div>}
+            {geoError && <div className="text-destructive">{geoError}</div>}
+            <div>
+              {filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
+              {radius !== "all" && userLoc ? ` · inden for ${radius} km` : ""}
+            </div>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border py-24 text-center">
+            <p className="font-display text-xl text-foreground">Ingen film matcher</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Prøv en anden dato eller en større radius.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {filtered.map((m) => (
+              <MovieCard key={m.id} movie={m} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

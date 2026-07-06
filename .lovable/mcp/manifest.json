@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "lanterna-mcp",
+      "version": "0.1.0",
+      "title": "Lanterna"
+    },
+    "tools": [
+      {
+        "name": "search_movies",
+        "title": "Search movies",
+        "description": "Search Lanterna's movie catalog by title. Returns matching movies with id, slug, title, year, runtime, genre, and synopsis.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Case-insensitive substring to match against the movie title."
+            },
+            "limit": {
+              "description": "Max results (default 10).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "search_cinemas",
+        "title": "Search cinemas",
+        "description": "Search Lanterna's cinema directory by name or filter by city. Returns cinemas with id, slug, name, city, address, and screens.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "query": {
+              "description": "Case-insensitive substring to match against the cinema name.",
+              "type": "string"
+            },
+            "city": {
+              "description": "Case-insensitive city filter (exact match).",
+              "type": "string"
+            },
+            "limit": {
+              "description": "Max results (default 20).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_showtimes",
+        "title": "Get showtimes",
+        "description": "List showtimes filtered by movie id/slug, cinema id/slug, and/or date (YYYY-MM-DD). At least one filter is required.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "movie_id": {
+              "description": "Movie id (uuid).",
+              "type": "string"
+            },
+            "movie_slug": {
+              "description": "Movie slug.",
+              "type": "string"
+            },
+            "cinema_id": {
+              "description": "Cinema id.",
+              "type": "string"
+            },
+            "cinema_slug": {
+              "description": "Cinema slug.",
+              "type": "string"
+            },
+            "date": {
+              "description": "Date in YYYY-MM-DD. Defaults to today if no other filters narrow it.",
+              "type": "string"
+            },
+            "limit": {
+              "description": "Max results (default 50).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

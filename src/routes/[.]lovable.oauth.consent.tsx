@@ -93,7 +93,7 @@ function Consent() {
 
       {scopes.length > 0 && (
         <ul className="rounded-md border border-border bg-card p-4 text-xs text-muted-foreground">
-          {scopes.map((s) => (
+          {scopes.map((s: string) => (
             <li key={s} className="font-mono">{s}</li>
           ))}
         </ul>

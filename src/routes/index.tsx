@@ -237,7 +237,7 @@ function HomePage() {
                 onFocus={() => setOpen(true)}
                 onKeyDown={onKeyDown}
                 placeholder="Søg på film, biograf eller by"
-                className="h-20 w-full rounded-md border border-border/80 bg-card/60 pl-16 pr-6 font-display text-2xl text-foreground placeholder:font-sans placeholder:text-lg placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
+                className="h-20 w-full rounded-md border border-primary/80 bg-primary pl-16 pr-6 font-display text-2xl text-primary-foreground placeholder:font-sans placeholder:text-lg placeholder:text-primary-foreground/60 focus:border-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary-foreground/30"
                 aria-autocomplete="list"
                 aria-expanded={open && suggestions.length > 0}
               />

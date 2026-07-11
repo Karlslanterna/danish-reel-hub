@@ -222,7 +222,7 @@ function HomePage() {
 
           <div className="mt-12" ref={boxRef}>
             <div className="group relative">
-              <div className="pointer-events-none absolute left-5 top-10 -translate-y-1/2 text-muted-foreground">
+              <div className="pointer-events-none absolute left-5 top-10 -translate-y-1/2 text-primary-foreground/70">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="7" />
                   <path d="m20 20-3.5-3.5" />
@@ -237,7 +237,7 @@ function HomePage() {
                 onFocus={() => setOpen(true)}
                 onKeyDown={onKeyDown}
                 placeholder="Søg på film, biograf eller by"
-                className="h-20 w-full rounded-md border border-border/80 bg-card/60 pl-16 pr-6 font-display text-2xl text-foreground placeholder:font-sans placeholder:text-lg placeholder:text-muted-foreground/70 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring/40"
+                className="h-20 w-full rounded-md border border-primary/80 bg-primary pl-16 pr-6 font-display text-2xl text-primary-foreground placeholder:font-sans placeholder:text-lg placeholder:text-primary-foreground/60 focus:border-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary-foreground/30"
                 aria-autocomplete="list"
                 aria-expanded={open && suggestions.length > 0}
               />
@@ -247,7 +247,7 @@ function HomePage() {
                     setQuery("");
                     setOpen(false);
                   }}
-                  className="absolute right-4 top-10 -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  className="absolute right-4 top-10 -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
                 >
                   Ryd
                 </button>

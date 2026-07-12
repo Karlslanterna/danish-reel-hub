@@ -4,8 +4,7 @@ import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, fmtDateLabel } from "@/lib/filters";
 import {
   fetchCinemaBySlug,
-  fetchMoviesForCinema,
-  fetchShowtimesForMovie,
+  fetchMoviesAndShowtimesForCinemas,
   formatRuntime,
   type Cinema,
   type Movie,
@@ -16,9 +15,8 @@ export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
     const cinema = await fetchCinemaBySlug(params.slug);
     if (!cinema) throw notFound();
-    const movies = await fetchMoviesForCinema(cinema.id);
-    const showtimeLists = await Promise.all(movies.map((m) => fetchShowtimesForMovie(m.id)));
-    const showtimes = showtimeLists.flat().filter((s) => s.cinemaId === cinema.id);
+    const { movies, showtimes } = await fetchMoviesAndShowtimesForCinemas([cinema.id]);
+    movies.sort((a, b) => a.title.localeCompare(b.title, "da"));
     return { cinema, movies, showtimes };
   },
   head: ({ loaderData }) => ({

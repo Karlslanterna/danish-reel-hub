@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
-import { fetchCinemas, fetchMoviesForCinema, fetchShowtimes, type Cinema, type Movie } from "@/lib/cinema-data";
+import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/by/$city")({
   loader: async ({ params }) => {
@@ -21,11 +21,8 @@ export const Route = createFileRoute("/by/$city")({
         c.city.toLowerCase().includes(citySlug),
     );
     if (cinemas.length === 0) throw notFound();
-    const movieLists = await Promise.all(cinemas.map((c) => fetchMoviesForCinema(c.id)));
-    const showtimes = await fetchShowtimes();
-    const byId = new Map<string, Movie>();
-    movieLists.flat().forEach((m) => byId.set(m.id, m));
-    const movies = Array.from(byId.values());
+    const { movies, showtimes } = await fetchMoviesAndShowtimesForCinemas(cinemas.map((c) => c.id));
+    movies.sort((a, b) => a.title.localeCompare(b.title, "da"));
     const displays = new Set(cinemas.map((c) => displayOf(c.city)));
     const displayCity = displays.size === 1 ? stripPostcode(cinemas[0].city) : stripBase(cinemas[0].city);
     return { city: displayCity, cinemas, movies, showtimes };
@@ -62,7 +59,7 @@ function CityPage() {
     city: string;
     cinemas: Cinema[];
     movies: Movie[];
-    showtimes: Awaited<ReturnType<typeof fetchShowtimes>>;
+    showtimes: Showtime[];
   };
   const { radius, userLoc, selectedDate, geoLoading, geoError, clear } = useFilters();
   const hasFilters = Boolean(selectedDate) || radius !== "all";

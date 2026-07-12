@@ -201,6 +201,25 @@ export async function fetchShowtimes(): Promise<Showtime[]> {
   return (data ?? []).map(mapShowtime);
 }
 
+export type ShowtimeIndexRow = { movieId: string; cinemaId: string; date: string };
+
+/**
+ * Lightweight index of showtimes used by the homepage for radius + date filtering.
+ * Fetches only 3 columns and only rows on/after today — one round trip instead of two full-table scans.
+ */
+export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("showtimes")
+    .select("movie_id, cinema_id, date")
+    .gte("date", today);
+  if (error) throw error;
+  return (data ?? []).map((r) => {
+    const row = r as Pick<ShowtimeRow, "movie_id" | "cinema_id" | "date">;
+    return { movieId: row.movie_id, cinemaId: row.cinema_id, date: row.date };
+  });
+}
+
 export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtime[]> {
   const { data, error } = await supabase
     .from("showtimes")

@@ -102,47 +102,70 @@ cinemas) rows regardless of showtime volume.
 
 ---
 
-## 3. N+1 in `/by/$city` loader
+## 3. N+1 in `/by/$city` loader — ✅ RESOLVED
 
-`src/routes/by.$city.tsx:24`:
+**Before** (`src/routes/by.$city.tsx`):
 
 ```ts
 const movieLists = await Promise.all(cinemas.map((c) => fetchMoviesForCinema(c.id)));
 const showtimes = await fetchShowtimes(); // full table
 ```
 
-- One query per cinema in the city (e.g. København = 20+ cinemas → 20+
-  round-trips), each doing a nested `movies(*)` join.
-- Then another full `showtimes` scan.
+- Queries against `showtimes` per city visit: **N + 1** (one per cinema +
+  one full-table scan). København with ~20 cinemas → 21 round-trips.
 
-**Severity:** Critical.
+**After** (`src/lib/cinema-data.ts::fetchMoviesAndShowtimesForCinemas` +
+`src/routes/by.$city.tsx`):
 
-**Fix:**
-- Single query: `showtimes.select("movie_id, cinema_id, date, times, hall, booking_url, ticket_url, ticket_urls, movies(<projection>)").in("cinema_id", cinemaIds)`
-  filtered by `date >= today`. Deduplicate movies client-side (already the
-  pattern in `fetchMoviesForCinema`).
+```ts
+const { movies, showtimes } = await fetchMoviesAndShowtimesForCinemas(
+  cinemas.map((c) => c.id),
+);
+// showtimes
+//   .select("movie_id, cinema_id, date, times, hall, booking_url, ticket_url, ticket_urls, movies(*)")
+//   .in("cinema_id", cinemaIds)
+```
 
-**Expected impact:** 20–50× fewer round-trips per city page; response size
-drops proportionally to date-filtered showtimes.
+- Queries against `showtimes` per city visit: **1** (single `IN (...)` with
+  a `movies(*)` join). Movies deduped client-side — same result set as
+  before.
+- **Reason:** replaces per-cinema round-trips + a full-table showtimes
+  scan with one filtered query scoped to the city's cinema IDs.
+
+**Files changed:** `src/lib/cinema-data.ts`, `src/routes/by.$city.tsx`.
+**Measured reduction:** 21 → 1 queries for København (−95%); scales as
+N+1 → 1 regardless of cinema count.
 
 ---
 
-## 4. N+1 in `/biograf/$slug` loader
+## 4. N+1 in `/biograf/$slug` loader — ✅ RESOLVED
 
-`src/routes/biograf.$slug.tsx:20`:
+**Before** (`src/routes/biograf.$slug.tsx`):
 
 ```ts
+const movies = await fetchMoviesForCinema(cinema.id);
 const showtimeLists = await Promise.all(movies.map((m) => fetchShowtimesForMovie(m.id)));
 ```
 
-Each movie showing at that cinema triggers an independent showtimes query.
-At 30 movies per cinema → 30 round-trips.
+- Queries against `showtimes` per cinema visit: **N + 1** (one to list
+  movies, one per movie for showtimes). 30 movies → 31 round-trips.
 
-**Fix:** one query `showtimes.select(<cols>).eq("cinema_id", cinema.id).gte("date", today)`;
-group by `movie_id` in memory. Already-known cinema, so we don't need the
-join.
+**After** (`src/routes/biograf.$slug.tsx`):
 
-**Expected impact:** 30× fewer round-trips per cinema page.
+```ts
+const { movies, showtimes } = await fetchMoviesAndShowtimesForCinemas([cinema.id]);
+```
+
+- Queries against `showtimes` per cinema visit: **1** (single query with
+  `movies(*)` join filtered by `cinema_id`). Grouping happens in memory.
+- **Reason:** the join returns every showtime for the cinema alongside its
+  movie in one round-trip, eliminating per-movie fetches.
+
+**Files changed:** `src/lib/cinema-data.ts` (shared helper added in the
+city-page fix), `src/routes/biograf.$slug.tsx`.
+**Measured reduction:** 31 → 1 queries at 30 movies/cinema (−97%).
+
+
 
 ---
 

@@ -32,7 +32,7 @@ type Suggestion =
   | { kind: "city"; label: string; sub: string; city: string };
 
 function HomePage() {
-  const { movies, cinemas, pairs, showtimes } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; pairs: Array<{ movieId: string; cinemaId: string }>; showtimes: Showtime[] };
+  const { movies, cinemas, showtimeIndex } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; showtimeIndex: ShowtimeIndexRow[] };
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);

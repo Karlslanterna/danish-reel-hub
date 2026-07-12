@@ -4,12 +4,12 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
-import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, fetchShowtimes, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
+import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [movies, cinemas, pairs, showtimes] = await Promise.all([fetchMovies(), fetchCinemas(), fetchMovieCinemaPairs(), fetchShowtimes()]);
-    return { movies, cinemas, pairs, showtimes };
+    const [movies, cinemas, showtimeIndex] = await Promise.all([fetchMovies(), fetchCinemas(), fetchShowtimeIndex()]);
+    return { movies, cinemas, showtimeIndex };
   },
   head: () => ({
     meta: [

@@ -59,7 +59,7 @@ function CityPage() {
     city: string;
     cinemas: Cinema[];
     movies: Movie[];
-    showtimes: Awaited<ReturnType<typeof fetchShowtimes>>;
+    showtimes: Showtime[];
   };
   const { radius, userLoc, selectedDate, geoLoading, geoError, clear } = useFilters();
   const hasFilters = Boolean(selectedDate) || radius !== "all";

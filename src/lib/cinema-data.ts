@@ -200,3 +200,35 @@ export async function fetchShowtimes(): Promise<Showtime[]> {
   if (error) throw error;
   return (data ?? []).map(mapShowtime);
 }
+
+export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtime[]> {
+  const { data, error } = await supabase
+    .from("showtimes")
+    .select("*")
+    .eq("cinema_id", cinemaId);
+  if (error) throw error;
+  return (data ?? []).map(mapShowtime);
+}
+
+export async function fetchMoviesAndShowtimesForCinemas(
+  cinemaIds: string[],
+): Promise<{ movies: Movie[]; showtimes: Showtime[] }> {
+  if (cinemaIds.length === 0) return { movies: [], showtimes: [] };
+  const { data, error } = await supabase
+    .from("showtimes")
+    .select("movie_id, cinema_id, date, times, hall, booking_url, ticket_url, ticket_urls, movies(*)")
+    .in("cinema_id", cinemaIds);
+  if (error) throw error;
+  const rows = (data ?? []) as Array<ShowtimeRow & { movies: MovieRow | null }>;
+  const seen = new Set<string>();
+  const movies: Movie[] = [];
+  const showtimes: Showtime[] = [];
+  for (const row of rows) {
+    if (row.movies && !seen.has(row.movie_id)) {
+      seen.add(row.movie_id);
+      movies.push(mapMovie(row.movies));
+    }
+    showtimes.push(mapShowtime(row));
+  }
+  return { movies, showtimes };
+}

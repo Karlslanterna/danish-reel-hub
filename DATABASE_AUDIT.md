@@ -11,8 +11,8 @@ Target scale used throughout: **1,000 movies, 500 cinemas, 100,000 showtimes**.
 
 | # | Finding | Severity |
 |---|---|---|
-| 1 | Homepage loader fetches the entire `showtimes` table (`select *`) on every visit | **Critical** |
-| 2 | `fetchMovieCinemaPairs` scans all 100k showtimes for the homepage | **Critical** |
+| 1 | Homepage loader fetches the entire `showtimes` table (`select *`) on every visit | ✅ **Fixed** |
+| 2 | `fetchMovieCinemaPairs` scans all 100k showtimes for the homepage | ✅ **Fixed** |
 | 3 | `/by/$city` loader triggers N+1 (`fetchMoviesForCinema` per cinema) + full showtimes scan | **Critical** |
 | 4 | `/biograf/$slug` loader triggers N+1 (`fetchShowtimesForMovie` per movie) | **High** |
 | 5 | Missing composite index `showtimes(movie_id, date)` / `showtimes(cinema_id, date)` | **High** |

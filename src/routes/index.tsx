@@ -4,12 +4,12 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
-import { fetchMovies, fetchCinemas, fetchMovieCinemaPairs, fetchShowtimes, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
+import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [movies, cinemas, pairs, showtimes] = await Promise.all([fetchMovies(), fetchCinemas(), fetchMovieCinemaPairs(), fetchShowtimes()]);
-    return { movies, cinemas, pairs, showtimes };
+    const [movies, cinemas, showtimeIndex] = await Promise.all([fetchMovies(), fetchCinemas(), fetchShowtimeIndex()]);
+    return { movies, cinemas, showtimeIndex };
   },
   head: () => ({
     meta: [
@@ -32,7 +32,7 @@ type Suggestion =
   | { kind: "city"; label: string; sub: string; city: string };
 
 function HomePage() {
-  const { movies, cinemas, pairs, showtimes } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; pairs: Array<{ movieId: string; cinemaId: string }>; showtimes: Showtime[] };
+  const { movies, cinemas, showtimeIndex } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; showtimeIndex: ShowtimeIndexRow[] };
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -55,20 +55,20 @@ function HomePage() {
   const nearbyMovieIds = useMemo(() => {
     if (!nearbyCinemaIds) return null;
     const ids = new Set<string>();
-    for (const p of pairs) {
+    for (const p of showtimeIndex) {
       if (nearbyCinemaIds.has(p.cinemaId)) ids.add(p.movieId);
     }
     return ids;
-  }, [nearbyCinemaIds, pairs]);
+  }, [nearbyCinemaIds, showtimeIndex]);
 
   const dateMovieIds = useMemo(() => {
     if (!selectedDate) return null;
     const ids = new Set<string>();
-    for (const s of showtimes) {
+    for (const s of showtimeIndex) {
       if (s.date === selectedDate) ids.add(s.movieId);
     }
     return ids;
-  }, [selectedDate, showtimes]);
+  }, [selectedDate, showtimeIndex]);
 
   const displayCityOf = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
   const baseCityOf = (s: string) =>

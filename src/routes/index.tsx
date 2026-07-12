@@ -55,20 +55,20 @@ function HomePage() {
   const nearbyMovieIds = useMemo(() => {
     if (!nearbyCinemaIds) return null;
     const ids = new Set<string>();
-    for (const p of pairs) {
+    for (const p of showtimeIndex) {
       if (nearbyCinemaIds.has(p.cinemaId)) ids.add(p.movieId);
     }
     return ids;
-  }, [nearbyCinemaIds, pairs]);
+  }, [nearbyCinemaIds, showtimeIndex]);
 
   const dateMovieIds = useMemo(() => {
     if (!selectedDate) return null;
     const ids = new Set<string>();
-    for (const s of showtimes) {
+    for (const s of showtimeIndex) {
       if (s.date === selectedDate) ids.add(s.movieId);
     }
     return ids;
-  }, [selectedDate, showtimes]);
+  }, [selectedDate, showtimeIndex]);
 
   const displayCityOf = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
   const baseCityOf = (s: string) =>

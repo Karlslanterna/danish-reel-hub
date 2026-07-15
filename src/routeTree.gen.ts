@@ -11,19 +11,20 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
 import { Route as ByCityRouteImport } from './routes/by.$city'
 import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
-import { Route as AdminImportRouteImport } from './routes/admin.import'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
-import { Route as AdminImportJobIdRouteImport } from './routes/admin.import_.$jobId'
+import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
 import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
+import { Route as AuthenticatedAdminImportJobIdRouteImport } from './routes/_authenticated/admin.import_.$jobId'
 
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
@@ -33,6 +34,10 @@ const McpRoute = McpRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -55,11 +60,6 @@ const BiografSlugRoute = BiografSlugRouteImport.update({
   path: '/biograf/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminImportRoute = AdminImportRouteImport.update({
-  id: '/admin/import',
-  path: '/admin/import',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const Char91DotwellKnownChar93OauthProtectedResourceRoute =
   Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
     id: '/.well-known/oauth-protected-resource',
@@ -78,11 +78,12 @@ const ApiPublicKultunautImportRoute =
     path: '/api/public/kultunaut-import',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AdminImportJobIdRoute = AdminImportJobIdRouteImport.update({
-  id: '/admin/import_/$jobId',
-  path: '/admin/import/$jobId',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const AuthenticatedAdminImportRoute =
+  AuthenticatedAdminImportRouteImport.update({
+    id: '/admin/import',
+    path: '/admin/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -106,6 +107,12 @@ const ApiPublicKultunautImportProcessRoute =
     path: '/process',
     getParentRoute: () => ApiPublicKultunautImportRoute,
   } as any)
+const AuthenticatedAdminImportJobIdRoute =
+  AuthenticatedAdminImportJobIdRouteImport.update({
+    id: '/admin/import_/$jobId',
+    path: '/admin/import/$jobId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -113,14 +120,14 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/admin/import': typeof AdminImportRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/admin/import/$jobId': typeof AdminImportJobIdRoute
+  '/admin/import': typeof AuthenticatedAdminImportRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
 }
@@ -130,32 +137,33 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/admin/import': typeof AdminImportRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/admin/import/$jobId': typeof AdminImportJobIdRoute
+  '/admin/import': typeof AuthenticatedAdminImportRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  '/admin/import': typeof AdminImportRoute
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/admin/import_/$jobId': typeof AdminImportJobIdRoute
+  '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/_authenticated/admin/import_/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
 }
@@ -167,14 +175,14 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
-    | '/admin/import'
     | '/biograf/$slug'
     | '/by/$city'
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/admin/import/$jobId'
+    | '/admin/import'
     | '/api/public/kultunaut-import'
+    | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
   fileRoutesByTo: FileRoutesByTo
@@ -184,48 +192,48 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
-    | '/admin/import'
     | '/biograf/$slug'
     | '/by/$city'
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/admin/import/$jobId'
+    | '/admin/import'
     | '/api/public/kultunaut-import'
+    | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/auth'
     | '/mcp'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
-    | '/admin/import'
     | '/biograf/$slug'
     | '/by/$city'
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/admin/import_/$jobId'
+    | '/_authenticated/admin/import'
     | '/api/public/kultunaut-import'
+    | '/_authenticated/admin/import_/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   McpRoute: typeof McpRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  AdminImportRoute: typeof AdminImportRoute
   BiografSlugRoute: typeof BiografSlugRoute
   ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
-  AdminImportJobIdRoute: typeof AdminImportJobIdRoute
   ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
 }
 
@@ -243,6 +251,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -273,13 +288,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BiografSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/import': {
-      id: '/admin/import'
-      path: '/admin/import'
-      fullPath: '/admin/import'
-      preLoaderRoute: typeof AdminImportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/.well-known/oauth-protected-resource': {
       id: '/.well-known/oauth-protected-resource'
       path: '/.well-known/oauth-protected-resource'
@@ -301,12 +309,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/import_/$jobId': {
-      id: '/admin/import_/$jobId'
-      path: '/admin/import/$jobId'
-      fullPath: '/admin/import/$jobId'
-      preLoaderRoute: typeof AdminImportJobIdRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_authenticated/admin/import': {
+      id: '/_authenticated/admin/import'
+      path: '/admin/import'
+      fullPath: '/admin/import'
+      preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
@@ -336,8 +344,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicKultunautImportProcessRouteImport
       parentRoute: typeof ApiPublicKultunautImportRoute
     }
+    '/_authenticated/admin/import_/$jobId': {
+      id: '/_authenticated/admin/import_/$jobId'
+      path: '/admin/import/$jobId'
+      fullPath: '/admin/import/$jobId'
+      preLoaderRoute: typeof AuthenticatedAdminImportJobIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
+  AuthenticatedAdminImportJobIdRoute: typeof AuthenticatedAdminImportJobIdRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
+  AuthenticatedAdminImportJobIdRoute: AuthenticatedAdminImportJobIdRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface ApiPublicKultunautImportRouteChildren {
   ApiPublicKultunautImportProcessRoute: typeof ApiPublicKultunautImportProcessRoute
@@ -357,18 +385,17 @@ const ApiPublicKultunautImportRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   McpRoute: McpRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
-  AdminImportRoute: AdminImportRoute,
   BiografSlugRoute: BiografSlugRoute,
   ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
-  AdminImportJobIdRoute: AdminImportJobIdRoute,
   ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,
 }
 export const routeTree = rootRouteImport

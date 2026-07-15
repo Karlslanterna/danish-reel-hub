@@ -146,7 +146,7 @@ function ImportStatusPage() {
           </h1>
         </div>
         <Button asChild variant="outline">
-          <Link to="/_authenticated/admin/import">Ny import</Link>
+          <Link to="/admin/import">Ny import</Link>
         </Button>
       </header>
 

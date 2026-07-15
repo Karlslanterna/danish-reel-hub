@@ -76,7 +76,7 @@ function AdminImportPage() {
     setError(null);
     try {
       const { jobId } = await createJob({ data: { xml } });
-      navigate({ to: "/_authenticated/admin/import/$jobId", params: { jobId } });
+      navigate({ to: "/admin/import/$jobId", params: { jobId } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ukendt fejl");
     } finally {

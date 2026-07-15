@@ -14,8 +14,8 @@ export const Route = createFileRoute("/auth")({
     next: typeof s.next === "string" ? s.next : undefined,
   }),
   beforeLoad: async ({ search }) => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) {
       throw redirect({ href: isSafeNext(search.next) ? search.next : "/" });
     }
   },

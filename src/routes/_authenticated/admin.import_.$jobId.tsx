@@ -1,18 +1,31 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import {
+  checkIsAdmin,
+  adminGetImportJobStatus,
+  adminProcessImportJob,
+} from "@/lib/admin.functions";
 
-export const Route = createFileRoute("/admin/import_/$jobId")({
+export const Route = createFileRoute("/_authenticated/admin/import_/$jobId")({
   head: () => ({
     meta: [
       { title: "Import status — Admin" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
+  beforeLoad: async ({ location }) => {
+    const { isAdmin } = await checkIsAdmin();
+    if (!isAdmin) {
+      throw redirect({
+        to: "/auth",
+        search: { next: location.pathname + location.searchStr },
+      });
+    }
+  },
   component: ImportStatusPage,
   errorComponent: ({ error }) => (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -42,58 +55,21 @@ type JobStatus = {
   updated_at: string;
 };
 
-const SECRET_STORAGE_KEY = "kultunaut-import-secret";
-
 function ImportStatusPage() {
   const { jobId } = Route.useParams();
+  const getStatus = useServerFn(adminGetImportJobStatus);
+  const processOne = useServerFn(adminProcessImportJob);
   const [job, setJob] = useState<JobStatus | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
-  const [secret, setSecret] = useState<string>("");
-  const [secretInput, setSecretInput] = useState<string>("");
-  const [needsSecret, setNeedsSecret] = useState(false);
   const processingRef = useRef(false);
   const stoppedRef = useRef(false);
 
-  // Hydrate secret from sessionStorage on the client
   useEffect(() => {
-    const stored = window.sessionStorage.getItem(SECRET_STORAGE_KEY) ?? "";
-    if (stored) {
-      setSecret(stored);
-    } else {
-      setNeedsSecret(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!secret) return;
     stoppedRef.current = false;
-
-    const fetchStatus = async () => {
-      const res = await fetch(
-        `/api/public/kultunaut-import/status?jobId=${encodeURIComponent(jobId)}`,
-        { headers: { "x-kultunaut-secret": secret } },
-      );
-      if (res.status === 401) {
-        setNeedsSecret(true);
-        window.sessionStorage.removeItem(SECRET_STORAGE_KEY);
-        throw new Error("Forkert hemmelighed (401). Indtast igen.");
-      }
-      if (!res.ok) throw new Error(`Status HTTP ${res.status}`);
-      return (await res.json()) as JobStatus;
-    };
-
-    const processOne = async () => {
-      const res = await fetch(
-        `/api/public/kultunaut-import/process?jobId=${encodeURIComponent(jobId)}`,
-        { method: "POST", headers: { "x-kultunaut-secret": secret } },
-      );
-      if (!res.ok) throw new Error(`Process HTTP ${res.status}: ${await res.text()}`);
-      return (await res.json()) as { done: boolean; status: string; phase: string };
-    };
 
     const loop = async () => {
       try {
-        const initial = await fetchStatus();
+        const initial = (await getStatus({ data: { jobId } })) as JobStatus;
         setJob(initial);
         setFatal(null);
         if (initial.status === "completed" || initial.status === "failed") return;
@@ -105,8 +81,12 @@ function ImportStatusPage() {
           }
           processingRef.current = true;
           try {
-            const result = await processOne();
-            const next = await fetchStatus();
+            const result = (await processOne({ data: { jobId } })) as {
+              done: boolean;
+              status: string;
+              phase: string;
+            };
+            const next = (await getStatus({ data: { jobId } })) as JobStatus;
             setJob(next);
             if (result.done || next.status === "completed" || next.status === "failed") {
               return;
@@ -125,7 +105,7 @@ function ImportStatusPage() {
 
     const poll = window.setInterval(async () => {
       try {
-        const s = await fetchStatus();
+        const s = (await getStatus({ data: { jobId } })) as JobStatus;
         setJob(s);
         if (s.status === "completed" || s.status === "failed") {
           stoppedRef.current = true;
@@ -140,17 +120,7 @@ function ImportStatusPage() {
       stoppedRef.current = true;
       window.clearInterval(poll);
     };
-  }, [jobId, secret]);
-
-  const submitSecret = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!secretInput.trim()) return;
-    window.sessionStorage.setItem(SECRET_STORAGE_KEY, secretInput.trim());
-    setSecret(secretInput.trim());
-    setNeedsSecret(false);
-    setFatal(null);
-  };
-
+  }, [jobId, getStatus, processOne]);
 
   const statusColor =
     job?.status === "completed"
@@ -180,29 +150,6 @@ function ImportStatusPage() {
         </Button>
       </header>
 
-      {needsSecret && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Indtast import-hemmelighed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={submitSecret} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="status-secret">x-kultunaut-secret</Label>
-                <Input
-                  id="status-secret"
-                  type="password"
-                  value={secretInput}
-                  onChange={(e) => setSecretInput(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-              <Button type="submit">Fortsæt</Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
       {fatal && (
         <Card className="mb-6 border-destructive">
           <CardContent className="pt-6">
@@ -211,12 +158,10 @@ function ImportStatusPage() {
         </Card>
       )}
 
-
       <Card>
         <CardHeader>
           <CardTitle>
-            Status:{" "}
-            <span className={statusColor}>{job?.status ?? "loading…"}</span>
+            Status: <span className={statusColor}>{job?.status ?? "loading…"}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

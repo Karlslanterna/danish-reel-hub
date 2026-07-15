@@ -9,9 +9,9 @@ export function SiteHeader() {
           <span className="font-display text-lg font-bold tracking-tight">Lanterna - Danmarks nye biografportal</span>
         </Link>
         <nav className="flex items-center gap-7 text-sm text-muted-foreground">
-          <a href="#" className="hidden rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary md:inline-block">
+          <Link to="/auth" className="inline-block rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary">
             Log ind
-          </a>
+          </Link>
         </nav>
       </div>
     </header>

@@ -8,27 +8,36 @@ Legend: **Critical** = exploitable now / data loss risk · **High** = likely exp
 
 ## Critical
 
-### C1. `/admin/import` has no authorization gate
-- **Where:** `src/routes/admin.import.tsx`, `src/routes/admin.import_.$jobId.tsx`.
-- **Issue:** The admin import UI is a public route. Access is "gated" only by asking the user to paste `KULTUNAUT_IMPORT_SECRET` into a text field, which the backend routes (`/api/public/kultunaut-import*`) then compare. There is no user-role check, no `_authenticated` layout, and the page is directly reachable at `/admin/import`. The secret is also cached in `sessionStorage` (`SECRET_STORAGE_KEY`), so anyone who ever borrows the browser inherits import capability.
-- **Impact:** Anyone with the shared secret can create, mutate, or replace the entire catalog (movies, cinemas, showtimes). One secret leak = full data-integrity compromise. There is no per-user audit trail.
-- **Recommended fix:** Move admin routes under `src/routes/_authenticated/admin/…`, add a `user_roles` table with an `admin` role and a `has_role()` SECURITY DEFINER function, gate the server routes on that role via `requireSupabaseAuth`, and stop storing the shared secret in `sessionStorage`. Keep the header secret only as a secondary machine-to-machine credential for cron / CI callers.
+### C1. ✅ RESOLVED — `/admin/import` now requires an authenticated admin user
+- **Where:** `src/routes/_authenticated/admin.import.tsx`, `src/routes/_authenticated/admin.import_.$jobId.tsx`, `src/routes/_authenticated/route.tsx`, `src/lib/admin.functions.ts`.
+- **Original issue:** The admin import UI was a public route gated only by a `KULTUNAUT_IMPORT_SECRET` typed into a text field and cached in `sessionStorage`.
+- **Implementation (this change):**
+  - **Database.** New migration adds `app_role` enum (`admin`, `moderator`, `user`), `public.user_roles(user_id, role)` table (unique per pair, FK to `auth.users` with cascade delete), and a `public.has_role(_user_id, _role) SECURITY DEFINER STABLE` function on `search_path = public`. Grants: `SELECT` on `user_roles` to `authenticated`, `ALL` to `service_role`; `EXECUTE` on `has_role` revoked from `PUBLIC`/`anon` and granted to `authenticated`/`service_role`. RLS enabled on `user_roles`; single policy lets a signed-in user read only their own rows. Role assignments happen exclusively server-side (no INSERT/UPDATE/DELETE policies), so escalation from the client is impossible.
+  - **Route layer.** New pathless `_authenticated` layout (`src/routes/_authenticated/route.tsx`, `ssr: false`) calls `supabase.auth.getUser()` in `beforeLoad` and redirects unauthenticated visitors to `/auth` preserving `next`. The admin routes moved under it (`/_authenticated/admin.import.tsx` and `/_authenticated/admin.import_.$jobId.tsx`) — URLs stay `/admin/import` and `/admin/import/$jobId`. Each admin route's `beforeLoad` additionally calls the `checkIsAdmin` server function and redirects to `/auth` if the caller lacks the `admin` role, so non-admin authenticated users can't see the page either.
+  - **Server functions.** New `src/lib/admin.functions.ts` exposes `checkIsAdmin`, `adminCreateImportJob`, `adminProcessImportJob`, and `adminGetImportJobStatus`. All four use `.middleware([requireSupabaseAuth])` and, except for `checkIsAdmin`, call an internal `assertAdmin(context)` that invokes `has_role(userId, 'admin')` via RPC and throws Forbidden if the caller is not an admin. The server functions wrap the existing `createImportJob` / `processJobBatch` / `getJobStatus` helpers in `src/lib/kultunaut/import.server.ts`, so import behavior is unchanged. Zod validators enforce that the XML payload is 1..20 MB and `jobId` is a UUID.
+  - **UI.** All shared-secret prompts and the `SECRET_STORAGE_KEY` `sessionStorage` cache are removed from both admin pages. The UI now calls the new server functions via `useServerFn`; the bearer token is attached automatically by the `attachSupabaseAuth` `functionMiddleware` already registered in `src/start.ts`.
+- **Bootstrapping the first admin (one-time manual step):** sign in once at `/auth` to create your `auth.users` row, then run this SQL through the Cloud backend SQL editor (Cloud → SQL):
+  ```sql
+  INSERT INTO public.user_roles (user_id, role)
+  SELECT id, 'admin' FROM auth.users WHERE email = 'you@example.com';
+  ```
+  Consider disabling open signups after that (`supabase--configure_auth` with `disable_signup: true`) to prevent random accounts from being created just to attempt privilege escalation.
+- **What did NOT change:** the `/api/public/kultunaut-import*` HTTP endpoints and their shared-secret header still exist, unchanged, so cron / external callers keep working. They are no longer used by the admin UI. See C2 for their remaining hardening work.
 
 ### C2. Import HTTP endpoints authenticate with a single static shared secret and no rate limiting
 - **Where:** `src/routes/api/public/kultunaut-import.ts`, `kultunaut-import.process.ts`, `kultunaut-import.status.ts`.
 - **Issue:** All three routes accept any caller presenting `x-kultunaut-secret: $KULTUNAUT_IMPORT_SECRET`. There is no signature, nonce, timestamp, IP allowlist, or rate limit. The upload endpoint accepts XML bodies up to 20 MB and immediately queues a service-role-driven write job. The comparison uses `===`, which is not constant-time (marginal, but not best practice for token compare).
 - **Impact:** A leaked secret allows unlimited catalog rewrites and job spam (each job persists the full XML into `import_jobs`, unbounded — see M2). No throttle exists to slow a brute-force or replay.
+- **Status update:** the admin UI no longer depends on these endpoints (C1 replaces them with authenticated server functions). If you have no external / cron caller, delete these three files and drop `KULTUNAUT_IMPORT_SECRET` from secrets. If you keep them, add per-IP rate limiting and switch to `crypto.timingSafeEqual`.
 - **Recommended fix:** Use `crypto.timingSafeEqual`; add a simple per-IP token-bucket in front of the three endpoints (e.g. Cloudflare KV or an in-DB counter); rotate the secret; and prefer signed requests (HMAC over body + timestamp) rather than a bearer-style shared token.
 
 ---
 
 ## High
 
-### H1. `KULTUNAUT_IMPORT_SECRET` is entered client-side and persisted in `sessionStorage`
-- **Where:** `src/routes/admin.import.tsx` (`SECRET_STORAGE_KEY`).
-- **Issue:** The shared import secret is typed into a plain `<Input>` on a public route and cached in `sessionStorage`. Any XSS in any route running on the same origin (React libs, third-party fonts stylesheet, future integrations) can exfiltrate it. It is also visible in DevTools screenshots and browser sync in some setups.
-- **Impact:** Elevates any minor XSS to full catalog write access.
-- **Recommended fix:** After C1 is in place, delete the client-side secret field entirely — call the server routes from an authenticated admin server function that reads the secret from `process.env` server-side.
+### H1. ✅ RESOLVED — `KULTUNAUT_IMPORT_SECRET` is no longer entered client-side
+- **Where:** was `src/routes/admin.import.tsx` (`SECRET_STORAGE_KEY`).
+- **Fix (this change):** The password `<Input>` and the `SECRET_STORAGE_KEY` `sessionStorage` cache are gone from both admin routes. The import server functions run under `requireSupabaseAuth` + `has_role('admin')` and never expose the shared secret to the browser. If the `/api/public/kultunaut-import*` endpoints are retained for cron, the secret lives only in server-side env (see C2).
 
 ### H2. No security headers / Content Security Policy
 - **Where:** `src/server.ts`, `src/start.ts`, `src/routes/__root.tsx`.

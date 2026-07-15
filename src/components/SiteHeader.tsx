@@ -36,6 +36,15 @@ export function SiteHeader() {
     navigate({ to: "/auth", replace: true });
   }
 
+  async function handleSignIn() {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) {
+      setIsAuthenticated(true);
+      return;
+    }
+    navigate({ to: "/auth" });
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-8">
@@ -53,9 +62,13 @@ export function SiteHeader() {
               Log ud
             </button>
           ) : (
-            <Link to="/auth" className="inline-block rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary">
+            <button
+              type="button"
+              onClick={handleSignIn}
+              className="inline-block rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary"
+            >
               Log ind
-            </Link>
+            </button>
           )}
         </nav>
       </div>

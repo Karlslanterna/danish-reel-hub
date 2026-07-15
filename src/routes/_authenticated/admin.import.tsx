@@ -14,13 +14,10 @@ export const Route = createFileRoute("/_authenticated/admin/import")({
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async () => {
     const { isAdmin } = await checkIsAdmin();
     if (!isAdmin) {
-      throw redirect({
-        to: "/auth",
-        search: { next: location.pathname + location.searchStr },
-      });
+      throw redirect({ to: "/" });
     }
   },
   component: AdminImportPage,

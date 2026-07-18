@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /auth
+Disallow: /api
+Disallow: /.mcp
+Disallow: /.lovable
+Disallow: /.well-known
+
+Sitemap: https://danish-reel-hub.lovable.app/sitemap.xml

@@ -11,6 +11,7 @@ import {
   type Cinema,
   type Showtime,
 } from "@/lib/cinema-data";
+import { canonicalUrl } from "@/lib/canonical";
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {
@@ -22,14 +23,19 @@ export const Route = createFileRoute("/film/$slug")({
     ]);
     return { movie, cinemas, showtimes };
   },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: `${loaderData.movie.title} — Lanterna` },
-          { name: "description", content: loaderData.movie.synopsis.slice(0, 155) },
-        ]
-      : [],
-  }),
+  head: ({ params, loaderData }) => {
+    const href = canonicalUrl(`/film/${params.slug}`);
+    return {
+      meta: loaderData
+        ? [
+            { title: `${loaderData.movie.title} — Lanterna` },
+            { name: "description", content: loaderData.movie.synopsis.slice(0, 155) },
+            { property: "og:url", content: href },
+          ]
+        : [],
+      links: loaderData ? [{ rel: "canonical", href }] : [],
+    };
+  },
   notFoundComponent: () => (
     <div className="min-h-screen bg-background">
       <SiteHeader />

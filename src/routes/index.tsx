@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
+import { canonicalUrl } from "@/lib/canonical";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -15,7 +16,9 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "Lanterna — Find film og spilletider i Danmark" },
       { name: "description", content: "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg." },
+      { property: "og:url", content: canonicalUrl("/") },
     ],
+    links: [{ rel: "canonical", href: canonicalUrl("/") }],
   }),
   errorComponent: ({ reset }) => (
     <div className="p-12">

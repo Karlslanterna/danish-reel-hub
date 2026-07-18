@@ -10,6 +10,7 @@ import {
   type Movie,
   type Showtime,
 } from "@/lib/cinema-data";
+import { canonicalUrl } from "@/lib/canonical";
 
 export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
@@ -19,14 +20,19 @@ export const Route = createFileRoute("/biograf/$slug")({
     movies.sort((a, b) => a.title.localeCompare(b.title, "da"));
     return { cinema, movies, showtimes };
   },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: `${loaderData.cinema.name}, ${loaderData.cinema.city} — Lanterna` },
-          { name: "description", content: loaderData.cinema.description.slice(0, 155) },
-        ]
-      : [],
-  }),
+  head: ({ params, loaderData }) => {
+    const href = canonicalUrl(`/biograf/${params.slug}`);
+    return {
+      meta: loaderData
+        ? [
+            { title: `${loaderData.cinema.name}, ${loaderData.cinema.city} — Lanterna` },
+            { name: "description", content: loaderData.cinema.description.slice(0, 155) },
+            { property: "og:url", content: href },
+          ]
+        : [],
+      links: loaderData ? [{ rel: "canonical", href }] : [],
+    };
+  },
   notFoundComponent: () => (
     <div className="min-h-screen bg-background">
       <SiteHeader />

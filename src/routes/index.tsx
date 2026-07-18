@@ -15,7 +15,9 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "Lanterna — Find film og spilletider i Danmark" },
       { name: "description", content: "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg." },
+      { property: "og:url", content: canonicalUrl("/") },
     ],
+    links: [{ rel: "canonical", href: canonicalUrl("/") }],
   }),
   errorComponent: ({ reset }) => (
     <div className="p-12">

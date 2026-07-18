@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
+import { canonicalUrl } from "@/lib/canonical";
 
 export const Route = createFileRoute("/by/$city")({
   loader: async ({ params }) => {

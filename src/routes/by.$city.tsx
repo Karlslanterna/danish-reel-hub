@@ -28,14 +28,19 @@ export const Route = createFileRoute("/by/$city")({
     const displayCity = displays.size === 1 ? stripPostcode(cinemas[0].city) : stripBase(cinemas[0].city);
     return { city: displayCity, cinemas, movies, showtimes };
   },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: `Film i ${loaderData.city} — Lanterna` },
-          { name: "description", content: `Find aktuelle film i ${loaderData.city}.` },
-        ]
-      : [],
-  }),
+  head: ({ params, loaderData }) => {
+    const href = canonicalUrl(`/by/${params.city.toLowerCase()}`);
+    return {
+      meta: loaderData
+        ? [
+            { title: `Film i ${loaderData.city} — Lanterna` },
+            { name: "description", content: `Find aktuelle film i ${loaderData.city}.` },
+            { property: "og:url", content: href },
+          ]
+        : [],
+      links: loaderData ? [{ rel: "canonical", href }] : [],
+    };
+  },
   notFoundComponent: () => (
     <div className="min-h-screen bg-background">
       <SiteHeader />

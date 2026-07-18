@@ -11,6 +11,7 @@ import {
   type Cinema,
   type Showtime,
 } from "@/lib/cinema-data";
+import { canonicalUrl } from "@/lib/canonical";
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {

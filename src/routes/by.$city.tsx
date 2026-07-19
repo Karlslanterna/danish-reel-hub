@@ -5,6 +5,7 @@ import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
+import { citySchemas } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/by/$city")({
   loader: async ({ params }) => {
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/by/$city")({
           ]
         : [],
       links: loaderData ? [{ rel: "canonical", href }] : [],
+      scripts: loaderData ? citySchemas(params.city.toLowerCase(), loaderData.city) : [],
     };
   },
   notFoundComponent: () => (

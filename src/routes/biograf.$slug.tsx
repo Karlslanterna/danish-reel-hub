@@ -11,6 +11,7 @@ import {
   type Showtime,
 } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
+import { cinemaSchemas } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/biograf/$slug")({
           ]
         : [],
       links: loaderData ? [{ rel: "canonical", href }] : [],
+      scripts: loaderData ? cinemaSchemas(loaderData.cinema) : [],
     };
   },
   notFoundComponent: () => (

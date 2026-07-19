@@ -6,6 +6,7 @@ import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
+import { homeSchemas } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/")({
       { property: "og:url", content: canonicalUrl("/") },
     ],
     links: [{ rel: "canonical", href: canonicalUrl("/") }],
+    scripts: homeSchemas(),
   }),
   errorComponent: ({ reset }) => (
     <div className="p-12">

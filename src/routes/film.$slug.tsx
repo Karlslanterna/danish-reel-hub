@@ -12,6 +12,7 @@ import {
   type Showtime,
 } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
+import { movieSchemas } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/film/$slug")({
           ]
         : [],
       links: loaderData ? [{ rel: "canonical", href }] : [],
+      scripts: loaderData ? movieSchemas(loaderData.movie, loaderData.cinemas, loaderData.showtimes) : [],
     };
   },
   notFoundComponent: () => (

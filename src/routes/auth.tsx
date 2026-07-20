@@ -10,6 +10,12 @@ function isSafeNext(next: string | undefined): next is string {
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
+  head: () => ({
+    meta: [
+      { title: "Log ind — Lanterna" },
+      { name: "robots", content: "noindex, follow" },
+    ],
+  }),
   validateSearch: (s: Record<string, unknown>) => ({
     next: typeof s.next === "string" ? s.next : undefined,
   }),

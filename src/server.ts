@@ -37,12 +37,35 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+// Paths whose responses should never be indexed by search engines.
+// HTML pages (auth, admin) set noindex via <meta>; these prefixes cover
+// non-HTML responses (API + MCP + well-known) where meta tags don't apply.
+const NOINDEX_PATH_PREFIXES = ["/api/", "/mcp", "/.mcp/", "/.well-known/"];
+function shouldNoindex(pathname: string): boolean {
+  if (pathname === "/mcp") return true;
+  return NOINDEX_PATH_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
+function withNoindexHeader(response: Response, pathname: string): Response {
+  if (!shouldNoindex(pathname)) return response;
+  if (response.headers.has("x-robots-tag")) return response;
+  const headers = new Headers(response.headers);
+  headers.set("x-robots-tag", "noindex");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const pathname = new URL(request.url).pathname;
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return withNoindexHeader(normalized, pathname);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

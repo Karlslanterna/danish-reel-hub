@@ -13,15 +13,26 @@ export const Route = createFileRoute("/")({
     const [movies, cinemas, showtimeIndex] = await Promise.all([fetchMovies(), fetchCinemas(), fetchShowtimeIndex()]);
     return { movies, cinemas, showtimeIndex };
   },
-  head: () => ({
-    meta: [
-      { title: "Lanterna — Find film og spilletider i Danmark" },
-      { name: "description", content: "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg." },
-      { property: "og:url", content: canonicalUrl("/") },
-    ],
-    links: [{ rel: "canonical", href: canonicalUrl("/") }],
-    scripts: homeSchemas(),
-  }),
+  head: () => {
+    const title = "Lanterna — Find film og spilletider i Danmark";
+    const description = "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg.";
+    const image = "https://lanterna.dk/og-image.jpg";
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: canonicalUrl("/") },
+        { property: "og:image", content: image },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+        { name: "twitter:image", content: image },
+      ],
+      links: [{ rel: "canonical", href: canonicalUrl("/") }],
+      scripts: homeSchemas(),
+    };
+  },
   errorComponent: ({ reset }) => (
     <div className="p-12">
       <button onClick={reset} className="text-primary">Prøv igen</button>

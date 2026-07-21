@@ -26,16 +26,27 @@ export const Route = createFileRoute("/film/$slug")({
   },
   head: ({ params, loaderData }) => {
     const href = canonicalUrl(`/film/${params.slug}`);
+    if (!loaderData) return { meta: [], links: [], scripts: [] };
+    const title = `${loaderData.movie.title} — Lanterna`;
+    const description = loaderData.movie.synopsis.slice(0, 155);
+    const image = loaderData.movie.poster.url;
     return {
-      meta: loaderData
-        ? [
-            { title: `${loaderData.movie.title} — Lanterna` },
-            { name: "description", content: loaderData.movie.synopsis.slice(0, 155) },
-            { property: "og:url", content: href },
-          ]
-        : [],
-      links: loaderData ? [{ rel: "canonical", href }] : [],
-      scripts: loaderData ? movieSchemas(loaderData.movie, loaderData.cinemas, loaderData.showtimes) : [],
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: href },
+        { property: "og:type", content: "video.movie" },
+        ...(image ? [
+          { property: "og:image", content: image },
+          { name: "twitter:image", content: image },
+        ] : []),
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+      ],
+      links: [{ rel: "canonical", href }],
+      scripts: movieSchemas(loaderData.movie, loaderData.cinemas, loaderData.showtimes),
     };
   },
   notFoundComponent: () => (

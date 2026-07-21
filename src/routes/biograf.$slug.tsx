@@ -23,16 +23,21 @@ export const Route = createFileRoute("/biograf/$slug")({
   },
   head: ({ params, loaderData }) => {
     const href = canonicalUrl(`/biograf/${params.slug}`);
+    if (!loaderData) return { meta: [], links: [], scripts: [] };
+    const title = `${loaderData.cinema.name}, ${loaderData.cinema.city} — Lanterna`;
+    const description = loaderData.cinema.description.slice(0, 155);
     return {
-      meta: loaderData
-        ? [
-            { title: `${loaderData.cinema.name}, ${loaderData.cinema.city} — Lanterna` },
-            { name: "description", content: loaderData.cinema.description.slice(0, 155) },
-            { property: "og:url", content: href },
-          ]
-        : [],
-      links: loaderData ? [{ rel: "canonical", href }] : [],
-      scripts: loaderData ? cinemaSchemas(loaderData.cinema) : [],
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: href },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+      ],
+      links: [{ rel: "canonical", href }],
+      scripts: cinemaSchemas(loaderData.cinema),
     };
   },
   notFoundComponent: () => (

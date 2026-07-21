@@ -31,16 +31,21 @@ export const Route = createFileRoute("/by/$city")({
   },
   head: ({ params, loaderData }) => {
     const href = canonicalUrl(`/by/${params.city.toLowerCase()}`);
+    if (!loaderData) return { meta: [], links: [], scripts: [] };
+    const title = `Film i ${loaderData.city} — Lanterna`;
+    const description = `Find aktuelle film og spilletider i ${loaderData.city}.`;
     return {
-      meta: loaderData
-        ? [
-            { title: `Film i ${loaderData.city} — Lanterna` },
-            { name: "description", content: `Find aktuelle film i ${loaderData.city}.` },
-            { property: "og:url", content: href },
-          ]
-        : [],
-      links: loaderData ? [{ rel: "canonical", href }] : [],
-      scripts: loaderData ? citySchemas(params.city.toLowerCase(), loaderData.city) : [],
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: href },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+      ],
+      links: [{ rel: "canonical", href }],
+      scripts: citySchemas(params.city.toLowerCase(), loaderData.city),
     };
   },
   notFoundComponent: () => (

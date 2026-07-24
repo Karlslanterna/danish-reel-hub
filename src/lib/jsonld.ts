@@ -95,7 +95,12 @@ export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtim
     });
   }
 
-  return [ld(movieObj), ...events.map((e) => ld(e))];
+  const crumbs = breadcrumbSchema([
+    { name: "Forside", url: canonicalUrl("/") },
+    { name: movie.title, url: canonicalUrl(`/film/${movie.slug}`) },
+  ]);
+
+  return [ld(movieObj), ...events.map((e) => ld(e)), crumbs];
 }
 
 export function cinemaSchemas(cinema: Cinema) {

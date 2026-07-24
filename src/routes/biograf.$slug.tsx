@@ -94,6 +94,21 @@ function CinemaPage() {
             ← Alle biografer
           </Link>
 
+          <div className="mt-4">
+            <Breadcrumb
+              items={[
+                { label: "Forside", to: "/" },
+                { label: "By" },
+                {
+                  label: cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim(),
+                  to: "/by/$city",
+                  params: { city: cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim().toLowerCase() },
+                },
+                { label: cinema.name },
+              ]}
+            />
+          </div>
+
           <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-[1.4fr_1fr]">
             <div>
               <div className="text-xs uppercase tracking-[0.25em] text-primary">{cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim()}</div>

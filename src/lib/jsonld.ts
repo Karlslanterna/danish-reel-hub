@@ -33,6 +33,22 @@ export function homeSchemas() {
   ];
 }
 
+const stripPostcode = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
+const citySlugOf = (city: string) => stripPostcode(city).toLowerCase();
+
+function breadcrumbSchema(items: { name: string; url: string }[]) {
+  return ld({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: it.name,
+      item: it.url,
+    })),
+  });
+}
+
 export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtime[]) {
   const cinemaById = new Map(cinemas.map((c) => [c.id, c] as const));
 

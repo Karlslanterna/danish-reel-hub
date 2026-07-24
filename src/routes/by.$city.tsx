@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";

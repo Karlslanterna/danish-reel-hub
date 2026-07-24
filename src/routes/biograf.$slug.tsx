@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, fmtDateLabel } from "@/lib/filters";
 import {
@@ -92,6 +93,21 @@ function CinemaPage() {
           <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
             ← Alle biografer
           </Link>
+
+          <div className="mt-4">
+            <Breadcrumb
+              items={[
+                { label: "Forside", to: "/" },
+                { label: "By" },
+                {
+                  label: cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim(),
+                  to: "/by/$city",
+                  params: { city: cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim().toLowerCase() },
+                },
+                { label: cinema.name },
+              ]}
+            />
+          </div>
 
           <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-[1.4fr_1fr]">
             <div>

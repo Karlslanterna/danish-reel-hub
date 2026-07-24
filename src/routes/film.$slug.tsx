@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import {
@@ -127,6 +128,15 @@ function MoviePage() {
             <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
               ← Tilbage
             </Link>
+            <div className="mt-4">
+              <Breadcrumb
+                items={[
+                  { label: "Forside", to: "/" },
+                  { label: "Film" },
+                  { label: movie.title },
+                ]}
+              />
+            </div>
             <div className="mt-6 text-xs uppercase tracking-[0.25em] text-primary">
               {movie.genre.join(" · ")}
             </div>

@@ -33,6 +33,22 @@ export function homeSchemas() {
   ];
 }
 
+const stripPostcode = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
+const citySlugOf = (city: string) => stripPostcode(city).toLowerCase();
+
+function breadcrumbSchema(items: { name: string; url: string }[]) {
+  return ld({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: it.name,
+      item: it.url,
+    })),
+  });
+}
+
 export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtime[]) {
   const cinemaById = new Map(cinemas.map((c) => [c.id, c] as const));
 
@@ -79,7 +95,12 @@ export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtim
     });
   }
 
-  return [ld(movieObj), ...events.map((e) => ld(e))];
+  const crumbs = breadcrumbSchema([
+    { name: "Forside", url: canonicalUrl("/") },
+    { name: movie.title, url: canonicalUrl(`/film/${movie.slug}`) },
+  ]);
+
+  return [ld(movieObj), ...events.map((e) => ld(e)), crumbs];
 }
 
 export function cinemaSchemas(cinema: Cinema) {
@@ -100,7 +121,14 @@ export function cinemaSchemas(cinema: Cinema) {
   if (cinema.latitude != null && cinema.longitude != null) {
     obj.geo = { "@type": "GeoCoordinates", latitude: cinema.latitude, longitude: cinema.longitude };
   }
-  return [ld(obj)];
+  const cityName = stripPostcode(cinema.city);
+  const citySlug = citySlugOf(cinema.city);
+  const crumbs = breadcrumbSchema([
+    { name: "Forside", url: canonicalUrl("/") },
+    { name: cityName, url: canonicalUrl(`/by/${citySlug}`) },
+    { name: cinema.name, url: canonicalUrl(`/biograf/${cinema.slug}`) },
+  ]);
+  return [ld(obj), crumbs];
 }
 
 export function citySchemas(citySlug: string, cityName: string) {

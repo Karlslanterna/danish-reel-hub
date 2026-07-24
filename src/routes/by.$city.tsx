@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
@@ -110,6 +111,15 @@ function CityPage() {
           <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
             ← Forside
           </Link>
+          <div className="mt-4">
+            <Breadcrumb
+              items={[
+                { label: "Forside", to: "/" },
+                { label: "By" },
+                { label: city },
+              ]}
+            />
+          </div>
           <div className="mt-6 text-xs uppercase tracking-[0.25em] text-primary">By</div>
           <h1 className="mt-3 font-display text-7xl font-bold leading-[0.9] tracking-tight text-foreground">
             {city}

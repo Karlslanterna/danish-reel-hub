@@ -121,7 +121,14 @@ export function cinemaSchemas(cinema: Cinema) {
   if (cinema.latitude != null && cinema.longitude != null) {
     obj.geo = { "@type": "GeoCoordinates", latitude: cinema.latitude, longitude: cinema.longitude };
   }
-  return [ld(obj)];
+  const cityName = stripPostcode(cinema.city);
+  const citySlug = citySlugOf(cinema.city);
+  const crumbs = breadcrumbSchema([
+    { name: "Forside", url: canonicalUrl("/") },
+    { name: cityName, url: canonicalUrl(`/by/${citySlug}`) },
+    { name: cinema.name, url: canonicalUrl(`/biograf/${cinema.slug}`) },
+  ]);
+  return [ld(obj), crumbs];
 }
 
 export function citySchemas(citySlug: string, cityName: string) {

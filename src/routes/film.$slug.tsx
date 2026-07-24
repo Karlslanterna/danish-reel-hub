@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import {

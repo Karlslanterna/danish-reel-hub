@@ -128,6 +128,15 @@ function MoviePage() {
             <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
               ← Tilbage
             </Link>
+            <div className="mt-4">
+              <Breadcrumb
+                items={[
+                  { label: "Forside", to: "/" },
+                  { label: "Film", current: true },
+                  { label: movie.title, current: true },
+                ]}
+              />
+            </div>
             <div className="mt-6 text-xs uppercase tracking-[0.25em] text-primary">
               {movie.genre.join(" · ")}
             </div>

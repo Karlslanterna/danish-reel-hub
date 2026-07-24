@@ -132,8 +132,8 @@ function MoviePage() {
               <Breadcrumb
                 items={[
                   { label: "Forside", to: "/" },
-                  { label: "Film", current: true },
-                  { label: movie.title, current: true },
+                  { label: "Film" },
+                  { label: movie.title },
                 ]}
               />
             </div>

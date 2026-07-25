@@ -4,9 +4,11 @@ type Props = {
   movie: Movie;
   className?: string;
   showTitle?: boolean;
+  priority?: boolean;
+  sizes?: string;
 };
 
-export function Poster({ movie, className = "", showTitle = true }: Props) {
+export function Poster({ movie, className = "", showTitle = true, priority = false, sizes }: Props) {
   const posterUrl = movie.poster.url;
   const style = {
     "--p-a": movie.poster.a,
@@ -24,7 +26,12 @@ export function Poster({ movie, className = "", showTitle = true }: Props) {
         <img
           src={posterUrl}
           alt={movie.poster.alt ?? movie.title}
-          loading="lazy"
+          width={400}
+          height={600}
+          loading={priority ? "eager" : "lazy"}
+          decoding={priority ? "sync" : "async"}
+          {...(priority ? { fetchPriority: "high" as const } : { fetchPriority: "low" as const })}
+          {...(sizes ? { sizes } : {})}
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}

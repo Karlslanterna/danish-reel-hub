@@ -114,6 +114,8 @@ function MoviePage() {
             src={movie.poster.url}
             alt=""
             aria-hidden
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
           />
         )}
@@ -121,7 +123,7 @@ function MoviePage() {
 
         <div className="relative mx-auto grid max-w-[1400px] grid-cols-1 gap-12 px-8 py-16 lg:grid-cols-[340px_1fr]">
           <div>
-            <Poster movie={movie} showTitle={false} className="shadow-2xl shadow-black/60" />
+            <Poster movie={movie} showTitle={false} priority sizes="(min-width: 1024px) 340px, 100vw" className="shadow-2xl shadow-black/60" />
           </div>
 
           <div className="flex flex-col">

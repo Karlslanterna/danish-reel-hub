@@ -114,6 +114,8 @@ function MoviePage() {
             src={movie.poster.url}
             alt=""
             aria-hidden
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
           />
         )}

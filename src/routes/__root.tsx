@@ -127,6 +127,17 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    initClientErrorMonitor();
+    supabase.auth.getSession().then(({ data }) => {
+      setMonitoringUser(data.session?.user?.id ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setMonitoringUser(session?.user?.id ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <FiltersProvider>

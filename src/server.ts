@@ -67,7 +67,7 @@ export default {
       const normalized = await normalizeCatastrophicSsrResponse(response);
       return withNoindexHeader(normalized, pathname);
     } catch (error) {
-      console.error(error);
+      console.error("[server:fetch]", { route: pathname, method: request.method }, error);
       return new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },

@@ -20,6 +20,7 @@ import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
+import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -84,6 +85,11 @@ const ApiPublicKultunautImportRoute =
     path: '/api/public/kultunaut-import',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicImportHealthRoute = ApiPublicImportHealthRouteImport.update({
+  id: '/api/public/import-health',
+  path: '/api/public/import-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminImportRoute =
   AuthenticatedAdminImportRouteImport.update({
     id: '/admin/import',
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
+  '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
+  '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
+  '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
   '/_authenticated/admin/import_/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/admin/import'
+    | '/api/public/import-health'
     | '/api/public/kultunaut-import'
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/admin/import'
+    | '/api/public/import-health'
     | '/api/public/kultunaut-import'
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/admin/import'
+    | '/api/public/import-health'
     | '/api/public/kultunaut-import'
     | '/_authenticated/admin/import_/$jobId'
     | '/api/public/kultunaut-import/process'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   FilmSlugRoute: typeof FilmSlugRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicImportHealthRoute: typeof ApiPublicImportHealthRoute
   ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
 }
 
@@ -327,6 +340,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/kultunaut-import'
       fullPath: '/api/public/kultunaut-import'
       preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/import-health': {
+      id: '/api/public/import-health'
+      path: '/api/public/import-health'
+      fullPath: '/api/public/import-health'
+      preLoaderRoute: typeof ApiPublicImportHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/import': {
@@ -417,6 +437,7 @@ const rootRouteChildren: RootRouteChildren = {
   FilmSlugRoute: FilmSlugRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicImportHealthRoute: ApiPublicImportHealthRoute,
   ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,
 }
 export const routeTree = rootRouteImport

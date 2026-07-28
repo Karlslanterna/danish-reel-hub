@@ -129,8 +129,9 @@ function classify(m: ImportMetrics): { status: HealthStatus; reasons: string[] }
   let level: 0 | 1 | 2 = 0; // 0 healthy, 1 warning, 2 critical
   const bump = (l: 1 | 2, reason: string) => {
     reasons.push(reason);
-    if (l > level) level = l;
+    if (l > level) level = l as 0 | 1 | 2;
   };
+
 
   if (m.lastJobId === null) {
     return { status: "unknown", reasons: ["No import jobs on record"] };

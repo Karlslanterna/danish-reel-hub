@@ -59,6 +59,36 @@ export type Database = {
         }
         Relationships: []
       }
+      import_health_events: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string | null
+          metrics: Json
+          previous_status: string | null
+          reasons: string[]
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          metrics?: Json
+          previous_status?: string | null
+          reasons?: string[]
+          status: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          metrics?: Json
+          previous_status?: string | null
+          reasons?: string[]
+          status?: string
+        }
+        Relationships: []
+      }
       import_jobs: {
         Row: {
           created_at: string

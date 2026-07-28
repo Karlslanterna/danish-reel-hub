@@ -220,7 +220,7 @@ async function recordTransition(
     previous_status: previous,
     reasons,
     job_id: metrics.lastJobId,
-    metrics: metrics as unknown as Record<string, unknown>,
+    metrics: JSON.parse(JSON.stringify(metrics)),
   });
   if (error) {
     console.error("[import-health] Failed to log transition:", error.message);

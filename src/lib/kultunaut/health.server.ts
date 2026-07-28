@@ -190,7 +190,9 @@ function classify(m: ImportMetrics): { status: HealthStatus; reasons: string[] }
     }
   }
 
-  const status: HealthStatus = level === 2 ? "critical" : level === 1 ? "warning" : "healthy";
+  const lvl = level as number;
+  const status: HealthStatus = lvl === 2 ? "critical" : lvl === 1 ? "warning" : "healthy";
+
   if (reasons.length === 0) reasons.push("All checks passed");
   return { status, reasons };
 }

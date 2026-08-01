@@ -431,3 +431,29 @@ export async function getSchedulerHealth(): Promise<SchedulerHealth> {
     hoursSinceLastSuccess,
   };
 }
+
+/**
+ * Verify the cron trigger token against `public.scheduler_secrets`.
+ * The token is generated inside Postgres and is readable only by
+ * service_role, so it never leaves the backend. Compared in constant time.
+ */
+export async function verifySchedulerToken(token: string | null): Promise<boolean> {
+  if (!token) return false;
+  const db = await admin();
+  const { data, error } = await db
+    .from("scheduler_secrets")
+    .select("value")
+    .eq("name", "kultunaut_cron")
+    .maybeSingle();
+  if (error || !data?.value) {
+    logError("token_lookup_failed", { error: error?.message ?? "token missing" });
+    return false;
+  }
+  const expected = data.value as string;
+  if (expected.length !== token.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ token.charCodeAt(i);
+  }
+  return diff === 0;
+}

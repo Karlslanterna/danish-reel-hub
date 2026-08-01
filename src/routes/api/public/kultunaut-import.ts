@@ -26,10 +26,14 @@ export const Route = createFileRoute("/api/public/kultunaut-import")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        if (request.headers.get("x-kultunaut-mode") === "scheduled") {
+        const mode = request.headers.get("x-kultunaut-mode");
+        if (mode === "scheduled" || mode === "resume") {
           try {
             const { runScheduledImport } = await import("@/lib/kultunaut/scheduler.server");
-            const result = await runScheduledImport("cron");
+            const result =
+              mode === "resume"
+                ? await runScheduledImport("resume", true)
+                : await runScheduledImport("cron");
             return Response.json(result, {
               status: result.status === "failed" ? 500 : 200,
               headers: { "cache-control": "no-store" },

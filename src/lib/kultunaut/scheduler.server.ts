@@ -161,7 +161,8 @@ async function activeImportJob(): Promise<string | null> {
  * active, and otherwise creates + drains a fresh import job.
  */
 export async function runScheduledImport(
-  trigger: "cron" | "manual" = "cron",
+  trigger: "cron" | "manual" | "resume" = "cron",
+  resumeOnly = false,
 ): Promise<ScheduleRunResult> {
   const db = await admin();
 
@@ -205,6 +206,21 @@ export async function runScheduledImport(
       startedAtMs,
       (inFlight.attempts as number) ?? 0,
     );
+  }
+
+  // 1b. Resume-only triggers never start a new import.
+  if (resumeOnly) {
+    log("run_skipped", { reason: "resume trigger with no run in progress" });
+    return {
+      runId: null,
+      status: "skipped",
+      reason: "No scheduled run in progress to resume",
+      jobId: null,
+      attempts: 0,
+      startedAt: null,
+      finishedAt: null,
+      durationSeconds: null,
+    };
   }
 
   // 2. Skip when a manual import is in flight — never overlap.

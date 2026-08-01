@@ -149,6 +149,48 @@ export type Database = {
         }
         Relationships: []
       }
+      import_schedule_runs: {
+        Row: {
+          attempts: number
+          created_at: string
+          duration_seconds: number | null
+          finished_at: string | null
+          id: string
+          job_id: string | null
+          reason: string | null
+          started_at: string
+          status: string
+          trigger: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          duration_seconds?: number | null
+          finished_at?: string | null
+          id?: string
+          job_id?: string | null
+          reason?: string | null
+          started_at?: string
+          status?: string
+          trigger?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          duration_seconds?: number | null
+          finished_at?: string | null
+          id?: string
+          job_id?: string | null
+          reason?: string | null
+          started_at?: string
+          status?: string
+          trigger?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       movies: {
         Row: {
           created_at: string
@@ -200,6 +242,27 @@ export type Database = {
           title?: string
           trailer_url?: string | null
           year?: number
+        }
+        Relationships: []
+      }
+      scheduler_secrets: {
+        Row: {
+          created_at: string
+          name: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          updated_at?: string
+          value?: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }

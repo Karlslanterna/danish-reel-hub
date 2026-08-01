@@ -19,15 +19,27 @@ export const Route = createFileRoute("/api/public/import-health")({
       GET: async () => {
         try {
           const { getImportHealth } = await import("@/lib/kultunaut/health.server");
-          const report = await getImportHealth();
-          const httpStatus = report.status === "critical" ? 503 : 200;
-          return Response.json(report, {
-            status: httpStatus,
-            headers: {
-              "cache-control": "no-store",
-              "x-robots-tag": "noindex",
+          const { getSchedulerHealth } = await import("@/lib/kultunaut/scheduler.server");
+          const [report, scheduler] = await Promise.all([
+            getImportHealth(),
+            getSchedulerHealth(),
+          ]);
+          // The scheduler can only make the overall picture worse.
+          const rank = { healthy: 0, unknown: 1, warning: 2, critical: 3 } as const;
+          const overall =
+            rank[scheduler.status] > rank[report.status] ? scheduler.status : report.status;
+          const httpStatus = overall === "critical" ? 503 : 200;
+          return Response.json(
+            { ...report, status: overall, importStatus: report.status, scheduler },
+            {
+              status: httpStatus,
+              headers: {
+                "cache-control": "no-store",
+                "x-robots-tag": "noindex",
+              },
             },
-          });
+          );
+
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
           console.error("[import-health] check failed:", message);

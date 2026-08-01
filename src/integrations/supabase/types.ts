@@ -245,6 +245,27 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduler_secrets: {
+        Row: {
+          created_at: string
+          name: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          updated_at?: string
+          value?: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       showtimes: {
         Row: {
           booking_url: string | null

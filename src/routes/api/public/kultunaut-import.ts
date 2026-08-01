@@ -3,11 +3,15 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * POST /api/public/kultunaut-import
  *
- * Accepts a Kultunaut XML payload and creates a background import job.
- * Returns immediately with `{ jobId }`. Processing is driven by polling
- * /api/public/kultunaut-import/process and /api/public/kultunaut-import/status.
+ * Two modes on the SAME endpoint (no new public surface):
+ *  1. Manual: body = Kultunaut XML → creates a background import job and
+ *     returns `{ jobId }`. Processing is driven by polling
+ *     /api/public/kultunaut-import/process and .../status.
+ *  2. Scheduled: header `x-kultunaut-mode: scheduled` (sent by the daily
+ *     pg_cron job) → runs the automated scheduler, which fetches the feed,
+ *     creates the job, drains it and refreshes import health.
  *
- * Auth: requires header `x-kultunaut-secret: <KULTUNAUT_IMPORT_SECRET>`.
+ * Auth (both modes): header `x-kultunaut-secret: <KULTUNAUT_IMPORT_SECRET>`.
  */
 export const Route = createFileRoute("/api/public/kultunaut-import")({
   server: {
@@ -22,11 +26,27 @@ export const Route = createFileRoute("/api/public/kultunaut-import")({
           return new Response("Unauthorized", { status: 401 });
         }
 
+        if (request.headers.get("x-kultunaut-mode") === "scheduled") {
+          try {
+            const { runScheduledImport } = await import("@/lib/kultunaut/scheduler.server");
+            const result = await runScheduledImport("cron");
+            return Response.json(result, {
+              status: result.status === "failed" ? 500 : 200,
+              headers: { "cache-control": "no-store" },
+            });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Unknown error";
+            console.error("[import-scheduler] run crashed:", message);
+            return Response.json({ status: "failed", reason: message }, { status: 500 });
+          }
+        }
+
         const body = await request.text();
         if (!body) return new Response("Empty body", { status: 400 });
         if (body.length > 20_000_000) {
           return new Response("Payload too large (max 20MB)", { status: 413 });
         }
+
 
         try {
           const { createImportJob } = await import("@/lib/kultunaut/import.server");

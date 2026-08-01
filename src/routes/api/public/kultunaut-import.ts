@@ -17,17 +17,32 @@ export const Route = createFileRoute("/api/public/kultunaut-import")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.KULTUNAUT_IMPORT_SECRET;
-        if (!secret) {
-          return new Response("Import secret not configured", { status: 500 });
-        }
-        const provided = request.headers.get("x-kultunaut-secret");
-        if (!provided || provided !== secret) {
-          return new Response("Unauthorized", { status: 401 });
+        const mode = request.headers.get("x-kultunaut-mode");
+        const isScheduler = mode === "scheduled" || mode === "resume";
+
+        if (isScheduler) {
+          // The scheduler authenticates with a token generated inside the
+          // database and readable only by service_role (never exposed).
+          const { verifySchedulerToken } = await import("@/lib/kultunaut/scheduler.server");
+          const token = request.headers.get("x-kultunaut-cron-token");
+          const envSecret = process.env.KULTUNAUT_IMPORT_SECRET;
+          const viaEnv =
+            !!envSecret && request.headers.get("x-kultunaut-secret") === envSecret;
+          const ok = viaEnv || (await verifySchedulerToken(token));
+          if (!ok) return new Response("Unauthorized", { status: 401 });
+        } else {
+          const secret = process.env.KULTUNAUT_IMPORT_SECRET;
+          if (!secret) {
+            return new Response("Import secret not configured", { status: 500 });
+          }
+          const provided = request.headers.get("x-kultunaut-secret");
+          if (!provided || provided !== secret) {
+            return new Response("Unauthorized", { status: 401 });
+          }
         }
 
-        const mode = request.headers.get("x-kultunaut-mode");
-        if (mode === "scheduled" || mode === "resume") {
+        if (isScheduler) {
+
           try {
             const { runScheduledImport } = await import("@/lib/kultunaut/scheduler.server");
             const result =

@@ -374,7 +374,7 @@ export async function getSchedulerHealth(): Promise<SchedulerHealth> {
     : null;
 
   const reasons: string[] = [];
-  let level: 0 | 1 | 2 = 0;
+  let level: number = 0;
   const bump = (l: 1 | 2, reason: string) => {
     reasons.push(reason);
     if (l > level) level = l;

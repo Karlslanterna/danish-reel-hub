@@ -145,10 +145,14 @@ async function finishRun(
 /** True when a manual/admin import job is still in flight. */
 async function activeImportJob(): Promise<string | null> {
   const db = await admin();
+  // Only jobs touched in the last 2 hours count as "in flight" — an older
+  // queued/running row is abandoned and must not block the daily import.
+  const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
   const { data } = await db
     .from("import_jobs")
-    .select("id,status")
+    .select("id,status,updated_at")
     .in("status", ["queued", "running"])
+    .gte("updated_at", cutoff)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

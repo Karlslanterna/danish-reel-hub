@@ -136,7 +136,7 @@ function CityPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Film i {city}</h2>
-            <FilterBar />
+            <FilterBar genres={allGenres} />
             {hasFilters && (
               <button
                 type="button"

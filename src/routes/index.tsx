@@ -52,9 +52,11 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, geoError, geoLoading, clear } = useFilters();
-  const hasFilters = Boolean(selectedDate) || radius !== "all";
+  const { radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, clear } = useFilters();
+  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre);
   const navigate = useNavigate();
+
+  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const boxRef = useRef<HTMLDivElement>(null);
 
   const nearbyCinemaIds = useMemo(() => {

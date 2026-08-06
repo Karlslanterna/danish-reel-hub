@@ -72,6 +72,11 @@ function CinemaPage() {
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const hasFilters = Boolean(selectedDate) || Boolean(selectedGenre);
 
+  const filteredMovies = useMemo(
+    () => (selectedGenre ? movies.filter((m) => m.genre.includes(selectedGenre)) : movies),
+    [movies, selectedGenre],
+  );
+
   const showtimesByMovie = new Map<string, Showtime[]>();
   for (const s of showtimes) {
     if (s.date !== activeDate) continue;
@@ -80,7 +85,7 @@ function CinemaPage() {
     showtimesByMovie.set(s.movieId, arr);
   }
 
-  const rows = movies
+  const rows = filteredMovies
     .map((m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }))
     .sort((a, b) => (b.shows.length > 0 ? 1 : 0) - (a.shows.length > 0 ? 1 : 0));
 

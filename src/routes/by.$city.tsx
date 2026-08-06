@@ -101,8 +101,8 @@ function CityPage() {
       if (selectedDate && s.date !== selectedDate) continue;
       movieIds.add(s.movieId);
     }
-    return movies.filter((m) => movieIds.has(m.id));
-  }, [movies, showtimes, selectedDate, nearbyCinemaIds, cityCinemaIds]);
+    return movies.filter((m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)));
+  }, [movies, showtimes, selectedDate, selectedGenre, nearbyCinemaIds, cityCinemaIds]);
 
   return (
     <div className="min-h-screen bg-background">

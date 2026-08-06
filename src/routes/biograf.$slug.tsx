@@ -66,8 +66,10 @@ function CinemaPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { selectedDate, clear } = useFilters();
+  const { selectedDate, selectedGenre, clear } = useFilters();
   const activeDate = selectedDate ?? todayStr();
+  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
+  const hasFilters = Boolean(selectedDate) || Boolean(selectedGenre);
 
   const showtimesByMovie = new Map<string, Showtime[]>();
   for (const s of showtimes) {

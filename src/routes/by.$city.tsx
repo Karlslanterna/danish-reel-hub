@@ -75,8 +75,10 @@ function CityPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { radius, userLoc, selectedDate, geoLoading, geoError, clear } = useFilters();
-  const hasFilters = Boolean(selectedDate) || radius !== "all";
+  const { radius, userLoc, selectedDate, selectedGenre, geoLoading, geoError, clear } = useFilters();
+  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre);
+
+  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
 
   const cityCinemaIds = useMemo(() => new Set(cinemas.map((c) => c.id)), [cinemas]);
 
@@ -99,8 +101,8 @@ function CityPage() {
       if (selectedDate && s.date !== selectedDate) continue;
       movieIds.add(s.movieId);
     }
-    return movies.filter((m) => movieIds.has(m.id));
-  }, [movies, showtimes, selectedDate, nearbyCinemaIds, cityCinemaIds]);
+    return movies.filter((m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)));
+  }, [movies, showtimes, selectedDate, selectedGenre, nearbyCinemaIds, cityCinemaIds]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -134,7 +136,7 @@ function CityPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Film i {city}</h2>
-            <FilterBar />
+            <FilterBar genres={allGenres} />
             {hasFilters && (
               <button
                 type="button"
@@ -151,6 +153,7 @@ function CityPage() {
             <div>
               {filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
               {radius !== "all" && userLoc ? ` · inden for ${radius} km` : ""}
+              {selectedGenre ? ` · ${selectedGenre}` : ""}
             </div>
           </div>
         </div>

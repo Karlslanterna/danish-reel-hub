@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -39,10 +40,12 @@ type FiltersState = {
   radius: Radius;
   userLoc: Loc | null;
   selectedDate: string | null;
+  selectedGenre: string | null;
   geoError: string | null;
   geoLoading: boolean;
   setRadius: (r: Radius) => void;
   setSelectedDate: (d: string | null) => void;
+  setSelectedGenre: (g: string | null) => void;
   requestLocation: (onSuccess?: () => void) => void;
   clear: () => void;
 };
@@ -51,22 +54,23 @@ const FiltersContext = createContext<FiltersState | null>(null);
 
 const STORAGE_KEY = "lanterna.filters.v1";
 
-type Persisted = { radius: Radius; userLoc: Loc | null; selectedDate: string | null };
+type Persisted = { radius: Radius; userLoc: Loc | null; selectedDate: string | null; selectedGenre: string | null };
 
 function loadPersisted(): Persisted {
-  if (typeof window === "undefined") return { radius: "all", userLoc: null, selectedDate: null };
+  if (typeof window === "undefined") return { radius: "all", userLoc: null, selectedDate: null, selectedGenre: null };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { radius: "all", userLoc: null, selectedDate: null };
+    if (!raw) return { radius: "all", userLoc: null, selectedDate: null, selectedGenre: null };
     const p = JSON.parse(raw) as Partial<Persisted>;
     const radius: Radius = p.radius === "all" || (typeof p.radius === "number" && [2, 5, 10, 25, 50].includes(p.radius)) ? (p.radius as Radius) : "all";
     const userLoc = p.userLoc && typeof p.userLoc.lat === "number" && typeof p.userLoc.lng === "number" ? p.userLoc : null;
     let selectedDate = typeof p.selectedDate === "string" ? p.selectedDate : null;
+    const selectedGenre = typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
     // drop past dates
     if (selectedDate && selectedDate < todayStr()) selectedDate = null;
-    return { radius, userLoc, selectedDate };
+    return { radius, userLoc, selectedDate, selectedGenre };
   } catch {
-    return { radius: "all", userLoc: null, selectedDate: null };
+    return { radius: "all", userLoc: null, selectedDate: null, selectedGenre: null };
   }
 }
 
@@ -74,6 +78,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [radius, setRadiusState] = useState<Radius>("all");
   const [userLoc, setUserLoc] = useState<Loc | null>(null);
   const [selectedDate, setSelectedDateState] = useState<string | null>(null);
+  const [selectedGenre, setSelectedGenreState] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
 
@@ -83,18 +88,20 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setRadiusState(p.radius);
     setUserLoc(p.userLoc);
     setSelectedDateState(p.selectedDate);
+    setSelectedGenreState(p.selectedGenre);
   }, []);
 
   // Persist
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ radius, userLoc, selectedDate }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ radius, userLoc, selectedDate, selectedGenre }));
     } catch { /* ignore */ }
-  }, [radius, userLoc, selectedDate]);
+  }, [radius, userLoc, selectedDate, selectedGenre]);
 
   const setRadius = useCallback((r: Radius) => setRadiusState(r), []);
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
+  const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
 
   const requestLocation = useCallback((onSuccess?: () => void) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
@@ -121,11 +128,12 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => {
     setRadiusState("all");
     setSelectedDateState(null);
+    setSelectedGenreState(null);
   }, []);
 
   const value = useMemo<FiltersState>(
-    () => ({ radius, userLoc, selectedDate, geoError, geoLoading, setRadius, setSelectedDate, requestLocation, clear }),
-    [radius, userLoc, selectedDate, geoError, geoLoading, setRadius, setSelectedDate, requestLocation, clear],
+    () => ({ radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, requestLocation, clear }),
+    [radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, requestLocation, clear],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;
@@ -137,12 +145,21 @@ export function useFilters() {
   return ctx;
 }
 
-export function FilterBar({ className = "", hideRadius = false }: { className?: string; hideRadius?: boolean }) {
-  const { radius, userLoc, selectedDate, setRadius, setSelectedDate, requestLocation } = useFilters();
+export function FilterBar({ className = "", hideRadius = false, genres }: { className?: string; hideRadius?: boolean; genres?: string[] }) {
+  const { radius, userLoc, selectedDate, selectedGenre, setRadius, setSelectedDate, setSelectedGenre, requestLocation } = useFilters();
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [moreView, setMoreView] = useState<"menu" | "genres">("menu");
   const TODAY = todayStr();
   const TOMORROW = tomorrowStr();
+
+  const sortedGenres = useMemo(() => {
+    if (!genres || genres.length === 0) return [];
+    return Array.from(new Set(genres)).sort((a, b) => a.localeCompare(b, "da"));
+  }, [genres]);
+
+  const hasMoreFilters = Boolean(selectedGenre);
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
@@ -261,6 +278,78 @@ export function FilterBar({ className = "", hideRadius = false }: { className?: 
               </button>
             )}
           </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover
+        open={moreOpen}
+        onOpenChange={(open) => {
+          setMoreOpen(open);
+          if (!open) setMoreView("menu");
+        }}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="Flere filtre"
+            className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border transition-colors ${
+              hasMoreFilters
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+            }`}
+          >
+            <Plus size="14" strokeWidth={2.5} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2" align="start">
+          {moreView === "menu" ? (
+            <div className="flex flex-col gap-1">
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Flere filtre</div>
+              {sortedGenres.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setMoreView("genres")}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                >
+                  <span>Genre</span>
+                  <div className="flex items-center gap-2">
+                    {selectedGenre && <span className="max-w-[80px] truncate text-xs text-primary">{selectedGenre}</span>}
+                    <ChevronRight size="14" className="text-muted-foreground" />
+                  </div>
+                </button>
+              )}
+              {sortedGenres.length === 0 && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">Ingen ekstra filtre tilgængelige</div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => setMoreView("menu")}
+                className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
+              >
+                <ArrowLeft size="12" />
+                Tilbage
+              </button>
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Vælg genre</div>
+              {sortedGenres.map((g) => {
+                const selected = selectedGenre === g;
+                return (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => { setSelectedGenre(selected ? null : g); setMoreOpen(false); }}
+                    className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                      selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {g}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     </div>

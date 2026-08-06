@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
@@ -66,8 +67,15 @@ function CinemaPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { selectedDate, clear } = useFilters();
+  const { selectedDate, selectedGenre, clear } = useFilters();
   const activeDate = selectedDate ?? todayStr();
+  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
+  const hasFilters = Boolean(selectedDate) || Boolean(selectedGenre);
+
+  const filteredMovies = useMemo(
+    () => (selectedGenre ? movies.filter((m) => m.genre.includes(selectedGenre)) : movies),
+    [movies, selectedGenre],
+  );
 
   const showtimesByMovie = new Map<string, Showtime[]>();
   for (const s of showtimes) {
@@ -77,7 +85,7 @@ function CinemaPage() {
     showtimesByMovie.set(s.movieId, arr);
   }
 
-  const rows = movies
+  const rows = filteredMovies
     .map((m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }))
     .sort((a, b) => (b.shows.length > 0 ? 1 : 0) - (a.shows.length > 0 ? 1 : 0));
 
@@ -135,8 +143,8 @@ function CinemaPage() {
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Film på plakaten</h2>
-            <FilterBar hideRadius />
-            {selectedDate && (
+            <FilterBar hideRadius genres={allGenres} />
+            {hasFilters && (
               <button
                 type="button"
                 onClick={clear}
@@ -147,7 +155,7 @@ function CinemaPage() {
             )}
           </div>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {withShows.length} film · {fmtDateLabel(activeDate)}
+            {withShows.length} film · {fmtDateLabel(activeDate)}{selectedGenre ? ` · ${selectedGenre}` : ""}
           </div>
         </div>
 

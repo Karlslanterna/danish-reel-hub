@@ -52,9 +52,11 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, geoError, geoLoading, clear } = useFilters();
-  const hasFilters = Boolean(selectedDate) || radius !== "all";
+  const { radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, clear } = useFilters();
+  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre);
   const navigate = useNavigate();
+
+  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const boxRef = useRef<HTMLDivElement>(null);
 
   const nearbyCinemaIds = useMemo(() => {
@@ -168,6 +170,7 @@ function HomePage() {
       (m) => {
         if (nearbyMovieIds && !nearbyMovieIds.has(m.id)) return false;
         if (dateMovieIds && !dateMovieIds.has(m.id)) return false;
+        if (selectedGenre && !m.genre.includes(selectedGenre)) return false;
         return (
           !q ||
           m.title.toLowerCase().includes(q) ||
@@ -176,7 +179,7 @@ function HomePage() {
         );
       },
     );
-  }, [query, movies, nearbyMovieIds, dateMovieIds]);
+  }, [query, movies, nearbyMovieIds, dateMovieIds, selectedGenre]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 
@@ -305,7 +308,7 @@ function HomePage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
-            <FilterBar />
+            <FilterBar genres={allGenres} />
             {hasFilters && (
               <button
                 type="button"
@@ -320,10 +323,10 @@ function HomePage() {
             {geoLoading && <div>Finder din placering…</div>}
             {geoError && <div className="text-destructive">{geoError}</div>}
             {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
-              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}</div>
+              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
             )}
             {(radius === "all" || (!userLoc && !geoLoading)) && (
-              <div>{filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}</div>
+              <div>{filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
             )}
           </div>
         </div>

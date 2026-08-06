@@ -170,6 +170,7 @@ function HomePage() {
       (m) => {
         if (nearbyMovieIds && !nearbyMovieIds.has(m.id)) return false;
         if (dateMovieIds && !dateMovieIds.has(m.id)) return false;
+        if (selectedGenre && !m.genre.includes(selectedGenre)) return false;
         return (
           !q ||
           m.title.toLowerCase().includes(q) ||
@@ -178,7 +179,7 @@ function HomePage() {
         );
       },
     );
-  }, [query, movies, nearbyMovieIds, dateMovieIds]);
+  }, [query, movies, nearbyMovieIds, dateMovieIds, selectedGenre]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 

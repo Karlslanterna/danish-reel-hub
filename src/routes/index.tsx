@@ -323,10 +323,10 @@ function HomePage() {
             {geoLoading && <div>Finder din placering…</div>}
             {geoError && <div className="text-destructive">{geoError}</div>}
             {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
-              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}</div>
+              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
             )}
             {(radius === "all" || (!userLoc && !geoLoading)) && (
-              <div>{filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}</div>
+              <div>{filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
             )}
           </div>
         </div>

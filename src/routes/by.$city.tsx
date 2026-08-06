@@ -75,8 +75,10 @@ function CityPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { radius, userLoc, selectedDate, geoLoading, geoError, clear } = useFilters();
-  const hasFilters = Boolean(selectedDate) || radius !== "all";
+  const { radius, userLoc, selectedDate, selectedGenre, geoLoading, geoError, clear } = useFilters();
+  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre);
+
+  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
 
   const cityCinemaIds = useMemo(() => new Set(cinemas.map((c) => c.id)), [cinemas]);
 

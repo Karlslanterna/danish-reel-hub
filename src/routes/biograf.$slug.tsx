@@ -155,7 +155,7 @@ function CinemaPage() {
             )}
           </div>
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {withShows.length} film · {fmtDateLabel(activeDate)}
+            {withShows.length} film · {fmtDateLabel(activeDate)}{selectedGenre ? ` · ${selectedGenre}` : ""}
           </div>
         </div>
 

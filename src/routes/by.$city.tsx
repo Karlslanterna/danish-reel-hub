@@ -153,6 +153,7 @@ function CityPage() {
             <div>
               {filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
               {radius !== "all" && userLoc ? ` · inden for ${radius} km` : ""}
+              {selectedGenre ? ` · ${selectedGenre}` : ""}
             </div>
           </div>
         </div>

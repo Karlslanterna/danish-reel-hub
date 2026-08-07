@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { SiteHeader } from "@/components/SiteHeader";
 
-function isSafeNext(next: string | undefined): next is string {
+export function isSafeNext(next: string | undefined): next is string {
   return !!next && next.startsWith("/") && !next.startsWith("//");
 }
 

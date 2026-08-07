@@ -50,7 +50,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-8">
         <Link to="/" className="flex items-center gap-3">
           <img src="/logo.svg" alt="Lanterna" width={32} height={32} className="h-8 w-8" />
-          <span className="font-display text-lg font-bold tracking-tight">Lanterna - Danmarks nye biografportal</span>
+          <span className="font-hero text-lg font-bold tracking-tight">Lanterna - Danmarks nye biografportal</span>
         </Link>
         <nav className="flex items-center gap-7 text-sm text-muted-foreground">
           {isAuthenticated ? (

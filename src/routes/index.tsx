@@ -229,7 +229,7 @@ function HomePage() {
               <h1 className="mt-4 font-hero text-5xl leading-[0.95] tracking-tight text-foreground">
                 En hurtigere vej i biografen
               </h1>
-              <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
+              <p className="font-hero mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
                 Alle danske biografer og aktuelle film, ét sted.
               </p>
             </div>

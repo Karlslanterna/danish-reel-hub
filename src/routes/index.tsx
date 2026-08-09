@@ -7,6 +7,7 @@ import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters"
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
 import { homeSchemas } from "@/lib/jsonld";
+import { useLanguage, LanguageToggle } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -55,6 +56,7 @@ function HomePage() {
   const { radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, clear } = useFilters();
   const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre);
   const navigate = useNavigate();
+  const { t, lang } = useLanguage();
 
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -131,7 +133,7 @@ function HomePage() {
         out.push({
           kind: "city",
           label: b.city,
-          sub: `${b.cinemas} ${b.cinemas === 1 ? "biograf" : "biografer"} · ${b.variants} områder`,
+          sub: `${b.cinemas} ${b.cinemas === 1 ? t("sug.cinema") : t("sug.cinemas")} · ${b.variants} ${t("sug.areas")}`,
           city: b.city,
         });
         seenCities.add(b.city.toLowerCase());
@@ -145,7 +147,7 @@ function HomePage() {
         out.push({
           kind: "city",
           label: c.city,
-          sub: `${c.count} ${c.count === 1 ? "biograf" : "biografer"}`,
+          sub: `${c.count} ${c.count === 1 ? t("sug.cinema") : t("sug.cinemas")}`,
           city: c.city,
         });
         seenCities.add(c.city.toLowerCase());
@@ -227,15 +229,15 @@ function HomePage() {
           <div className="flex items-end justify-between gap-12">
             <div className="max-w-2xl">
               <h1 className="mt-4 font-hero text-5xl leading-[0.95] tracking-tight text-foreground">
-                En hurtigere vej i biografen
+                {t("home.hero")}
               </h1>
               <p className="font-hero mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-                Alle danske biografer og aktuelle film, ét sted.
+                {t("home.sub")}
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
-              <div>{movies.length} film</div>
-              <div className="mt-1">{cinemas.length} biografer</div>
+              <div>{movies.length} {t("home.movies")}</div>
+              <div className="mt-1">{cinemas.length} {t("home.cinemas")}</div>
             </div>
           </div>
 
@@ -255,7 +257,7 @@ function HomePage() {
                 }}
                 onFocus={() => setOpen(true)}
                 onKeyDown={onKeyDown}
-                placeholder="Søg på film, biograf eller by"
+                placeholder={t("home.search")}
                 className="h-20 w-full rounded-md border border-primary/80 bg-primary pl-16 pr-6 font-display text-2xl text-primary-foreground placeholder:font-sans placeholder:text-lg placeholder:text-primary-foreground/60 focus:border-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary-foreground/30"
                 aria-autocomplete="list"
                 aria-expanded={open && suggestions.length > 0}
@@ -268,7 +270,7 @@ function HomePage() {
                   }}
                   className="absolute right-4 top-10 -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
                 >
-                  Ryd
+                  {t("home.clearSearch")}
                 </button>
               )}
 
@@ -292,13 +294,16 @@ function HomePage() {
                           <div className="truncate text-xs text-muted-foreground">{s.sub}</div>
                         </div>
                         <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-primary">
-                          {s.kind === "movie" ? "Film" : s.kind === "cinema" ? "Biograf" : "By"}
+                          {s.kind === "movie" ? t("kind.movie") : s.kind === "cinema" ? t("kind.cinema") : t("kind.city")}
                         </span>
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
+            </div>
+            <div className="mt-5 flex justify-center">
+              <LanguageToggle />
             </div>
           </div>
         </div>
@@ -307,7 +312,7 @@ function HomePage() {
       <section className="mx-auto max-w-[1400px] px-8 py-14">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
+            <h2 className="font-display text-2xl tracking-tight">{t("home.currentMovies")}</h2>
             <FilterBar genres={allGenres} />
             {hasFilters && (
               <button
@@ -315,27 +320,27 @@ function HomePage() {
                 onClick={clear}
                 className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
-                Ryd filtre
+                {t("home.clearFilters")}
               </button>
             )}
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {geoLoading && <div>Finder din placering…</div>}
+            {geoLoading && <div>{t("home.locating")}</div>}
             {geoError && <div className="text-destructive">{geoError}</div>}
             {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
-              <div>{nearbyCinemaCount} biografer · {filtered.length} film inden for {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
+              <div>{nearbyCinemaCount} {t("home.cinemas")} · {filtered.length} {t("home.movies")} {t("home.within")} {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate, lang)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
             )}
             {(radius === "all" || (!userLoc && !geoLoading)) && (
-              <div>{filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
+              <div>{filtered.length} {t("home.movies")}{selectedDate ? ` · ${fmtDateLabel(selectedDate, lang)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
             )}
           </div>
         </div>
 
         {filtered.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-24 text-center">
-            <p className="font-display text-xl text-foreground">Ingen film matcher</p>
+            <p className="font-display text-xl text-foreground">{t("home.noMatch")}</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {radius !== "all" && userLoc ? "Prøv en større radius." : "Prøv et andet søgeord."}
+              {radius !== "all" && userLoc ? t("home.tryRadius") : t("home.tryQuery")}
             </p>
           </div>
         ) : (
@@ -351,9 +356,9 @@ function HomePage() {
       <section id="cinemas" className="border-t border-border/60 bg-card/30">
         <div className="mx-auto max-w-[1400px] px-8 py-16">
           <div className="mb-8 flex items-baseline justify-between">
-            <h2 className="font-display text-2xl tracking-tight">Biografer</h2>
+            <h2 className="font-display text-2xl tracking-tight">{t("home.cinemasHeading")}</h2>
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {nearbyCinemaIds ? `${nearbyCinemaIds.size} inden for ${radius} km` : `${cinemas.length} steder`}
+              {nearbyCinemaIds ? `${nearbyCinemaIds.size} ${t("home.within")} ${radius} km` : `${cinemas.length} ${t("home.places")}`}
             </div>
           </div>
           <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md bg-border md:grid-cols-2 lg:grid-cols-3">
@@ -370,7 +375,7 @@ function HomePage() {
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.description}</p>
                 </div>
                 <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{c.screens} sale</span>
+                  <span>{c.screens} {t("home.screens")}</span>
                   <span className="text-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary">→</span>
                 </div>
               </Link>

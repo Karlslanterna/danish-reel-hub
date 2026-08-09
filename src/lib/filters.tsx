@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
+import { useLanguage, type Lang } from "@/lib/i18n";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -27,11 +28,12 @@ export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; l
 const todayStr = () => new Date().toISOString().split("T")[0];
 const tomorrowStr = () => new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
-export function fmtDateLabel(date: string | null) {
-  if (!date) return "Dato";
-  if (date === todayStr()) return "I dag";
-  if (date === tomorrowStr()) return "I morgen";
-  return new Date(date + "T12:00:00").toLocaleDateString("da-DK", { day: "numeric", month: "short" });
+export function fmtDateLabel(date: string | null, lang: Lang = "da") {
+  const en = lang === "en";
+  if (!date) return en ? "Date" : "Dato";
+  if (date === todayStr()) return en ? "Today" : "I dag";
+  if (date === tomorrowStr()) return en ? "Tomorrow" : "I morgen";
+  return new Date(date + "T12:00:00").toLocaleDateString(en ? "en-GB" : "da-DK", { day: "numeric", month: "short" });
 }
 
 type Loc = { lat: number; lng: number };
@@ -151,12 +153,13 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreView, setMoreView] = useState<"menu" | "genres">("menu");
+  const { t, lang } = useLanguage();
   const TODAY = todayStr();
   const TOMORROW = tomorrowStr();
 
   const sortedGenres = useMemo(() => {
     if (!genres || genres.length === 0) return [];
-    return Array.from(new Set(genres)).sort((a, b) => a.localeCompare(b, "da"));
+    return Array.from(new Set(genres)).sort((a, b) => a.localeCompare(b, lang));
   }, [genres]);
 
   const hasMoreFilters = Boolean(selectedGenre);
@@ -185,12 +188,13 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
               </svg>
-              {radius === "all" ? "Afstand fra mig" : `Inden for ${radius} km`}
+              {radius === "all" ? t("filter.distance") : `${t("filter.within")} ${radius} km`}
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-2" align="start">
             <div className="flex flex-col gap-1">
               {RADIUS_OPTIONS.map((opt) => {
+                const label = opt.value === "all" ? t("filter.allDenmark") : opt.label;
                 const selected = radius === opt.value;
                 return (
                   <button
@@ -201,7 +205,7 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
                       selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
                     }`}
                   >
-                    {opt.label}
+                    {label}
                   </button>
                 );
               })}
@@ -226,7 +230,7 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            {fmtDateLabel(selectedDate)}
+            {fmtDateLabel(selectedDate, lang)}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="start">
@@ -236,14 +240,14 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
               onClick={() => { setSelectedDate(TODAY); setDateOpen(false); }}
               className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TODAY ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
             >
-              I dag
+              {t("filter.today")}
             </button>
             <button
               type="button"
               onClick={() => { setSelectedDate(TOMORROW); setDateOpen(false); }}
               className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TOMORROW ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
             >
-              I morgen
+              {t("filter.tomorrow")}
             </button>
             <div className="px-2 py-2">
               <Calendar
@@ -274,7 +278,7 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
                 onClick={() => { setSelectedDate(null); setDateOpen(false); }}
                 className="rounded-md px-4 py-2 text-left text-xs uppercase tracking-[0.15em] text-muted-foreground hover:bg-secondary"
               >
-                Ryd dato
+                {t("filter.clearDate")}
               </button>
             )}
           </div>
@@ -291,7 +295,7 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label="Flere filtre"
+            aria-label={t("filter.more")}
             className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border transition-colors ${
               hasMoreFilters
                 ? "border-primary bg-primary text-primary-foreground"
@@ -304,14 +308,14 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
         <PopoverContent className="w-56 p-2" align="start">
           {moreView === "menu" ? (
             <div className="flex flex-col gap-1">
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Flere filtre</div>
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.more")}</div>
               {sortedGenres.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setMoreView("genres")}
                   className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
                 >
-                  <span>Genre</span>
+                  <span>{t("filter.genre")}</span>
                   <div className="flex items-center gap-2">
                     {selectedGenre && <span className="max-w-[80px] truncate text-xs text-primary">{selectedGenre}</span>}
                     <ChevronRight size="14" className="text-muted-foreground" />
@@ -319,7 +323,7 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
                 </button>
               )}
               {sortedGenres.length === 0 && (
-                <div className="px-3 py-2 text-sm text-muted-foreground">Ingen ekstra filtre tilgængelige</div>
+                <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
               )}
             </div>
           ) : (
@@ -330,9 +334,9 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
                 className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
               >
                 <ArrowLeft size="12" />
-                Tilbage
+                {t("filter.back")}
               </button>
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Vælg genre</div>
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickGenre")}</div>
               {sortedGenres.map((g) => {
                 const selected = selectedGenre === g;
                 return (

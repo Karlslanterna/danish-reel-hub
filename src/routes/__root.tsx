@@ -16,6 +16,7 @@ import {
   setMonitoringUser,
 } from "../lib/lovable-error-reporting";
 import { FiltersProvider } from "../lib/filters";
+import { LanguageProvider } from "../lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {

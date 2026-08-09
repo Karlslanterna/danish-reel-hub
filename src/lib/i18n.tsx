@@ -6,7 +6,7 @@ const STORAGE_KEY = "lanterna.lang.v1";
 
 const dict = {
   da: {
-    "header.tagline": "Lanterna - Danmarks nye biografportal",
+    "header.tagline": "Lanterna",
     "header.signIn": "Log ind",
     "header.signOut": "Log ud",
     "home.hero": "En hurtigere vej i biografen",
@@ -46,7 +46,7 @@ const dict = {
     "lang.toggle": "English",
   },
   en: {
-    "header.tagline": "Lanterna - Denmark's new cinema portal",
+    "header.tagline": "Lanterna",
     "header.signIn": "Sign in",
     "header.signOut": "Sign out",
     "home.hero": "A faster way to the cinema",

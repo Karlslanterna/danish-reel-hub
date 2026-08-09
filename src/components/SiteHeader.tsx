@@ -2,11 +2,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/lib/i18n";
 
 export function SiteHeader() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     let isMounted = true;
@@ -50,7 +52,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-8">
         <Link to="/" className="flex items-center gap-3">
           <img src="/logo.svg" alt="Lanterna" width={32} height={32} className="h-8 w-8" />
-          <span className="font-hero text-lg font-bold tracking-tight">Lanterna - Danmarks nye biografportal</span>
+          <span className="font-hero text-lg font-bold tracking-tight">{t("header.tagline")}</span>
         </Link>
         <nav className="flex items-center gap-7 text-sm text-muted-foreground">
           {isAuthenticated ? (
@@ -59,7 +61,7 @@ export function SiteHeader() {
               onClick={handleSignOut}
               className="inline-block rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary"
             >
-              Log ud
+              {t("header.signOut")}
             </button>
           ) : (
             <button
@@ -67,7 +69,7 @@ export function SiteHeader() {
               onClick={handleSignIn}
               className="inline-block rounded-sm border border-border px-3 py-1.5 text-foreground transition-colors hover:bg-secondary"
             >
-              Log ind
+              {t("header.signIn")}
             </button>
           )}
         </nav>

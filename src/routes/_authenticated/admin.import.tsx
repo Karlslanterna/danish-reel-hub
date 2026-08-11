@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AdminSignOut } from "@/components/AdminSignOut";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { checkIsAdmin, adminCreateImportJob } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/import")({
@@ -83,19 +83,11 @@ function AdminImportPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
-      <header className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm uppercase tracking-wider text-muted-foreground">Data Pipeline</p>
-          <h1 className="mt-1 font-display text-3xl font-bold text-foreground">
-            Manuel import
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Undtagelseshandling. Data opdateres normalt automatisk hver dag.
-          </p>
-        </div>
-        <AdminSignOut />
-      </header>
+    <AdminShell title="Manuel import">
+      <div className="mx-auto max-w-3xl">
+      <p className="mb-8 text-sm text-muted-foreground">
+        Undtagelseshandling. Data opdateres normalt automatisk hver dag.
+      </p>
 
       <Card>
         <CardHeader>
@@ -151,7 +143,8 @@ function AdminImportPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </AdminShell>
   );
 }
 

@@ -316,9 +316,11 @@ function AdminDashboard() {
               </p>
               {!isError && status !== "healthy" && data?.reasons?.length ? (
                 <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
-                  {data.reasons.map((r) => (
-                    <li key={r}>· {r}</li>
-                  ))}
+                  {[...new Set(data.reasons.map((r) => humanizeReason(r, lastAutoSuccess)))].map(
+                    (r) => (
+                      <li key={r}>· {r}</li>
+                    ),
+                  )}
                 </ul>
               ) : null}
             </>
@@ -340,11 +342,44 @@ function AdminDashboard() {
             <Row
               label="Seneste resultat"
               muted
-              value={`${metrics.lastMovies} film · ${metrics.lastCinemas} biografer · ${metrics.lastShowtimes} visninger`}
+              value={`${metrics.lastMovies} film · ${metrics.lastCinemas} biografer · ${metrics.lastShowtimes} forestillinger`}
             />
           ) : null}
         </CardContent>
       </Card>
+
+      {/* Systemoversigt */}
+      <section className="mb-10">
+        <h3 className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Systemoversigt
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Film" value={count(counts.data?.movies)} />
+          <StatCard label="Biografer" value={count(counts.data?.cinemas)} />
+          <StatCard label="Forestillinger" value={count(counts.data?.showtimes)} />
+          <StatCard label="Senest opdateret" value={formatDateTime(lastAutoSuccess)} />
+        </div>
+      </section>
+
+      {/* Systemstatus */}
+      <section className="mb-10">
+        <h3 className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Systemstatus
+        </h3>
+        <Card>
+          <CardContent className="py-2">
+            <StatusLine label="Datakilde" status={feedStatus} description={feedText} />
+            <StatusLine
+              label="Planlagt import"
+              status={schedulerStatus}
+              description={schedulerText}
+            />
+            <StatusLine label="Database" status={dbStatus} description={dbText} />
+            <StatusLine label="Datapipeline" status={pipelineStatus} description={pipelineText} />
+          </CardContent>
+        </Card>
+      </section>
+
 
       {/* Quick actions — deliberately secondary */}
       <section>

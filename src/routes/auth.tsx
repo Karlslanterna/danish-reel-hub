@@ -14,7 +14,7 @@ export const Route = createFileRoute("/auth")({
       { name: "robots", content: "noindex, follow" },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
   }),
   beforeLoad: async ({ search }) => {

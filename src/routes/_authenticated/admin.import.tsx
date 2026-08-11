@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/admin/import")({
   beforeLoad: async () => {
     const { isAdmin } = await checkIsAdmin();
     if (!isAdmin) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/admin/denied" });
     }
   },
   component: AdminImportPage,

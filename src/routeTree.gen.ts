@@ -19,9 +19,11 @@ import { Route as ByCityRouteImport } from './routes/by.$city'
 import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
 import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
+import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenticated/admin.denied'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
@@ -79,6 +81,11 @@ const Char91DotmcpChar93ListToolsRoute =
     path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const ApiPublicKultunautImportRoute =
   ApiPublicKultunautImportRouteImport.update({
     id: '/api/public/kultunaut-import',
@@ -94,6 +101,12 @@ const AuthenticatedAdminImportRoute =
   AuthenticatedAdminImportRouteImport.update({
     id: '/admin/import',
     path: '/admin/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminDeniedRoute =
+  AuthenticatedAdminDeniedRouteImport.update({
+    id: '/admin/denied',
+    path: '/admin/denied',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
@@ -138,9 +151,11 @@ export interface FileRoutesByFullPath {
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
@@ -157,9 +172,11 @@ export interface FileRoutesByTo {
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
@@ -178,9 +195,11 @@ export interface FileRoutesById {
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/_authenticated/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/import_/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
@@ -199,9 +218,11 @@ export interface FileRouteTypes {
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/admin/denied'
     | '/admin/import'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
+    | '/admin/'
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
@@ -218,9 +239,11 @@ export interface FileRouteTypes {
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/admin/denied'
     | '/admin/import'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
+    | '/admin'
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
@@ -238,9 +261,11 @@ export interface FileRouteTypes {
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/_authenticated/admin/denied'
     | '/_authenticated/admin/import'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
+    | '/_authenticated/admin/'
     | '/_authenticated/admin/import_/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
@@ -335,6 +360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/kultunaut-import': {
       id: '/api/public/kultunaut-import'
       path: '/api/public/kultunaut-import'
@@ -354,6 +386,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/import'
       fullPath: '/admin/import'
       preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/denied': {
+      id: '/_authenticated/admin/denied'
+      path: '/admin/denied'
+      fullPath: '/admin/denied'
+      preLoaderRoute: typeof AuthenticatedAdminDeniedRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/.mcp/invoke-tool/$tool': {
@@ -395,12 +434,16 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminDeniedRoute: typeof AuthenticatedAdminDeniedRoute
   AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedAdminImportJobIdRoute: typeof AuthenticatedAdminImportJobIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminDeniedRoute: AuthenticatedAdminDeniedRoute,
   AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedAdminImportJobIdRoute: AuthenticatedAdminImportJobIdRoute,
 }
 

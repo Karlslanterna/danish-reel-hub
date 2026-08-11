@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_authenticated/admin/import_/$jobId")({
   beforeLoad: async () => {
     const { isAdmin } = await checkIsAdmin();
     if (!isAdmin) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/admin/denied" });
     }
   },
   component: ImportStatusPage,

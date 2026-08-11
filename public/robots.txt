@@ -3,6 +3,7 @@ Allow: /
 
 Disallow: /admin
 Disallow: /auth
+Disallow: /reset-password
 Disallow: /api
 Disallow: /.mcp
 Disallow: /.lovable

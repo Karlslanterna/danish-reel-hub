@@ -193,6 +193,24 @@ function AdminDashboard() {
     refetchInterval: 60_000,
   });
 
+  const counts = useQuery({
+    queryKey: ["admin", "content-counts"],
+    queryFn: async () => {
+      const [movies, cinemas, showtimes] = await Promise.all([
+        supabase.from("movies").select("id", { count: "exact", head: true }),
+        supabase.from("cinemas").select("id", { count: "exact", head: true }),
+        supabase.from("showtimes").select("id", { count: "exact", head: true }),
+      ]);
+      return {
+        movies: movies.count ?? 0,
+        cinemas: cinemas.count ?? 0,
+        showtimes: showtimes.count ?? 0,
+        ok: !movies.error && !cinemas.error && !showtimes.error,
+      };
+    },
+    refetchInterval: 60_000,
+  });
+
   const status: HealthStatus = data?.status ?? "unknown";
   const metrics = data?.metrics;
   const scheduler = data?.scheduler;
@@ -205,6 +223,58 @@ function AdminDashboard() {
   const currentJobStatus = metrics?.lastJobStatus
     ? (JOB_STATUS_LABEL[metrics.lastJobStatus] ?? metrics.lastJobStatus)
     : "—";
+
+  const numberFmt = new Intl.NumberFormat("da-DK");
+  const count = (n: number | undefined) =>
+    counts.isLoading || n === undefined ? "—" : numberFmt.format(n);
+
+  // Derived, human-readable component statuses (existing data only).
+  const feedStatus: HealthStatus = isError
+    ? "unknown"
+    : metrics?.lastJobStatus === "failed"
+      ? "critical"
+      : (data?.importStatus ?? status);
+  const feedText =
+    feedStatus === "healthy"
+      ? "Data fra Kultunaut hentes som forventet."
+      : feedStatus === "warning"
+        ? "Seneste datahentning kræver opmærksomhed."
+        : feedStatus === "critical"
+          ? "Data fra Kultunaut kunne ikke hentes korrekt."
+          : "Der er endnu ikke data nok til at vurdere datakilden.";
+
+  const schedulerStatus: HealthStatus = scheduler?.status ?? "unknown";
+  const schedulerText =
+    schedulerStatus === "healthy"
+      ? "Den automatiske import kører efter planen."
+      : schedulerStatus === "warning"
+        ? "Den automatiske import er forsinket."
+        : schedulerStatus === "critical"
+          ? "Den automatiske import kører ikke som den skal."
+          : "Den automatiske import har endnu ikke kørt.";
+
+  const dbStatus: HealthStatus = counts.isLoading
+    ? "unknown"
+    : counts.isError || counts.data?.ok === false
+      ? "critical"
+      : "healthy";
+  const dbText =
+    dbStatus === "healthy"
+      ? "Databasen svarer normalt."
+      : dbStatus === "critical"
+        ? "Databasen fungerer ikke korrekt."
+        : "Kontrollerer forbindelsen til databasen…";
+
+  const pipelineStatus: HealthStatus = isError ? "unknown" : status;
+  const pipelineText =
+    pipelineStatus === "healthy"
+      ? "Datapipelinen fungerer normalt."
+      : pipelineStatus === "warning"
+        ? "Datapipelinen kræver opmærksomhed."
+        : pipelineStatus === "critical"
+          ? "Datapipelinen fejler og kræver handling."
+          : "Datapipelinens tilstand kan ikke vurderes endnu.";
+
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-14">

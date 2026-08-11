@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { AdminSignOut } from "@/components/AdminSignOut";
 import {
   checkIsAdmin,
   adminGetImportJobStatus,
@@ -133,7 +134,7 @@ function ImportStatusPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <header className="mb-8 flex items-center justify-between gap-4">
+      <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-wider text-muted-foreground">
             Admin · Import
@@ -142,9 +143,12 @@ function ImportStatusPage() {
             Job {jobId.slice(0, 8)}…
           </h1>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/admin/import">Ny import</Link>
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin/import">Ny import</Link>
+          </Button>
+          <AdminSignOut />
+        </div>
       </header>
 
       {fatal && (

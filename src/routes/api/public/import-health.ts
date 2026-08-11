@@ -9,14 +9,13 @@ import { createFileRoute } from "@tanstack/react-router";
  * no XML payloads, no error message bodies.
  *
  * Response status codes:
- *   200 — healthy
- *   200 — warning (still reachable; caller should alert on `status`)
- *   503 — critical (fires page/paging alerts on uptime monitors)
+ *   200 — always, unless ?monitor=1 is set
+ *   503 — critical, only with ?monitor=1 (fires paging alerts on uptime monitors)
  */
 export const Route = createFileRoute("/api/public/import-health")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         try {
           const { getImportHealth } = await import("@/lib/kultunaut/health.server");
           const { getSchedulerHealth } = await import("@/lib/kultunaut/scheduler.server");
@@ -28,7 +27,11 @@ export const Route = createFileRoute("/api/public/import-health")({
           const rank = { healthy: 0, unknown: 1, warning: 2, critical: 3 } as const;
           const overall =
             rank[scheduler.status] > rank[report.status] ? scheduler.status : report.status;
-          const httpStatus = overall === "critical" ? 503 : 200;
+          // Only uptime monitors opt into a failing HTTP status (?monitor=1).
+          // Dashboard/browser callers always get 200 and read `status` from the body,
+          // so a critical report does not surface as a client-side fetch error.
+          const monitorMode = new URL(request.url).searchParams.get("monitor") === "1";
+          const httpStatus = monitorMode && overall === "critical" ? 503 : 200;
           return Response.json(
             { ...report, status: overall, importStatus: report.status, scheduler },
             {

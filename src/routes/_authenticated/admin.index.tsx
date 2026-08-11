@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AdminSignOut } from "@/components/AdminSignOut";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -278,18 +278,8 @@ function AdminDashboard() {
 
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-14">
-      <header className="mb-10 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
-            Lanterna Administration
-          </h1>
-          <p className="mt-1 text-sm uppercase tracking-[0.2em] text-muted-foreground">
-            Dashboard
-          </p>
-        </div>
-        <AdminSignOut />
-      </header>
+    <AdminShell title="Dashboard">
+      <div className="mx-auto max-w-3xl">
 
       {/* Overall system status */}
       <Card className="mb-6">
@@ -395,6 +385,7 @@ function AdminDashboard() {
           </Link>
         </div>
       </section>
-    </div>
+      </div>
+    </AdminShell>
   );
 }

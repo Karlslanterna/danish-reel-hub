@@ -388,24 +388,11 @@ function AdminDashboard() {
         </h3>
         <div className="flex flex-wrap gap-3">
           <Link
-            to="/admin/import"
+            to="/admin/pipeline"
             className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           >
-            Start manuel import
+            Data Pipeline
           </Link>
-          {metrics?.lastJobId ? (
-            <Link
-              to="/admin/import/$jobId"
-              params={{ jobId: metrics.lastJobId }}
-              className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-            >
-              Se importhistorik
-            </Link>
-          ) : (
-            <span className="rounded-md border border-border/50 px-4 py-2 text-sm text-muted-foreground/50">
-              Se importhistorik
-            </span>
-          )}
         </div>
       </section>
     </div>

@@ -137,7 +137,7 @@ function ImportStatusPage() {
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-wider text-muted-foreground">
-            Admin · Import
+            Data Pipeline
           </p>
           <h1 className="mt-1 font-display text-3xl font-bold text-foreground">
             Job {jobId.slice(0, 8)}…
@@ -145,7 +145,7 @@ function ImportStatusPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link to="/admin/import">Ny import</Link>
+            <Link to="/admin/pipeline">Data Pipeline</Link>
           </Button>
           <AdminSignOut />
         </div>

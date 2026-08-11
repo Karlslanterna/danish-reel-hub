@@ -11,7 +11,7 @@ import { checkIsAdmin, adminCreateImportJob } from "@/lib/admin.functions";
 export const Route = createFileRoute("/_authenticated/admin/import")({
   head: () => ({
     meta: [
-      { title: "Kultunaut Import — Admin" },
+      { title: "Manuel import — Lanterna Administration" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -86,13 +86,12 @@ function AdminImportPage() {
     <div className="mx-auto max-w-3xl px-4 py-12">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-wider text-muted-foreground">Admin</p>
+          <p className="text-sm uppercase tracking-wider text-muted-foreground">Data Pipeline</p>
           <h1 className="mt-1 font-display text-3xl font-bold text-foreground">
-            Kultunaut Import
+            Manuel import
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Upload en Kultunaut-XML-fil. Import køres som baggrundsjob — du
-            omdirigeres til en status-side.
+            Undtagelseshandling. Data opdateres normalt automatisk hver dag.
           </p>
         </div>
         <AdminSignOut />

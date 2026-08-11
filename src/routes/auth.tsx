@@ -55,17 +55,16 @@ function AuthPage() {
     setError(null);
     setInfo(null);
     setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // Always respond generically: never reveal whether an account exists.
+    await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    if (error) {
-      setError(error.message);
-      setBusy(false);
-      return;
-    }
-    setInfo("Tjek din e-mail for et link til at nulstille din adgangskode.");
+    setInfo(
+      "Hvis der findes en konto med denne e-mail, er der sendt en e-mail med instruktioner.",
+    );
     setBusy(false);
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">

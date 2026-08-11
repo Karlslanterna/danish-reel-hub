@@ -102,6 +102,44 @@ function formatDuration(seconds: number | null | undefined): string {
   return rest === 0 ? `${m} min.` : `${m} min. ${rest} sek.`;
 }
 
+/** Turn backend (English, technical) reasons into readable Danish sentences. */
+function humanizeReason(reason: string, lastSuccessAt: string | null): string {
+  const r = reason.toLowerCase();
+  if (r.includes("last success was")) {
+    return lastSuccessAt
+      ? `Seneste vellykkede import blev gennemført ${formatDateTime(lastSuccessAt)}.`
+      : "Der er endnu ingen vellykket import.";
+  }
+  if (r.includes("no successful import")) return "Der er endnu ingen vellykket import.";
+  if (r.includes("scheduler has never run")) return "Den automatiske import har endnu ikke kørt.";
+  if (r.includes("scheduler has no successful run"))
+    return "Den automatiske import har endnu ikke gennemført en kørsel.";
+  if (r.includes("last scheduled import succeeded")) {
+    return lastSuccessAt
+      ? `Seneste automatiske import blev gennemført ${formatDateTime(lastSuccessAt)}.`
+      : "Den automatiske import mangler en nylig gennemførsel.";
+  }
+  if (r.includes("last scheduled run failed")) return "Seneste automatiske kørsel gik galt.";
+  if (r.includes("consecutive failed scheduled runs"))
+    return "Flere automatiske kørsler i træk er gået galt.";
+  if (r.includes("consecutive failed import")) return "Flere importkørsler i træk er gået galt.";
+  if (r.includes("zero movies")) return "Seneste import hentede ingen film.";
+  if (r.includes("zero cinemas")) return "Seneste import hentede ingen biografer.";
+  if (r.includes("zero showtimes")) return "Seneste import hentede ingen forestillinger.";
+  if (r.includes("movie count dropped")) return "Antallet af film faldt markant ved seneste import.";
+  if (r.includes("cinema count dropped"))
+    return "Antallet af biografer faldt markant ved seneste import.";
+  if (r.includes("showtime count dropped"))
+    return "Antallet af forestillinger faldt markant ved seneste import.";
+  if (r.includes("import took")) return "Seneste import tog usædvanligt lang tid.";
+  if (r.includes("no import jobs")) return "Der er endnu ikke kørt nogen import.";
+  if (r.includes("all checks passed") || r.includes("scheduler healthy"))
+    return "Alle kontroller er bestået.";
+  if (r.includes("failed to read scheduler runs"))
+    return "Oplysninger om automatiske kørsler kunne ikke hentes.";
+  return "Systemet kræver opmærksomhed.";
+}
+
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-6 border-b border-border/50 py-3 last:border-0">
@@ -112,6 +150,38 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
     </div>
   );
 }
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent className="py-5">
+        <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
+        <p className="mt-2 font-display text-2xl font-semibold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatusLine({
+  label,
+  status,
+  description,
+}: {
+  label: string;
+  status: HealthStatus;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 border-b border-border/50 py-3 last:border-0">
+      <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
+      <div className="min-w-0">
+        <p className="text-sm text-foreground">{label}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 
 function AdminDashboard() {
   const { data, isLoading, isError } = useQuery({

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { AdminSignOut } from "@/components/AdminSignOut";
+import { AdminShell } from "@/components/admin/AdminShell";
 import {
   checkIsAdmin,
   adminGetImportJobStatus,
@@ -133,23 +133,13 @@ function ImportStatusPage() {
     total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
-      <header className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm uppercase tracking-wider text-muted-foreground">
-            Data Pipeline
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-bold text-foreground">
-            Job {jobId.slice(0, 8)}…
-          </h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link to="/admin/pipeline">Data Pipeline</Link>
-          </Button>
-          <AdminSignOut />
-        </div>
-      </header>
+    <AdminShell title={`Importkørsel ${jobId.slice(0, 8)}…`}>
+      <div className="mx-auto max-w-3xl">
+      <div className="mb-8">
+        <Button asChild variant="outline" size="sm">
+          <Link to="/admin/pipeline">Tilbage til Data Pipeline</Link>
+        </Button>
+      </div>
 
       {fatal && (
         <Card className="mb-6 border-destructive">
@@ -208,7 +198,8 @@ function ImportStatusPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </AdminShell>
   );
 }
 

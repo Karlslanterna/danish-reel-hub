@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AdminSignOut } from "@/components/AdminSignOut";
+import { AdminShell } from "@/components/admin/AdminShell";
 import {
   checkIsAdmin,
   adminListImportJobs,
@@ -283,24 +283,11 @@ function DataPipelinePage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12">
-      <header className="mb-10 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm uppercase tracking-wider text-muted-foreground">
-            Lanterna Administration
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-bold text-foreground">Data Pipeline</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Overblik over dataopdateringer af film, biografer og forestillinger.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link to="/admin">Dashboard</Link>
-          </Button>
-          <AdminSignOut />
-        </div>
-      </header>
+    <AdminShell title="Data Pipeline">
+      <div className="mx-auto max-w-4xl">
+      <p className="mb-8 text-sm text-muted-foreground">
+        Overblik over dataopdateringer af film, biografer og forestillinger.
+      </p>
 
       {/* 1 — Nuværende status */}
       <section className="mb-10">
@@ -478,6 +465,7 @@ function DataPipelinePage() {
           </CardContent>
         </Card>
       </section>
-    </div>
+      </div>
+    </AdminShell>
   );
 }

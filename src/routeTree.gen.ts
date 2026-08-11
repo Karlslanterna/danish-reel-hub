@@ -26,6 +26,7 @@ import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/i
 import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authenticated/admin.pipeline'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
 import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenticated/admin.denied'
+import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
@@ -122,6 +123,12 @@ const AuthenticatedAdminDeniedRoute =
     path: '/admin/denied',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminAnalyticsRoute =
+  AuthenticatedAdminAnalyticsRouteImport.update({
+    id: '/admin/analytics',
+    path: '/admin/analytics',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -165,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
@@ -188,6 +196,7 @@ export interface FileRoutesByTo {
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
@@ -213,6 +222,7 @@ export interface FileRoutesById {
   '/film/$slug': typeof FilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/admin/analytics'
     | '/admin/denied'
     | '/admin/import'
     | '/admin/pipeline'
@@ -261,6 +272,7 @@ export interface FileRouteTypes {
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/admin/analytics'
     | '/admin/denied'
     | '/admin/import'
     | '/admin/pipeline'
@@ -285,6 +297,7 @@ export interface FileRouteTypes {
     | '/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/_authenticated/admin/analytics'
     | '/_authenticated/admin/denied'
     | '/_authenticated/admin/import'
     | '/_authenticated/admin/pipeline'
@@ -435,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDeniedRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/analytics': {
+      id: '/_authenticated/admin/analytics'
+      path: '/admin/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -474,6 +494,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminAnalyticsRoute: typeof AuthenticatedAdminAnalyticsRoute
   AuthenticatedAdminDeniedRoute: typeof AuthenticatedAdminDeniedRoute
   AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
   AuthenticatedAdminPipelineRoute: typeof AuthenticatedAdminPipelineRoute
@@ -482,6 +503,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminAnalyticsRoute: AuthenticatedAdminAnalyticsRoute,
   AuthenticatedAdminDeniedRoute: AuthenticatedAdminDeniedRoute,
   AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
   AuthenticatedAdminPipelineRoute: AuthenticatedAdminPipelineRoute,

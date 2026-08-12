@@ -43,6 +43,9 @@ export type Showtime = {
   hall: string;
   bookingUrl: string | null;
   ticketUrls: string[];
+  formats: string[];
+  languages: string[];
+  events: string[];
 };
 
 type MovieRow = {
@@ -80,6 +83,9 @@ type ShowtimeRow = {
   booking_url: string | null;
   ticket_url: string | null;
   ticket_urls: string[] | null;
+  formats: string[] | null;
+  languages: string[] | null;
+  events: string[] | null;
 };
 
 const mapMovie = (r: MovieRow): Movie => ({
@@ -116,6 +122,9 @@ const mapShowtime = (r: ShowtimeRow): Showtime => ({
   hall: r.hall,
   bookingUrl: r.booking_url ?? r.ticket_url ?? null,
   ticketUrls: r.ticket_urls ?? [],
+  formats: r.formats ?? [],
+  languages: r.languages ?? [],
+  events: r.events ?? [],
 });
 
 export async function fetchMovies(): Promise<Movie[]> {
@@ -201,7 +210,14 @@ export async function fetchShowtimes(): Promise<Showtime[]> {
   return (data ?? []).map(mapShowtime);
 }
 
-export type ShowtimeIndexRow = { movieId: string; cinemaId: string; date: string };
+export type ShowtimeIndexRow = {
+  movieId: string;
+  cinemaId: string;
+  date: string;
+  formats: string[];
+  languages: string[];
+  events: string[];
+};
 
 /**
  * Lightweight index of showtimes used by the homepage for radius + date filtering.
@@ -211,12 +227,19 @@ export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("showtimes")
-    .select("movie_id, cinema_id, date")
+    .select("movie_id, cinema_id, date, formats, languages, events")
     .gte("date", today);
   if (error) throw error;
   return (data ?? []).map((r) => {
-    const row = r as Pick<ShowtimeRow, "movie_id" | "cinema_id" | "date">;
-    return { movieId: row.movie_id, cinemaId: row.cinema_id, date: row.date };
+    const row = r as Pick<ShowtimeRow, "movie_id" | "cinema_id" | "date" | "formats" | "languages" | "events">;
+    return {
+      movieId: row.movie_id,
+      cinemaId: row.cinema_id,
+      date: row.date,
+      formats: row.formats ?? [],
+      languages: row.languages ?? [],
+      events: row.events ?? [],
+    };
   });
 }
 
@@ -235,7 +258,7 @@ export async function fetchMoviesAndShowtimesForCinemas(
   if (cinemaIds.length === 0) return { movies: [], showtimes: [] };
   const { data, error } = await supabase
     .from("showtimes")
-    .select("movie_id, cinema_id, date, times, hall, booking_url, ticket_url, ticket_urls, movies(*)")
+    .select("movie_id, cinema_id, date, times, hall, booking_url, ticket_url, ticket_urls, formats, languages, events, movies(*)")
     .in("cinema_id", cinemaIds);
   if (error) throw error;
   const rows = (data ?? []) as Array<ShowtimeRow & { movies: MovieRow | null }>;

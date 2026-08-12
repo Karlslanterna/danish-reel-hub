@@ -49,6 +49,9 @@ type GroupedShowtime = {
   hall: string;
   times: string[];
   ticket_urls: string[];
+  formats: string[];
+  languages: string[];
+  events: string[];
 };
 
 type JobPayload = {
@@ -211,12 +214,19 @@ export async function processJobBatch(
             hall: st.hall,
             times: [],
             ticket_urls: [],
+            formats: [],
+            languages: [],
+            events: [],
             timeUrls: new Map<string, string | null>(),
           } as GroupedShowtime & { timeUrls: Map<string, string | null> });
         for (const t of st.times) {
           if (!target.timeUrls.get(t) && st.ticket_url) target.timeUrls.set(t, st.ticket_url);
           else if (!target.timeUrls.has(t)) target.timeUrls.set(t, st.ticket_url);
         }
+        // Screening metadata is a union across the grouped time slots.
+        for (const f of st.formats) if (!target.formats.includes(f)) target.formats.push(f);
+        for (const l of st.languages) if (!target.languages.includes(l)) target.languages.push(l);
+        for (const e of st.events) if (!target.events.includes(e)) target.events.push(e);
         if (!existing) grouped.set(key, target);
       }
       const groupedShowtimes: GroupedShowtime[] = Array.from(grouped.values()).map((g) => {
@@ -229,6 +239,9 @@ export async function processJobBatch(
           hall: g.hall,
           times,
           ticket_urls,
+          formats: g.formats,
+          languages: g.languages,
+          events: g.events,
         };
       });
 
@@ -377,6 +390,9 @@ export async function processJobBatch(
               ticket_urls: row.ticket_urls,
               booking_url: primaryTicketUrl,
               start_time: startTimeIso,
+              formats: row.formats ?? [],
+              languages: row.languages ?? [],
+              events: row.events ?? [],
             })
             .eq("id", existing.id);
           if (error) {
@@ -394,6 +410,9 @@ export async function processJobBatch(
             ticket_urls: row.ticket_urls,
             booking_url: primaryTicketUrl,
             start_time: startTimeIso,
+            formats: row.formats ?? [],
+            languages: row.languages ?? [],
+            events: row.events ?? [],
           });
           if (error) {
             errors.push(`showtime insert: ${error.message}`);

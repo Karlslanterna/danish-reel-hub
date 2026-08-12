@@ -126,3 +126,37 @@ export function sortTagOptions(kind: keyof ShowtimeTags, values: string[]): stri
     return a.localeCompare(b, "da");
   });
 }
+
+export type TagSelection = {
+  format?: string | null;
+  language?: string | null;
+  event?: string | null;
+};
+
+export const hasTagSelection = (sel: TagSelection) =>
+  Boolean(sel.format || sel.language || sel.event);
+
+/** AND logic: a screening must carry every selected tag. */
+export function showtimeMatchesTags(row: Partial<ShowtimeTags>, sel: TagSelection): boolean {
+  if (sel.format && !(row.formats ?? []).includes(sel.format)) return false;
+  if (sel.language && !(row.languages ?? []).includes(sel.language)) return false;
+  if (sel.event && !(row.events ?? []).includes(sel.event)) return false;
+  return true;
+}
+
+/** Build the filter option lists from the screenings actually present. */
+export function collectTagOptions(rows: Array<Partial<ShowtimeTags>>): ShowtimeTags {
+  const f = new Set<string>();
+  const l = new Set<string>();
+  const e = new Set<string>();
+  for (const r of rows) {
+    for (const v of r.formats ?? []) f.add(v);
+    for (const v of r.languages ?? []) l.add(v);
+    for (const v of r.events ?? []) e.add(v);
+  }
+  return {
+    formats: sortTagOptions("formats", [...f]),
+    languages: sortTagOptions("languages", [...l]),
+    events: sortTagOptions("events", [...e]),
+  };
+}

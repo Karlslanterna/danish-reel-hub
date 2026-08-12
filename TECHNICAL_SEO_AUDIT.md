@@ -18,19 +18,19 @@ Effort key: **XS** ≤15 min · **S** ~1 h · **M** ~half day · **L** ~1+ day.
 ### C1. No `robots.txt`
 - **Finding:** `public/robots.txt` does not exist. Crawlers get a 404 and fall back to default behavior; no `Sitemap:` directive is discoverable.
 - **Why it matters:** Missing robots.txt removes an explicit crawl contract. Combined with C2, Google has no efficient way to discover the ~120 movie and ~160 cinema pages beyond following links from `/`. Also leaves admin/auth/mcp/api routes indexable in principle.
-- **Recommended fix:** Add `public/robots.txt` with `User-agent: *`, `Allow: /`, `Disallow:` for `/admin`, `/auth`, `/api/`, `/.mcp`, `/.well-known`, `/.lovable`, and a `Sitemap: https://danish-reel-hub.lovable.app/sitemap.xml` line.
+- **Recommended fix:** Add `public/robots.txt` with `User-agent: *`, `Allow: /`, `Disallow:` for `/admin`, `/auth`, `/api/`, `/.mcp`, `/.well-known`, `/.lovable`, and a `Sitemap: https://lanterna.dk/sitemap.xml` line.
 - **Effort:** XS
 
 ### C2. No `sitemap.xml`
 - **Finding:** No `public/sitemap.xml` and no `src/routes/sitemap[.]xml.ts` server route. The site ships ~280 detail routes (`/film/$slug`, `/biograf/$slug`, `/by/$city`) but none are enumerated.
 - **Why it matters:** Without a sitemap, discovery of movie/cinema/city pages depends entirely on internal links from the homepage. Many detail pages will be crawled slowly or missed, and there is no `lastmod` signal for the daily-changing showtime data.
-- **Recommended fix:** Add a dynamic server route at `src/routes/sitemap[.]xml.ts` that emits `<url>` entries for `/`, every movie slug, every cinema slug, and each unique city derived from `fetchCinemas()`. Set `changefreq=daily` for movie/cinema pages, `weekly` for cities, `1.0` for `/`. Use the canonical host `https://danish-reel-hub.lovable.app`.
+- **Recommended fix:** Add a dynamic server route at `src/routes/sitemap[.]xml.ts` that emits `<url>` entries for `/`, every movie slug, every cinema slug, and each unique city derived from `fetchCinemas()`. Set `changefreq=daily` for movie/cinema pages, `weekly` for cities, `1.0` for `/`. Use the canonical host `https://lanterna.dk`.
 - **Effort:** S
 
 ### C3. No canonical URLs on any route
 - **Finding:** Neither `__root.tsx` nor any leaf route emits `<link rel="canonical">`. The site is reachable on at least two hosts (`danish-reel-hub.lovable.app`, `id-preview--…lovable.app`) and users can arrive with tracking query strings.
 - **Why it matters:** Google will pick a canonical for you, and the preview subdomain can be selected — leaking preview URLs into the index and splitting authority. Query variants (e.g. from filter state persisted to URL) can also fragment ranking signals.
-- **Recommended fix:** Add `links: [{ rel: "canonical", href: "https://danish-reel-hub.lovable.app<path>" }]` in the `head()` of each leaf route (`index`, `film.$slug`, `biograf.$slug`, `by.$city`, `auth`). Do NOT add canonical in `__root.tsx` (TanStack concatenates `links`, producing duplicates). Build the URL from `params` and, for the home page, a static string.
+- **Recommended fix:** Add `links: [{ rel: "canonical", href: "https://lanterna.dk<path>" }]` in the `head()` of each leaf route (`index`, `film.$slug`, `biograf.$slug`, `by.$city`, `auth`). Do NOT add canonical in `__root.tsx` (TanStack concatenates `links`, producing duplicates). Build the URL from `params` and, for the home page, a static string.
 - **Effort:** S
 
 ### C4. Preview host is indexable and appears in `og:image`
@@ -160,7 +160,7 @@ Effort key: **XS** ≤15 min · **S** ~1 h · **M** ~half day · **L** ~1+ day.
 ### L4. No HTTP status control from route loaders
 - **Finding:** `notFound()` throws render a 404 UI, but the HTTP response status returned by `src/server.ts` is not verified. `/not-a-real-slug/film` should return `404`, not `200` with a 404 page.
 - **Why it matters:** Google's crawl budget and index quality depend on correct status codes; soft-404s are penalized.
-- **Recommended fix:** Verify with `curl -I https://danish-reel-hub.lovable.app/film/does-not-exist` — expect `404`. If it returns 200, wire `notFoundComponent` matches to set response status via TanStack Start's response helpers.
+- **Recommended fix:** Verify with `curl -I https://lanterna.dk/film/does-not-exist` — expect `404`. If it returns 200, wire `notFoundComponent` matches to set response status via TanStack Start's response helpers.
 - **Effort:** S (verification) / M (fix if broken)
 
 ### L5. No redirects for legacy/alternate slugs

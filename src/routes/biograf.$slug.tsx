@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, fmtDateLabel } from "@/lib/filters";
+import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import {
   fetchCinemaBySlug,
   fetchMoviesAndShowtimesForCinemas,
@@ -67,10 +68,12 @@ function CinemaPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { selectedDate, selectedGenre, clear } = useFilters();
+  const { selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, clear } = useFilters();
   const activeDate = selectedDate ?? todayStr();
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
-  const hasFilters = Boolean(selectedDate) || Boolean(selectedGenre);
+  const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
+  const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
+  const hasFilters = Boolean(selectedDate) || Boolean(selectedGenre) || hasTagSelection(tagSel);
 
   const filteredMovies = useMemo(
     () => (selectedGenre ? movies.filter((m) => m.genre.includes(selectedGenre)) : movies),
@@ -80,6 +83,7 @@ function CinemaPage() {
   const showtimesByMovie = new Map<string, Showtime[]>();
   for (const s of showtimes) {
     if (s.date !== activeDate) continue;
+    if (!showtimeMatchesTags(s, tagSel)) continue;
     const arr = showtimesByMovie.get(s.movieId) ?? [];
     arr.push(s);
     showtimesByMovie.set(s.movieId, arr);
@@ -143,7 +147,7 @@ function CinemaPage() {
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Film på plakaten</h2>
-            <FilterBar hideRadius genres={allGenres} />
+            <FilterBar hideRadius genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} />
             {hasFilters && (
               <button
                 type="button"

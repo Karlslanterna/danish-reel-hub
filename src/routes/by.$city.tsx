@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
 import { citySchemas } from "@/lib/jsonld";
@@ -75,10 +76,13 @@ function CityPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { radius, userLoc, selectedDate, selectedGenre, geoLoading, geoError, clear } = useFilters();
-  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre);
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoLoading, geoError, clear } = useFilters();
+  const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
+  const hasFilters =
+    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || hasTagSelection(tagSel);
 
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
+  const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
 
   const cityCinemaIds = useMemo(() => new Set(cinemas.map((c) => c.id)), [cinemas]);
 
@@ -99,10 +103,11 @@ function CityPage() {
     for (const s of showtimes) {
       if (!allowedCinemas.has(s.cinemaId)) continue;
       if (selectedDate && s.date !== selectedDate) continue;
+      if (!showtimeMatchesTags(s, tagSel)) continue;
       movieIds.add(s.movieId);
     }
     return movies.filter((m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)));
-  }, [movies, showtimes, selectedDate, selectedGenre, nearbyCinemaIds, cityCinemaIds]);
+  }, [movies, showtimes, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, nearbyCinemaIds, cityCinemaIds]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -136,7 +141,7 @@ function CityPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Film i {city}</h2>
-            <FilterBar genres={allGenres} />
+            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} />
             {hasFilters && (
               <button
                 type="button"

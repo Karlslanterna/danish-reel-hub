@@ -222,62 +222,63 @@ function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader onSearchClick={() => setOpen(true)} />
 
-      <section className="border-b border-border/60">
-        <div className="mx-auto max-w-[1400px] px-8 pb-14 pt-20">
-          <div className="flex items-end justify-between gap-12">
-            <div className="max-w-2xl">
-              <h1 className="mt-4 font-hero text-5xl leading-[0.95] tracking-tight text-foreground">
-                {t("home.hero")}
-              </h1>
-              <p className="font-hero mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-                {t("home.sub")}
-              </p>
-            </div>
-            <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
-              <div>{movies.length} {t("home.movies")}</div>
-              <div className="mt-1">{cinemas.length} {t("home.cinemas")}</div>
-            </div>
-          </div>
-
-          <div className="mt-12" ref={boxRef}>
-            <div className="group relative">
-              <div className="pointer-events-none absolute left-5 top-10 -translate-y-1/2 text-primary-foreground/70">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
+          style={{ animation: "fadeIn 150ms ease-out" }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+        >
+          <div className="flex min-h-full items-start justify-center px-4 pt-6 sm:pt-24">
+            <div
+              ref={boxRef}
+              className="w-full max-w-2xl rounded-lg border border-border/80 bg-card p-4 shadow-2xl shadow-black/40 sm:p-5"
+            >
+              <div className="relative">
+                <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-primary-foreground/70">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
+                </div>
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder={t("home.search")}
+                  className="h-14 w-full rounded-md border border-primary/80 bg-primary pl-12 pr-24 font-display text-lg text-primary-foreground placeholder:font-sans placeholder:text-base placeholder:text-primary-foreground/60 focus:border-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary-foreground/30"
+                  aria-autocomplete="list"
+                  aria-expanded={suggestions.length > 0}
+                />
+                <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                  {query && (
+                    <button
+                      onClick={() => setQuery("")}
+                      className="rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                    >
+                      {t("home.clearSearch")}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setOpen(false)}
+                    aria-label="Luk"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <input
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setOpen(true);
-                }}
-                onFocus={() => setOpen(true)}
-                onKeyDown={onKeyDown}
-                placeholder={t("home.search")}
-                className="h-20 w-full rounded-md border border-primary/80 bg-primary pl-16 pr-6 font-display text-2xl text-primary-foreground placeholder:font-sans placeholder:text-lg placeholder:text-primary-foreground/60 focus:border-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary-foreground/30"
-                aria-autocomplete="list"
-                aria-expanded={open && suggestions.length > 0}
-              />
-              {query && (
-                <button
-                  onClick={() => {
-                    setQuery("");
-                    setOpen(false);
-                  }}
-                  className="absolute right-4 top-10 -translate-y-1/2 rounded-sm px-2 py-1 text-xs uppercase tracking-wider text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
-                >
-                  {t("home.clearSearch")}
-                </button>
-              )}
 
-              {open && suggestions.length > 0 && (
+              {suggestions.length > 0 && (
                 <ul
                   role="listbox"
-                  className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 max-h-[28rem] overflow-y-auto rounded-md border border-border/80 bg-card shadow-2xl shadow-black/40"
+                  className="mt-3 max-h-[60vh] overflow-y-auto rounded-md border border-border/80 bg-card"
                 >
                   {suggestions.map((s, i) => (
                     <li key={`${s.kind}-${s.label}-${i}`} role="option" aria-selected={i === active}>
@@ -302,12 +303,33 @@ function HomePage() {
                 </ul>
               )}
             </div>
-            <div className="mt-5 flex justify-center">
-              <LanguageToggle />
+          </div>
+        </div>
+      )}
+
+      <section className="border-b border-border/60">
+        <div className="mx-auto max-w-[1400px] px-8 pb-14 pt-20">
+          <div className="flex items-end justify-between gap-12">
+            <div className="max-w-2xl">
+              <h1 className="mt-4 font-hero text-5xl leading-[0.95] tracking-tight text-foreground">
+                {t("home.hero")}
+              </h1>
+              <p className="font-hero mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
+                {t("home.sub")}
+              </p>
             </div>
+            <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
+              <div>{movies.length} {t("home.movies")}</div>
+              <div className="mt-1">{cinemas.length} {t("home.cinemas")}</div>
+            </div>
+          </div>
+
+          <div className="mt-10 flex justify-center">
+            <LanguageToggle />
           </div>
         </div>
       </section>
+
 
       <section className="mx-auto max-w-[1400px] px-8 py-14">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">

@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
+import { CANONICAL_HOST } from "@/lib/canonical";
 
-const BASE_URL = "https://danish-reel-hub.lovable.app";
+const BASE_URL = CANONICAL_HOST;
 
 type Entry = {
   loc: string;

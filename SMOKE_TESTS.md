@@ -73,7 +73,7 @@ bun run build && bun run preview &
 SMOKE_BASE_URL=http://localhost:4173 npx playwright test
 
 # against the preview deployment
-SMOKE_BASE_URL=https://danish-reel-hub.lovable.app npx playwright test
+SMOKE_BASE_URL=https://lanterna.dk npx playwright test
 
 # against production after release
 SMOKE_BASE_URL=https://lanterna.dk npx playwright test

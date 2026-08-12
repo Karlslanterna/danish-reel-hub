@@ -67,7 +67,7 @@ Read access: admins only (via `has_role`). Writes: server (service role).
 
 1. **Endpoint smoke test**
    ```bash
-   curl -i https://danish-reel-hub.lovable.app/api/public/import-health
+   curl -i https://lanterna.dk/api/public/import-health
    ```
    Expect `200 OK` with a JSON body containing `status`, `reasons`,
    `metrics`, `checkedAt`.

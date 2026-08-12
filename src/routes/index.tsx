@@ -7,7 +7,7 @@ import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters"
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
 import { homeSchemas } from "@/lib/jsonld";
-import { useLanguage, LanguageToggle } from "@/lib/i18n";
+import { useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -325,13 +325,13 @@ function HomePage() {
       )}
 
       <section className="border-b border-border/60">
-        <div className="mx-auto max-w-[1400px] px-8 pb-14 pt-20">
-          <div className="flex items-end justify-between gap-12">
+        <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-10">
+          <div className="flex items-end justify-between gap-6">
             <div className="max-w-2xl">
-              <h1 className="mt-4 font-hero text-5xl leading-[0.95] tracking-tight text-foreground">
+              <h1 className="font-hero text-3xl leading-[0.95] tracking-tight text-foreground sm:text-4xl lg:text-5xl">
                 {t("home.hero")}
               </h1>
-              <p className="font-hero mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
+              <p className="font-hero mt-2 max-w-md text-sm leading-relaxed text-muted-foreground sm:mt-4">
                 {t("home.sub")}
               </p>
             </div>
@@ -340,16 +340,14 @@ function HomePage() {
               <div className="mt-1">{cinemas.length} {t("home.cinemas")}</div>
             </div>
           </div>
-
-          <div className="mt-10 flex justify-center">
-            <LanguageToggle />
-          </div>
         </div>
       </section>
 
 
-      <section className="mx-auto max-w-[1400px] px-8 py-14">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
+
+      <section className="mx-auto max-w-[1400px] px-6 py-6 sm:px-8 sm:py-10">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
+
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">{t("home.currentMovies")}</h2>
             <FilterBar genres={allGenres} />

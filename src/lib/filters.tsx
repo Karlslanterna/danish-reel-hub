@@ -202,12 +202,30 @@ export function useFilters() {
   return ctx;
 }
 
-export function FilterBar({ className = "", hideRadius = false, genres }: { className?: string; hideRadius?: boolean; genres?: string[] }) {
-  const { radius, userLoc, selectedDate, selectedGenre, setRadius, setSelectedDate, setSelectedGenre, requestLocation } = useFilters();
+export function FilterBar({
+  className = "",
+  hideRadius = false,
+  genres,
+  formats,
+  languages,
+  events,
+}: {
+  className?: string;
+  hideRadius?: boolean;
+  genres?: string[];
+  formats?: string[];
+  languages?: string[];
+  events?: string[];
+}) {
+  const {
+    radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
+    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent,
+    requestLocation,
+  } = useFilters();
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [moreView, setMoreView] = useState<"menu" | "genres">("menu");
+  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events">("menu");
   const { t, lang } = useLanguage();
   const TODAY = todayStr();
   const TOMORROW = tomorrowStr();
@@ -217,7 +235,12 @@ export function FilterBar({ className = "", hideRadius = false, genres }: { clas
     return Array.from(new Set(genres)).sort((a, b) => a.localeCompare(b, lang));
   }, [genres]);
 
-  const hasMoreFilters = Boolean(selectedGenre);
+  const sortedFormats = useMemo(() => sortTagOptions("formats", formats ?? []), [formats]);
+  const sortedLanguages = useMemo(() => sortTagOptions("languages", languages ?? []), [languages]);
+  const sortedEvents = useMemo(() => sortTagOptions("events", events ?? []), [events]);
+
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent);
+
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>

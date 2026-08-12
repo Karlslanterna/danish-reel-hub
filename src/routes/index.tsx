@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
 import { homeSchemas } from "@/lib/jsonld";
@@ -53,12 +54,15 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, clear } = useFilters();
-  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre);
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoError, geoLoading, clear } = useFilters();
+  const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
+  const hasFilters =
+    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || hasTagSelection(tagSel);
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
+  const tagOptions = useMemo(() => collectTagOptions(showtimeIndex), [showtimeIndex]);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -98,14 +102,18 @@ function HomePage() {
     return ids;
   }, [nearbyCinemaIds, showtimeIndex]);
 
+  // Date + screening-tag filters are evaluated on the same screening (AND logic).
   const dateMovieIds = useMemo(() => {
-    if (!selectedDate) return null;
+    const tagged = hasTagSelection(tagSel);
+    if (!selectedDate && !tagged) return null;
     const ids = new Set<string>();
     for (const s of showtimeIndex) {
-      if (s.date === selectedDate) ids.add(s.movieId);
+      if (selectedDate && s.date !== selectedDate) continue;
+      if (tagged && !showtimeMatchesTags(s, tagSel)) continue;
+      ids.add(s.movieId);
     }
     return ids;
-  }, [selectedDate, showtimeIndex]);
+  }, [selectedDate, showtimeIndex, selectedFormat, selectedLanguage, selectedEvent]);
 
   const displayCityOf = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
   const baseCityOf = (s: string) =>
@@ -349,7 +357,7 @@ function HomePage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <FilterBar genres={allGenres} />
+            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} />
             {hasFilters && (
               <button
                 type="button"

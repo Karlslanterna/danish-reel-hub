@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import {
   formatRuntime,
   fetchMovieBySlug,
@@ -73,7 +74,9 @@ function MoviePage() {
     cinemas: Cinema[];
     showtimes: Showtime[];
   };
-  const { radius, userLoc, selectedDate, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedFormat, selectedLanguage, selectedEvent, clear } = useFilters();
+  const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
+  const tagOptions = collectTagOptions(showtimes);
   const hasGeo = radius !== "all" && userLoc !== null;
 
   const filteredCinemas = hasGeo
@@ -83,7 +86,9 @@ function MoviePage() {
       })
     : cinemasShowing;
 
-  const filteredShowtimes = selectedDate ? showtimes.filter((s) => s.date === selectedDate) : showtimes;
+  const filteredShowtimes = showtimes.filter(
+    (s) => (!selectedDate || s.date === selectedDate) && showtimeMatchesTags(s, tagSel),
+  );
 
   const byCinema = filteredCinemas
     .map((c) => ({
@@ -92,7 +97,7 @@ function MoviePage() {
     }))
     .filter((x) => x.days.length > 0);
 
-  const hasFilters = Boolean(selectedDate) || hasGeo;
+  const hasFilters = Boolean(selectedDate) || hasGeo || hasTagSelection(tagSel);
 
   return (
     <div className="min-h-screen bg-background">
@@ -178,7 +183,7 @@ function MoviePage() {
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Spilletider</h2>
-            <FilterBar />
+            <FilterBar formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} />
             {hasFilters && (
               <button
                 type="button"

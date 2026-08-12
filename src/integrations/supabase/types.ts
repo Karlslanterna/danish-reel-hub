@@ -272,9 +272,12 @@ export type Database = {
           cinema_id: string
           created_at: string
           date: string
+          events: string[]
           external_id: string | null
+          formats: string[]
           hall: string
           id: string
+          languages: string[]
           movie_id: string
           start_time: string | null
           ticket_url: string | null
@@ -286,9 +289,12 @@ export type Database = {
           cinema_id: string
           created_at?: string
           date: string
+          events?: string[]
           external_id?: string | null
+          formats?: string[]
           hall: string
           id?: string
+          languages?: string[]
           movie_id: string
           start_time?: string | null
           ticket_url?: string | null
@@ -300,9 +306,12 @@ export type Database = {
           cinema_id?: string
           created_at?: string
           date?: string
+          events?: string[]
           external_id?: string | null
+          formats?: string[]
           hall?: string
           id?: string
+          languages?: string[]
           movie_id?: string
           start_time?: string | null
           ticket_url?: string | null

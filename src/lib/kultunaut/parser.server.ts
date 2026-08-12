@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { extractTags, mergeTags, emptyTags, normalizeLanguage, type ShowtimeTags } from "@/lib/showtime-tags";
 
 /**
  * Normalized records produced by the Kultunaut XML parser.
@@ -50,6 +51,12 @@ export type ParsedShowtime = {
   times: string[];
   hall: string;
   ticket_url: string | null;
+  /** Canonical screening types, e.g. ["3D"]. */
+  formats: string[];
+  /** Canonical language/subtitle labels, e.g. ["Danske undertekster"]. */
+  languages: string[];
+  /** Canonical event labels, e.g. ["Babybio"]. */
+  events: string[];
 };
 
 export type ParsedKultunaut = {
@@ -255,7 +262,35 @@ const parseMovieNode = (n: AnyNode): ParsedMovie | null => {
   };
 };
 
-const parseShowTimeNode = (n: AnyNode): ParsedShowtime[] => {
+/**
+ * Language hints carried as showTime attributes. Kultunaut emits
+ * `subtitled="da"` and (for some cinemas) `dubbed="da"` / `version="..."`.
+ */
+const tagsFromShowTimeAttrs = (n: AnyNode): ShowtimeTags => {
+  let tags = emptyTags();
+  const subtitled = attr(n, "subtitled");
+  if (subtitled) {
+    const label =
+      subtitled.toLowerCase().startsWith("da") ? "Danske undertekster"
+      : subtitled.toLowerCase().startsWith("en") ? "Engelske undertekster"
+      : null;
+    if (label) tags = mergeTags(tags, { formats: [], languages: [label], events: [] });
+  }
+  const dubbed = attr(n, "dubbed");
+  if (dubbed) {
+    const label = dubbed.toLowerCase().startsWith("da") ? "Dansk tale" : normalizeLanguage(dubbed);
+    if (label) tags = mergeTags(tags, { formats: [], languages: [label], events: [] });
+  }
+  // Free-text attributes some feeds add; normalized through the shared rules.
+  const free = ["version", "format", "type", "note", "screen", "hall", "auditorium", "event"]
+    .map((k) => attr(n, k))
+    .filter(Boolean)
+    .join(" · ");
+  if (free) tags = mergeTags(tags, extractTags(free));
+  return tags;
+};
+
+const parseShowTimeNode = (n: AnyNode, movieTags?: ShowtimeTags): ParsedShowtime[] => {
   if (!n || typeof n !== "object") return [];
   const date = normalizeDate(attr(n, "date"));
   const movieId = attr(n, "movieId");
@@ -265,10 +300,14 @@ const parseShowTimeNode = (n: AnyNode): ParsedShowtime[] => {
   const timesParent = child(n, "times");
   const timeNodes = toArray(child(timesParent, "time")) as AnyNode[];
 
+  const baseTags = mergeTags(movieTags ?? emptyTags(), tagsFromShowTimeAttrs(n));
+
   const out: ParsedShowtime[] = [];
   for (const t of timeNodes) {
     const time = normalizeTime(textOf(t));
     if (!time) continue;
+    // A single <time> may carry its own labelling (e.g. "3D", "Babybio").
+    const timeTags = mergeTags(baseTags, extractTags(attr(t, "version"), attr(t, "note"), attr(t, "type")));
     out.push({
       movie_external_id: movieId,
       cinema_external_id: theaterId,
@@ -276,6 +315,9 @@ const parseShowTimeNode = (n: AnyNode): ParsedShowtime[] => {
       times: [time],
       hall: "",
       ticket_url: attr(t, "ticketUrl") || null,
+      formats: timeTags.formats,
+      languages: timeTags.languages,
+      events: timeTags.events,
     });
   }
   return out;
@@ -341,9 +383,17 @@ export function parseKultunautXml(xml: string): ParsedKultunaut {
       if (movie && !movies.has(movie.external_id)) movies.set(movie.external_id, movie);
     }
   }
+  // Tags implied by the movie itself (e.g. "Live in 3D", "Opera", "Koncert")
+  // apply to every screening of that movie.
+  const movieTagsById = new Map<string, ShowtimeTags>();
+  for (const m of movies.values()) {
+    movieTagsById.set(m.external_id, extractTags(m.title, m.original_title, m.genre.join(" · ")));
+  }
+
   for (const s of containers.showTimes) {
     for (const node of toArray(child(s, "showTime")) as AnyNode[]) {
-      for (const st of parseShowTimeNode(node)) showtimes.push(st);
+      const mt = movieTagsById.get(attr(node, "movieId"));
+      for (const st of parseShowTimeNode(node, mt)) showtimes.push(st);
     }
   }
 

@@ -349,7 +349,6 @@ function HomePage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <h2 className="font-display text-2xl tracking-tight">{t("home.currentMovies")}</h2>
             <FilterBar genres={allGenres} />
             {hasFilters && (
               <button

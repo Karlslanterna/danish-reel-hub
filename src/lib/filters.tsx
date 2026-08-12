@@ -383,56 +383,73 @@ export function FilterBar({
             <Plus size="14" strokeWidth={2.5} />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-56 p-2" align="start">
-          {moreView === "menu" ? (
-            <div className="flex flex-col gap-1">
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.more")}</div>
-              {sortedGenres.length > 0 && (
+        <PopoverContent className="max-h-[70vh] w-56 overflow-y-auto p-2" align="start">
+          {(() => {
+            const groups = [
+              { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres, value: selectedGenre, set: setSelectedGenre },
+              { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats, value: selectedFormat, set: setSelectedFormat },
+              { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages, value: selectedLanguage, set: setSelectedLanguage },
+              { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents, value: selectedEvent, set: setSelectedEvent },
+            ].filter((g) => g.options.length > 0);
+
+            if (moreView === "menu") {
+              return (
+                <div className="flex flex-col gap-1">
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.more")}</div>
+                  {groups.map((g) => (
+                    <button
+                      key={g.key}
+                      type="button"
+                      onClick={() => setMoreView(g.key)}
+                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                    >
+                      <span>{g.label}</span>
+                      <div className="flex items-center gap-2">
+                        {g.value && <span className="max-w-[80px] truncate text-xs text-primary">{g.value}</span>}
+                        <ChevronRight size="14" className="text-muted-foreground" />
+                      </div>
+                    </button>
+                  ))}
+                  {groups.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
+                  )}
+                </div>
+              );
+            }
+
+            const active = groups.find((g) => g.key === moreView);
+            if (!active) return null;
+            return (
+              <div className="flex flex-col gap-1">
                 <button
                   type="button"
-                  onClick={() => setMoreView("genres")}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                  onClick={() => setMoreView("menu")}
+                  className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
                 >
-                  <span>{t("filter.genre")}</span>
-                  <div className="flex items-center gap-2">
-                    {selectedGenre && <span className="max-w-[80px] truncate text-xs text-primary">{selectedGenre}</span>}
-                    <ChevronRight size="14" className="text-muted-foreground" />
-                  </div>
+                  <ArrowLeft size="12" />
+                  {t("filter.back")}
                 </button>
-              )}
-              {sortedGenres.length === 0 && (
-                <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                onClick={() => setMoreView("menu")}
-                className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
-              >
-                <ArrowLeft size="12" />
-                {t("filter.back")}
-              </button>
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickGenre")}</div>
-              {sortedGenres.map((g) => {
-                const selected = selectedGenre === g;
-                return (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => { setSelectedGenre(selected ? null : g); setMoreOpen(false); }}
-                    className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                      selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    {g}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{active.pick}</div>
+                {active.options.map((opt) => {
+                  const selected = active.value === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => { active.set(selected ? null : opt); setMoreOpen(false); }}
+                      className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                        selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </PopoverContent>
+
       </Popover>
     </div>
   );

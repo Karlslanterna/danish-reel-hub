@@ -3,6 +3,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
 import { useLanguage, type Lang } from "@/lib/i18n";
+import { sortTagOptions } from "@/lib/showtime-tags";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -43,11 +44,17 @@ type FiltersState = {
   userLoc: Loc | null;
   selectedDate: string | null;
   selectedGenre: string | null;
+  selectedFormat: string | null;
+  selectedLanguage: string | null;
+  selectedEvent: string | null;
   geoError: string | null;
   geoLoading: boolean;
   setRadius: (r: Radius) => void;
   setSelectedDate: (d: string | null) => void;
   setSelectedGenre: (g: string | null) => void;
+  setSelectedFormat: (v: string | null) => void;
+  setSelectedLanguage: (v: string | null) => void;
+  setSelectedEvent: (v: string | null) => void;
   requestLocation: (onSuccess?: () => void) => void;
   clear: () => void;
 };
@@ -56,13 +63,33 @@ const FiltersContext = createContext<FiltersState | null>(null);
 
 const STORAGE_KEY = "lanterna.filters.v1";
 
-type Persisted = { radius: Radius; userLoc: Loc | null; selectedDate: string | null; selectedGenre: string | null };
+type Persisted = {
+  radius: Radius;
+  userLoc: Loc | null;
+  selectedDate: string | null;
+  selectedGenre: string | null;
+  selectedFormat: string | null;
+  selectedLanguage: string | null;
+  selectedEvent: string | null;
+};
+
+const EMPTY_PERSISTED: Persisted = {
+  radius: "all",
+  userLoc: null,
+  selectedDate: null,
+  selectedGenre: null,
+  selectedFormat: null,
+  selectedLanguage: null,
+  selectedEvent: null,
+};
+
+const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
 
 function loadPersisted(): Persisted {
-  if (typeof window === "undefined") return { radius: "all", userLoc: null, selectedDate: null, selectedGenre: null };
+  if (typeof window === "undefined") return EMPTY_PERSISTED;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { radius: "all", userLoc: null, selectedDate: null, selectedGenre: null };
+    if (!raw) return EMPTY_PERSISTED;
     const p = JSON.parse(raw) as Partial<Persisted>;
     const radius: Radius = p.radius === "all" || (typeof p.radius === "number" && [2, 5, 10, 25, 50].includes(p.radius)) ? (p.radius as Radius) : "all";
     const userLoc = p.userLoc && typeof p.userLoc.lat === "number" && typeof p.userLoc.lng === "number" ? p.userLoc : null;
@@ -70,9 +97,17 @@ function loadPersisted(): Persisted {
     const selectedGenre = typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
     // drop past dates
     if (selectedDate && selectedDate < todayStr()) selectedDate = null;
-    return { radius, userLoc, selectedDate, selectedGenre };
+    return {
+      radius,
+      userLoc,
+      selectedDate,
+      selectedGenre,
+      selectedFormat: str(p.selectedFormat),
+      selectedLanguage: str(p.selectedLanguage),
+      selectedEvent: str(p.selectedEvent),
+    };
   } catch {
-    return { radius: "all", userLoc: null, selectedDate: null, selectedGenre: null };
+    return EMPTY_PERSISTED;
   }
 }
 
@@ -81,6 +116,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [userLoc, setUserLoc] = useState<Loc | null>(null);
   const [selectedDate, setSelectedDateState] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenreState] = useState<string | null>(null);
+  const [selectedFormat, setSelectedFormatState] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguageState] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEventState] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
 
@@ -91,19 +129,28 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setUserLoc(p.userLoc);
     setSelectedDateState(p.selectedDate);
     setSelectedGenreState(p.selectedGenre);
+    setSelectedFormatState(p.selectedFormat);
+    setSelectedLanguageState(p.selectedLanguage);
+    setSelectedEventState(p.selectedEvent);
   }, []);
 
   // Persist
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ radius, userLoc, selectedDate, selectedGenre }));
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent }),
+      );
     } catch { /* ignore */ }
-  }, [radius, userLoc, selectedDate, selectedGenre]);
+  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent]);
 
   const setRadius = useCallback((r: Radius) => setRadiusState(r), []);
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
   const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
+  const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);
+  const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
+  const setSelectedEvent = useCallback((v: string | null) => setSelectedEventState(v), []);
 
   const requestLocation = useCallback((onSuccess?: () => void) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
@@ -131,11 +178,19 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setRadiusState("all");
     setSelectedDateState(null);
     setSelectedGenreState(null);
+    setSelectedFormatState(null);
+    setSelectedLanguageState(null);
+    setSelectedEventState(null);
   }, []);
 
   const value = useMemo<FiltersState>(
-    () => ({ radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, requestLocation, clear }),
-    [radius, userLoc, selectedDate, selectedGenre, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, requestLocation, clear],
+    () => ({
+      radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
+      geoError, geoLoading,
+      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent,
+      requestLocation, clear,
+    }),
+    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, requestLocation, clear],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;

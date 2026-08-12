@@ -244,7 +244,7 @@ function HomePage() {
       {open && (
         <div
           className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
-          style={{ animation: "fadeIn 150ms ease-out" }}
+          
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
           }}

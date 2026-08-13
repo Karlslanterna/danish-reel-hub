@@ -24,6 +24,7 @@ const SKIPPED_TTL_DAYS = 7;
 type MovieRow = {
   id: string;
   title: string;
+  original_title: string | null;
   year: number | null;
   tmdb_status: string | null;
 };

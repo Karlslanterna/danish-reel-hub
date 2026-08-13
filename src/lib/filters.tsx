@@ -259,6 +259,8 @@ export function useFilters() {
   return ctx;
 }
 
+const OPEN_CITY_FILTER_EVENT = "lanterna:open-city-filter";
+
 export function GeoNotice({ className = "" }: { className?: string }) {
   const { geoStatus, geoLoading, requestLocation, dismissGeo } = useFilters();
   const { t } = useLanguage();
@@ -266,7 +268,7 @@ export function GeoNotice({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    setCityFilterFound(Boolean(document.querySelector("[data-city-filter]")));
+    setCityFilterFound(Boolean(document.querySelector("[data-more-filters-trigger]")));
   }, []);
 
   if (geoLoading) return null;
@@ -283,9 +285,7 @@ export function GeoNotice({ className = "" }: { className?: string }) {
   const openCityFilter = () => {
     dismissGeo();
     if (typeof document === "undefined") return;
-    const el = document.querySelector("[data-city-filter]") as HTMLElement | null;
-    el?.focus();
-    el?.click();
+    document.dispatchEvent(new CustomEvent(OPEN_CITY_FILTER_EVENT, { bubbles: true }));
   };
 
   return (
@@ -361,6 +361,17 @@ export function FilterBar({
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities">("menu");
   const { t, lang } = useLanguage();
+
+  // Allow GeoNotice (or any other caller) to open the city filter inside the more-menu.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () => {
+      setMoreView("cities");
+      setMoreOpen(true);
+    };
+    document.addEventListener(OPEN_CITY_FILTER_EVENT, handler);
+    return () => document.removeEventListener(OPEN_CITY_FILTER_EVENT, handler);
+  }, []);
   const TODAY = todayStr();
   const TOMORROW = tomorrowStr();
 
@@ -381,8 +392,7 @@ export function FilterBar({
     [cities],
   );
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent);
-  const [cityOpen, setCityOpen] = useState(false);
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity);
 
   // City selection is part of the URL: picking a city moves the user to the
   // city-scoped version of the current page (and clearing it back to national).
@@ -391,7 +401,8 @@ export function FilterBar({
 
   const applyCity = (cityName: string | null) => {
     setSelectedCity(cityName);
-    setCityOpen(false);
+    setMoreOpen(false);
+    setMoreView("menu");
     const slug = cityName ? slugifyCity(cityName) : null;
     const movie = pathname.match(/^\/(?:[^/]+\/)?film\/([^/?#]+)/);
     if (movie) {
@@ -529,54 +540,6 @@ export function FilterBar({
         </PopoverContent>
       </Popover>
 
-      <Popover open={cityOpen} onOpenChange={setCityOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              data-city-filter
-              className={`inline-flex max-w-[140px] items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors sm:max-w-[180px] ${
-                selectedCity
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
-              }`}
-            >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 21h18M5 21V7l8-4 8 4v14M8 21v-9a2 2 0 0 1 4 0v9" />
-            </svg>
-            <span className="truncate">{selectedCity ?? t("filter.city")}</span>
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="max-h-[60vh] w-56 overflow-y-auto p-2" align="start">
-          <div className="flex flex-col gap-1">
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCity")}</div>
-            <button
-              type="button"
-              onClick={() => applyCity(null)}
-              className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                !selectedCity ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
-              }`}
-            >
-              {t("filter.allCities")}
-            </button>
-            {sortedCities.map((c) => {
-              const selected = selectedCity === c.value;
-              return (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => applyCity(selected ? null : c.value)}
-                  className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                    selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
-                  }`}
-                >
-                  {c.value} ({c.count})
-                </button>
-              );
-            })}
-          </div>
-        </PopoverContent>
-      </Popover>
-
       <Popover
         open={moreOpen}
         onOpenChange={(open) => {
@@ -588,6 +551,7 @@ export function FilterBar({
         <PopoverTrigger asChild>
           <button
             type="button"
+            data-more-filters-trigger
             aria-label={t("filter.more")}
             className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border transition-colors ${
               hasMoreFilters
@@ -602,7 +566,6 @@ export function FilterBar({
           {(() => {
             const groups = [
               { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedGenre, set: setSelectedGenre },
-
               { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedFormat, set: setSelectedFormat },
               { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedLanguage, set: setSelectedLanguage },
               { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedEvent, set: setSelectedEvent },
@@ -626,9 +589,60 @@ export function FilterBar({
                       </div>
                     </button>
                   ))}
-                  {groups.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMoreView("cities")}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                  >
+                    <span>{t("filter.city")}</span>
+                    <div className="flex items-center gap-2">
+                      {selectedCity && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCity}</span>}
+                      <ChevronRight size="14" className="text-muted-foreground" />
+                    </div>
+                  </button>
+                  {groups.length === 0 && !selectedCity && (
                     <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
                   )}
+                </div>
+              );
+            }
+
+            if (moreView === "cities") {
+              return (
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMoreView("menu")}
+                    className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
+                  >
+                    <ArrowLeft size="12" />
+                    {t("filter.back")}
+                  </button>
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCity")}</div>
+                  <button
+                    type="button"
+                    onClick={() => applyCity(null)}
+                    className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                      !selectedCity ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {t("filter.allCities")}
+                  </button>
+                  {sortedCities.map((c) => {
+                    const selected = selectedCity === c.value;
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => applyCity(selected ? null : c.value)}
+                        className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                          selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        {c.value} ({c.count})
+                      </button>
+                    );
+                  })}
                 </div>
               );
             }

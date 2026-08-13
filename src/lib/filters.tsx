@@ -767,6 +767,58 @@ export function FilterBar({
               );
             }
 
+            if (moreView === "cinemas") {
+              return (
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMoreView("menu")}
+                    className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
+                  >
+                    <ArrowLeft size="12" />
+                    {t("filter.back")}
+                  </button>
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCinema")}</div>
+                  <input
+                    value={cinemaQuery}
+                    onChange={(e) => setCinemaQuery(e.target.value)}
+                    placeholder={t("filter.searchCinema")}
+                    className="mx-1 mb-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyCinema(null)}
+                    className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                      !selectedCinemaId ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {t("filter.allCinemas")}
+                  </button>
+                  {visibleCinemas.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noCinemas")}</div>
+                  )}
+                  {visibleCinemas.map((c) => {
+                    const selected = selectedCinemaId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => applyCinema(selected ? null : c)}
+                        className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                          selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        <span className="block truncate">{c.name}</span>
+                        <span className={`block truncate text-[11px] ${selected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                          {baseCityOf(c.city)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            }
+
             const active = groups.find((g) => g.key === moreView);
             if (!active) return null;
             return (

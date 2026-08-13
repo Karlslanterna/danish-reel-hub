@@ -258,7 +258,9 @@ export function FilterBar({
     [cities],
   );
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity);
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent);
+  const [cityOpen, setCityOpen] = useState(false);
+
 
 
   return (

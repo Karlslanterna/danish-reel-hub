@@ -86,6 +86,9 @@ type Persisted = {
   selectedLanguage: string | null;
   selectedEvent: string | null;
   selectedCity: string | null;
+  selectedCinemaId: string | null;
+  selectedCinemaSlug: string | null;
+  selectedCinemaName: string | null;
 };
 
 const EMPTY_PERSISTED: Persisted = {

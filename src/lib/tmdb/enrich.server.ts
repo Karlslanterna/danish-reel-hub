@@ -6,7 +6,7 @@ import {
   TmdbUnavailableError,
   type TmdbMovieDetails,
 } from "./client.server";
-import { pickMatch, type MatchCandidate } from "./match";
+import { isNonFilmEvent, pickMatch, searchQueries, type MatchCandidate } from "./match";
 
 export type EnrichSummary = {
   processed: number;

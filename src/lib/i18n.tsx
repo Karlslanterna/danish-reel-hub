@@ -60,6 +60,7 @@ const dict = {
     "geo.explainNoConnection": "Tjek din forbindelse, eller vælg en by manuelt.",
     "geo.retry": "Prøv igen",
     "geo.pickCity": "Vælg by",
+    "geo.close": "Luk",
     "lang.toggle": "English",
   },
   en: {
@@ -117,6 +118,7 @@ const dict = {
     "geo.explainNoConnection": "Check your connection, or choose a city manually.",
     "geo.retry": "Try again",
     "geo.pickCity": "Choose city",
+    "geo.close": "Close",
     "lang.toggle": "Dansk",
   },
 } as const;

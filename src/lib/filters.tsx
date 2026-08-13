@@ -551,6 +551,7 @@ export function FilterBar({
         <PopoverTrigger asChild>
           <button
             type="button"
+            data-more-filters-trigger
             aria-label={t("filter.more")}
             className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border transition-colors ${
               hasMoreFilters

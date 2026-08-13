@@ -54,10 +54,10 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoError, geoLoading, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoError, geoLoading, clear } = useFilters();
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const hasFilters =
-    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || hasTagSelection(tagSel);
+    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || hasTagSelection(tagSel);
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
@@ -93,14 +93,26 @@ function HomePage() {
     return ids;
   }, [radius, userLoc, cinemas]);
 
-  const nearbyMovieIds = useMemo(() => {
-    if (!nearbyCinemaIds) return null;
+  // "Near me" overrides the city filter while it is active.
+  const cityCinemaIds = useMemo(() => {
+    if (nearbyCinemaIds || !selectedCity) return null;
     const ids = new Set<string>();
-    for (const p of showtimeIndex) {
-      if (nearbyCinemaIds.has(p.cinemaId)) ids.add(p.movieId);
+    for (const c of cinemas) {
+      if (baseCityOf(c.city) === selectedCity) ids.add(c.id);
     }
     return ids;
-  }, [nearbyCinemaIds, showtimeIndex]);
+  }, [selectedCity, cinemas, nearbyCinemaIds]);
+
+  const activeCinemaIds = nearbyCinemaIds ?? cityCinemaIds;
+
+  const nearbyMovieIds = useMemo(() => {
+    if (!activeCinemaIds) return null;
+    const ids = new Set<string>();
+    for (const p of showtimeIndex) {
+      if (activeCinemaIds.has(p.cinemaId)) ids.add(p.movieId);
+    }
+    return ids;
+  }, [activeCinemaIds, showtimeIndex]);
 
   // Date + screening-tag filters are evaluated on the same screening (AND logic).
   const dateMovieIds = useMemo(() => {
@@ -209,6 +221,11 @@ function HomePage() {
   }, [query, movies, nearbyMovieIds, dateMovieIds, selectedGenre]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
+
+  const cityOptions = useMemo(
+    () => baseCities.map((b) => ({ value: b.city, count: b.cinemas })),
+    [baseCities],
+  );
 
   useEffect(() => {
     setActive(0);
@@ -357,7 +374,7 @@ function HomePage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} />
+            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={cityOptions} />
             {hasFilters && (
               <button
                 type="button"
@@ -402,11 +419,11 @@ function HomePage() {
           <div className="mb-8 flex items-baseline justify-between">
             <h2 className="font-display text-2xl tracking-tight">{t("home.cinemasHeading")}</h2>
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {nearbyCinemaIds ? `${nearbyCinemaIds.size} ${t("home.within")} ${radius} km` : `${cinemas.length} ${t("home.places")}`}
+              {nearbyCinemaIds ? `${nearbyCinemaIds.size} ${t("home.within")} ${radius} km` : `${activeCinemaIds ? activeCinemaIds.size : cinemas.length} ${t("home.places")}`}
             </div>
           </div>
           <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md bg-border md:grid-cols-2 lg:grid-cols-3">
-            {cinemas.filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id)).map((c) => (
+            {cinemas.filter((c) => !activeCinemaIds || activeCinemaIds.has(c.id)).map((c) => (
               <Link
                 key={c.id}
                 to="/biograf/$slug"

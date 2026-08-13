@@ -361,6 +361,17 @@ export function FilterBar({
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities">("menu");
   const { t, lang } = useLanguage();
+
+  // Allow GeoNotice (or any other caller) to open the city filter inside the more-menu.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () => {
+      setMoreView("cities");
+      setMoreOpen(true);
+    };
+    document.addEventListener(OPEN_CITY_FILTER_EVENT, handler);
+    return () => document.removeEventListener(OPEN_CITY_FILTER_EVENT, handler);
+  }, []);
   const TODAY = todayStr();
   const TOMORROW = tomorrowStr();
 

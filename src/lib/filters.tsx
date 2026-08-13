@@ -315,6 +315,22 @@ export function useFilters() {
   return ctx;
 }
 
+/**
+ * Hydrates the selected cinema from `?biograf=<slug>` on first load / navigation
+ * so a shared URL restores the same filtered view.
+ */
+export function useCinemaUrlSync(cinemas: CinemaFilterOption[]) {
+  const { selectedCinemaSlug, setSelectedCinema } = useFilters();
+  const search = useRouterState({ select: (s) => s.location.search }) as Record<string, unknown>;
+  const slug = typeof search?.biograf === "string" ? search.biograf : null;
+
+  useEffect(() => {
+    if (!slug || slug === selectedCinemaSlug) return;
+    const match = cinemas.find((c) => c.slug === slug);
+    if (match) setSelectedCinema(match);
+  }, [slug, selectedCinemaSlug, cinemas, setSelectedCinema]);
+}
+
 const OPEN_CITY_FILTER_EVENT = "lanterna:open-city-filter";
 
 export function GeoNotice({ className = "" }: { className?: string }) {

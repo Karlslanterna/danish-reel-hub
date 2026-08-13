@@ -258,7 +258,9 @@ export function FilterBar({
     [cities],
   );
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity);
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent);
+  const [cityOpen, setCityOpen] = useState(false);
+
 
 
   return (
@@ -382,9 +384,57 @@ export function FilterBar({
         </PopoverContent>
       </Popover>
 
+      <Popover open={cityOpen} onOpenChange={setCityOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={`inline-flex max-w-[140px] items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors sm:max-w-[180px] ${
+              selectedCity
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 21h18M5 21V7l8-4 8 4v14M8 21v-9a2 2 0 0 1 4 0v9" />
+            </svg>
+            <span className="truncate">{selectedCity ?? t("filter.city")}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="max-h-[60vh] w-56 overflow-y-auto p-2" align="start">
+          <div className="flex flex-col gap-1">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCity")}</div>
+            <button
+              type="button"
+              onClick={() => { setSelectedCity(null); setCityOpen(false); }}
+              className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                !selectedCity ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+              }`}
+            >
+              {t("filter.allCities")}
+            </button>
+            {sortedCities.map((c) => {
+              const selected = selectedCity === c.value;
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => { setSelectedCity(selected ? null : c.value); setCityOpen(false); }}
+                  className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                    selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {c.value} ({c.count})
+                </button>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <Popover
         open={moreOpen}
         onOpenChange={(open) => {
+
           setMoreOpen(open);
           if (!open) setMoreView("menu");
         }}
@@ -405,16 +455,8 @@ export function FilterBar({
         <PopoverContent className="max-h-[70vh] w-56 overflow-y-auto p-2" align="start">
           {(() => {
             const groups = [
-              {
-                key: "cities" as const,
-                label: t("filter.city"),
-                pick: t("filter.pickCity"),
-                options: sortedCities.map((c) => ({ value: c.value, label: `${c.value} (${c.count})` })),
-                value: selectedCity,
-                set: setSelectedCity,
-                allLabel: t("filter.allCities"),
-              },
               { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedGenre, set: setSelectedGenre },
+
               { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedFormat, set: setSelectedFormat },
               { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedLanguage, set: setSelectedLanguage },
               { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedEvent, set: setSelectedEvent },

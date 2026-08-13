@@ -398,6 +398,7 @@ export function FilterBar({
   languages,
   events,
   cities,
+  cinemas,
 }: {
   className?: string;
   hideRadius?: boolean;
@@ -406,16 +407,20 @@ export function FilterBar({
   languages?: string[];
   events?: string[];
   cities?: Array<{ value: string; count: number }>;
+  /** Cinemas that are still valid given the page's other active filters (date, radius, …). */
+  cinemas?: CinemaFilterOption[];
 }) {
   const {
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
-    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity,
+    selectedCinemaId, selectedCinemaName,
+    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
     requestLocation,
   } = useFilters();
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities">("menu");
+  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities" | "cinemas">("menu");
+  const [cinemaQuery, setCinemaQuery] = useState("");
   const { t, lang } = useLanguage();
 
   // Allow GeoNotice (or any other caller) to open the city filter inside the more-menu.

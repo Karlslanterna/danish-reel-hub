@@ -100,6 +100,9 @@ const EMPTY_PERSISTED: Persisted = {
   selectedLanguage: null,
   selectedEvent: null,
   selectedCity: null,
+  selectedCinemaId: null,
+  selectedCinemaSlug: null,
+  selectedCinemaName: null,
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);

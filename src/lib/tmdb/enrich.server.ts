@@ -32,7 +32,7 @@ type MovieRow = {
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 async function selectWork(db: any, limit: number): Promise<{ rows: MovieRow[]; remaining: number }> {
-  const cols = "id, title, year, tmdb_status";
+  const cols = "id, title, original_title, year, tmdb_status";
 
   // 1) never attempted
   const { data: pending, error: pErr } = await db

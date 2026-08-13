@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
-import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { FilterBar, GeoNotice, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";

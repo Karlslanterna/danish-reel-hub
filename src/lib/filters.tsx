@@ -455,16 +455,8 @@ export function FilterBar({
         <PopoverContent className="max-h-[70vh] w-56 overflow-y-auto p-2" align="start">
           {(() => {
             const groups = [
-              {
-                key: "cities" as const,
-                label: t("filter.city"),
-                pick: t("filter.pickCity"),
-                options: sortedCities.map((c) => ({ value: c.value, label: `${c.value} (${c.count})` })),
-                value: selectedCity,
-                set: setSelectedCity,
-                allLabel: t("filter.allCities"),
-              },
               { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedGenre, set: setSelectedGenre },
+
               { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedFormat, set: setSelectedFormat },
               { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedLanguage, set: setSelectedLanguage },
               { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedEvent, set: setSelectedEvent },

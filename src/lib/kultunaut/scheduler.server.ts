@@ -70,9 +70,32 @@ class FeedAccessError extends Error {
   }
 }
 
+/**
+ * Resolve the feed URL. An override is only honoured when it is a valid
+ * absolute http(s) URL — a malformed value (e.g. the bare word "kalorius")
+ * is ignored with a logged warning so scheduled imports keep working.
+ */
+export function resolveFeedUrl(): string {
+  const override = (process.env.KULTUNAUT_FEED_URL ?? "").trim();
+  if (!override) return DEFAULT_FEED_URL;
+  try {
+    const parsed = new URL(override);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`unsupported protocol ${parsed.protocol}`);
+    }
+    return parsed.toString();
+  } catch {
+    logError("feed_url_invalid", {
+      reason: "KULTUNAUT_FEED_URL is not a valid absolute URL — using default feed",
+    });
+    return DEFAULT_FEED_URL;
+  }
+}
+
 /** Fetch the Kultunaut feed with exponential-backoff retries. */
 async function fetchFeedXml(): Promise<string> {
-  const feedUrl = process.env.KULTUNAUT_FEED_URL || DEFAULT_FEED_URL;
+  const feedUrl = resolveFeedUrl();
+
   let lastError = "";
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -171,12 +194,59 @@ async function finishRun(
   };
 }
 
+/** A queued/running import job untouched for this long is considered dead. */
+const STALE_JOB_MS = 30 * 60 * 1000;
+/** A scheduled run left 'running' for this long is considered abandoned. */
+const STALE_RUN_MS = 60 * 60 * 1000;
+
+/**
+ * Mark abandoned import jobs as failed so they can never block future
+ * scheduled imports. Returns the ids that were reaped.
+ */
+export async function reapStaleJobs(): Promise<string[]> {
+  const db = await admin();
+  const cutoff = new Date(Date.now() - STALE_JOB_MS).toISOString();
+  const { data, error } = await db
+    .from("import_jobs")
+    .update({
+      status: "failed",
+      message: "Import afbrudt: jobbet var inaktivt for længe og blev nulstillet",
+    })
+    .in("status", ["queued", "running"])
+    .lt("updated_at", cutoff)
+    .select("id");
+  if (error) {
+    logError("stale_job_reap_failed", { error: error.message });
+    return [];
+  }
+  const ids = (data ?? []).map((r) => r.id as string);
+  if (ids.length > 0) log("stale_jobs_reaped", { count: ids.length, ids });
+
+  // Also close scheduled runs stuck in 'running' whose job is gone/dead.
+  const runCutoff = new Date(Date.now() - STALE_RUN_MS).toISOString();
+  const { data: runs, error: runErr } = await db
+    .from("import_schedule_runs")
+    .update({
+      status: "failed",
+      reason: "Run abandoned: still running past the stale timeout",
+      finished_at: new Date().toISOString(),
+    })
+    .eq("status", "running")
+    .lt("started_at", runCutoff)
+    .select("id");
+  if (runErr) logError("stale_run_reap_failed", { error: runErr.message });
+  else if ((runs ?? []).length > 0)
+    log("stale_runs_reaped", { count: (runs ?? []).length });
+
+  return ids;
+}
+
 /** True when a manual/admin import job is still in flight. */
 async function activeImportJob(): Promise<string | null> {
   const db = await admin();
-  // Only jobs touched in the last 2 hours count as "in flight" — an older
-  // queued/running row is abandoned and must not block the daily import.
-  const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  // Only recently-touched jobs count as "in flight" — anything older has
+  // already been failed by reapStaleJobs() and must not block the import.
+  const cutoff = new Date(Date.now() - STALE_JOB_MS).toISOString();
   const { data } = await db
     .from("import_jobs")
     .select("id,status,updated_at")
@@ -199,17 +269,23 @@ export async function runScheduledImport(
 ): Promise<ScheduleRunResult> {
   const db = await admin();
 
+  // 0. Clear abandoned jobs/runs before anything else.
+  await reapStaleJobs();
+
   // 1. Resume an in-flight scheduled run (previous invocation ran out of budget).
-  const { data: inFlight } = await db
+  const { data: inFlightRows } = await db
     .from("import_schedule_runs")
     .select("id,job_id,attempts,started_at")
     .eq("status", "running")
-    .maybeSingle();
+    .order("started_at", { ascending: false })
+    .limit(1);
+  const inFlight = inFlightRows?.[0] ?? null;
 
   if (inFlight) {
     const startedAtMs = new Date(inFlight.started_at as string).getTime();
     const staleHours = (Date.now() - startedAtMs) / 3_600_000;
-    if (staleHours > 6) {
+    if (staleHours > STALE_RUN_MS / 3_600_000) {
+
       log("run_stale_failed", { runId: inFlight.id, staleHours });
       return finishRun(
         inFlight.id as string,

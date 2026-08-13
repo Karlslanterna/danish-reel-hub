@@ -58,6 +58,90 @@ type JobPayload = {
   groupedShowtimes: GroupedShowtime[];
 };
 
+export type CleanupSummary = {
+  showtimesDeleted: number;
+  moviesDeleted: number;
+  cinemasDeleted: number;
+  errors: string[];
+};
+
+/** Fetch every value of `column` from `table`, paging past PostgREST limits. */
+async function allValues(
+  db: any,
+  table: string,
+  column: string,
+): Promise<string[]> {
+  const out: string[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from(table)
+      .select(column)
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`${table}.${column}: ${error.message}`);
+    const rows = (data ?? []) as Array<Record<string, string | null>>;
+    for (const r of rows) {
+      const v = r[column];
+      if (v) out.push(v);
+    }
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
+/**
+ * Remove data that is no longer current:
+ *  - showtimes whose date is in the past
+ *  - movies with no remaining upcoming showtimes
+ *  - cinemas with no remaining upcoming showtimes
+ */
+export async function cleanupStaleData(): Promise<CleanupSummary> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const errors: string[] = [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  let showtimesDeleted = 0;
+  const { data: deletedShowtimes, error: stErr } = await supabaseAdmin
+    .from("showtimes")
+    .delete()
+    .lt("date", today)
+    .select("id");
+  if (stErr) errors.push(`cleanup showtimes: ${stErr.message}`);
+  else showtimesDeleted = (deletedShowtimes ?? []).length;
+
+  const deleteOrphans = async (
+    table: "movies" | "cinemas",
+    fk: "movie_id" | "cinema_id",
+  ): Promise<number> => {
+    try {
+      const referenced = new Set(await allValues(supabaseAdmin, "showtimes", fk));
+      const ids = await allValues(supabaseAdmin, table, "id");
+      const orphans = ids.filter((id) => !referenced.has(id));
+      let deleted = 0;
+      const CHUNK = 200;
+      for (let i = 0; i < orphans.length; i += CHUNK) {
+        const slice = orphans.slice(i, i + CHUNK);
+        const { error } = await supabaseAdmin.from(table).delete().in("id", slice);
+        if (error) errors.push(`cleanup ${table}: ${error.message}`);
+        else deleted += slice.length;
+      }
+      return deleted;
+    } catch (err) {
+      errors.push(
+        `cleanup ${table}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return 0;
+    }
+  };
+
+  const moviesDeleted = await deleteOrphans("movies", "movie_id");
+  const cinemasDeleted = await deleteOrphans("cinemas", "cinema_id");
+
+  return { showtimesDeleted, moviesDeleted, cinemasDeleted, errors };
+}
+
+
+
 /**
  * Create a queued import job from a Kultunaut XML payload.
  * Returns the new job id immediately; processing happens in subsequent
@@ -430,20 +514,40 @@ export async function processJobBatch(
         .update({
           cursor: newCursor,
           processed_showtimes: upserted,
-          phase: finished ? "done" : "showtimes",
-          status: finished ? "completed" : "running",
+          phase: finished ? "cleanup" : "showtimes",
+          status: "running",
           message: finished
-            ? "Import completed"
+            ? "Rydder op i forældede data…"
             : `Showtimes ${newCursor}/${grouped.length}`,
         })
         .eq("id", jobId);
       await pushErrors(errors);
       return {
-        done: finished,
-        status: finished ? "completed" : "running",
-        phase: finished ? "done" : "showtimes",
+        done: false,
+        status: "running",
+        phase: finished ? "cleanup" : "showtimes",
       };
     }
+
+    if (job.phase === "cleanup") {
+      const errors: string[] = [];
+      const summary = await cleanupStaleData();
+      errors.push(...summary.errors);
+
+      await supabaseAdmin
+        .from("import_jobs")
+        .update({
+          phase: "done",
+          status: "completed",
+          message:
+            `Import completed — fjernede ${summary.showtimesDeleted} forældede visninger, ` +
+            `${summary.moviesDeleted} film og ${summary.cinemasDeleted} biografer uden kommende visninger`,
+        })
+        .eq("id", jobId);
+      await pushErrors(errors);
+      return { done: true, status: "completed", phase: "done" };
+    }
+
 
     // Unknown phase: mark done.
     return { done: true, status: job.status, phase: job.phase };

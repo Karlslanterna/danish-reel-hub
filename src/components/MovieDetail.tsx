@@ -172,6 +172,15 @@ export function MovieDetail({
       </section>
 
       <section id="showtimes" className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <FilterBar
+            formats={tagOptions.formats}
+            languages={tagOptions.languages}
+            events={tagOptions.events}
+            cities={cityFilterOptions}
+          />
+        </div>
+
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <h2 className="font-display text-xl tracking-tight sm:text-2xl">
             Spilletider{city ? ` i ${city.name}` : ""}

@@ -62,7 +62,7 @@ function HomePage() {
   useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const hasFilters =
-    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || hasTagSelection(tagSel);
+    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || Boolean(selectedCinemaId) || hasTagSelection(tagSel);
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 

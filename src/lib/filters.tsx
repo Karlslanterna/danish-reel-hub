@@ -513,7 +513,20 @@ export function FilterBar({
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      {!hideRadius && (
+      {selectedCinemaId && selectedCinemaName && (
+        <button
+          type="button"
+          onClick={() => applyCinema(null)}
+          className="inline-flex max-w-[190px] items-center gap-2 rounded-full border border-primary bg-primary px-4 py-1.5 text-xs uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
+          title={selectedCinemaName}
+        >
+          <span className="truncate">{selectedCinemaName}</span>
+          <span aria-hidden>×</span>
+        </button>
+      )}
+
+      {/* A chosen cinema already pins the location, so distance is hidden. */}
+      {!hideRadius && !selectedCinemaId && (
         <Popover
           open={radiusOpen}
           onOpenChange={(open) => {

@@ -51,24 +51,52 @@ function logError(event: string, ctx: Record<string, unknown> = {}) {
   );
 }
 
+/** Default Kultunaut feed when no override is configured. */
+const DEFAULT_FEED_URL = "https://kultunaut.dk/perl/export/kalorius.xml";
+/** Kultunaut requires this exact User-Agent for access (server-side only). */
+const KULTUNAUT_USER_AGENT = "KarlVictor";
+
+/** Error carrying the HTTP status of a denied Kultunaut response. */
+class FeedAccessError extends Error {
+  status: number;
+  constructor(status: number, snippet: string) {
+    super(
+      `Kultunaut nægtede adgang (HTTP ${status}). ` +
+        (snippet ? `Svar fra Kultunaut: ${snippet}` : "") +
+        " Kontrollér at Kultunaut har godkendt vores User-Agent og IP-adresse.",
+    );
+    this.status = status;
+    this.name = "FeedAccessError";
+  }
+}
+
 /** Fetch the Kultunaut feed with exponential-backoff retries. */
 async function fetchFeedXml(): Promise<string> {
-  const feedUrl = process.env.KULTUNAUT_FEED_URL;
-  if (!feedUrl) {
-    throw new Error(
-      "KULTUNAUT_FEED_URL is not configured — the scheduler has no source to import from",
-    );
-  }
+  const feedUrl = process.env.KULTUNAUT_FEED_URL || DEFAULT_FEED_URL;
   let lastError = "";
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const res = await fetch(feedUrl, { headers: { accept: "application/xml,text/xml" } });
+      const res = await fetch(feedUrl, {
+        headers: {
+          accept: "application/xml,text/xml",
+          // Kultunaut whitelists this agent string; must be sent server-side.
+          "user-agent": KULTUNAUT_USER_AGENT,
+        },
+      });
+      if (res.status === 401 || res.status === 403) {
+        const body = (await res.text().catch(() => "")).replace(/<[^>]*>/g, " ");
+        const snippet = body.replace(/\s+/g, " ").trim().slice(0, 200);
+        logError("feed_access_denied", { attempt, status: res.status, snippet });
+        // Access denial is not transient — fail immediately, no retries.
+        throw new FeedAccessError(res.status, snippet);
+      }
       if (!res.ok) throw new Error(`Feed responded ${res.status}`);
       const xml = await res.text();
       if (!xml.trim()) throw new Error("Feed returned an empty body");
       log("feed_fetched", { attempt, bytes: xml.length });
       return xml;
     } catch (err) {
+      if (err instanceof FeedAccessError) throw err;
       lastError = err instanceof Error ? err.message : String(err);
       logError("feed_fetch_failed", { attempt, error: lastError });
       if (attempt < MAX_ATTEMPTS) await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
@@ -76,6 +104,7 @@ async function fetchFeedXml(): Promise<string> {
   }
   throw new Error(`Feed fetch failed after ${MAX_ATTEMPTS} attempts: ${lastError}`);
 }
+
 
 /** One batch with retries; returns the pipeline result. */
 async function processBatchWithRetry(jobId: string) {

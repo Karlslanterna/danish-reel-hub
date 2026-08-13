@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
@@ -22,7 +23,26 @@ export function MovieDetail({
   city?: MovieDetailCity;
   cityOptions?: CityOption[];
 }) {
-  const { radius, userLoc, selectedDate, selectedFormat, selectedLanguage, selectedEvent, clear } = useFilters();
+  const {
+    radius,
+    userLoc,
+    selectedDate,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    selectedCity,
+    setSelectedCity,
+    clear,
+  } = useFilters();
+
+  // City is routing context: keep the global (persisted) city filter in sync with
+  // the URL so the selection carries across the whole site.
+  useEffect(() => {
+    const next = city?.name ?? null;
+    if (next !== selectedCity) setSelectedCity(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city?.name]);
+
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const tagOptions = collectTagOptions(showtimes);
   const hasGeo = radius !== "all" && userLoc !== null;
@@ -44,6 +64,21 @@ export function MovieDetail({
 
   const hasFilters = Boolean(selectedDate) || hasGeo || hasTagSelection(tagSel);
 
+  const cityFilterOptions = (cityOptions ?? []).map((c) => ({ value: c.name, count: c.count }));
+
+  // First few showtimes across cinemas, so a ticket is reachable above the fold.
+  const quickTimes: Array<{ time: string; url: string | null; cinema: string }> = [];
+  for (const { cinema, days } of byCinema) {
+    for (const d of days) {
+      d.times.forEach((t, idx) => {
+        if (quickTimes.length < 6) {
+          quickTimes.push({ time: t, url: d.ticketUrls?.[idx] || d.bookingUrl || null, cinema: cinema.name });
+        }
+      });
+    }
+    if (quickTimes.length >= 6) break;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -51,162 +86,164 @@ export function MovieDetail({
       <section className="relative overflow-hidden border-b border-border/60">
         <div
           aria-hidden
-          style={{
-            "--p-a": movie.poster.a ?? "#8f332d",
-            "--p-b": movie.poster.b ?? "#0b2545",
-            "--p-c": movie.poster.c ?? "#111111",
-            "--p-d": movie.poster.d ?? "#05070a",
-          } as React.CSSProperties}
-          className="poster-gradient absolute inset-0 scale-110 opacity-30 blur-3xl"
-        />
-        {movie.backdropUrl ? (
-          <img
-            src={movie.backdropUrl}
-            alt=""
+          className="absolute inset-x-0 top-0 h-[30vh] md:h-[45vh]"
+        >
+          <div
             aria-hidden
-            loading="eager"
-            decoding="async"
-            className="absolute inset-0 h-full w-full object-cover object-center opacity-40"
+            style={{
+              "--p-a": movie.poster.a ?? "#8f332d",
+              "--p-b": movie.poster.b ?? "#0b2545",
+              "--p-c": movie.poster.c ?? "#111111",
+              "--p-d": movie.poster.d ?? "#05070a",
+            } as React.CSSProperties}
+            className="poster-gradient absolute inset-0 scale-110 opacity-25 blur-3xl"
           />
-        ) : (
-          movie.poster.url && (
+          {movie.backdropUrl ? (
             <img
-              src={movie.poster.url}
+              src={movie.backdropUrl}
               alt=""
               aria-hidden
-              loading="lazy"
+              loading="eager"
               decoding="async"
-              className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
+              className="absolute inset-0 h-full w-full object-cover object-center opacity-30"
             />
-          )
-        )}
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
+          ) : (
+            movie.poster.url && (
+              <img
+                src={movie.poster.url}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover opacity-15 blur-2xl"
+              />
+            )
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/85 to-background" />
+        </div>
 
-        <div className="relative mx-auto grid max-w-[1400px] grid-cols-1 gap-12 px-8 py-16 lg:grid-cols-[340px_1fr]">
-          <div>
-            <Poster movie={movie} showTitle={false} priority sizes="(min-width: 1024px) 340px, 100vw" className="shadow-2xl shadow-black/60" />
-          </div>
+        <div className="relative mx-auto max-w-[1400px] px-4 pb-6 pt-4 sm:px-6 md:px-8 md:pb-10 md:pt-6">
+          <Breadcrumb
+            items={
+              city
+                ? [
+                    { label: "Forside", to: "/" },
+                    { label: city.name, to: "/$city", params: { city: city.slug } },
+                    { label: movie.title },
+                  ]
+                : [{ label: "Forside", to: "/" }, { label: "Film" }, { label: movie.title }]
+            }
+          />
 
-          <div className="flex flex-col">
-            {city ? (
-              <Link
-                to="/$city"
-                params={{ city: city.slug }}
-                className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
-              >
-                ← {city.name}
-              </Link>
-            ) : (
-              <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
-                ← Tilbage
-              </Link>
-            )}
-            <div className="mt-4">
-              <Breadcrumb
-                items={
-                  city
-                    ? [
-                        { label: "Forside", to: "/" },
-                        { label: city.name, to: "/$city", params: { city: city.slug } },
-                        { label: movie.title },
-                      ]
-                    : [{ label: "Forside", to: "/" }, { label: "Film" }, { label: movie.title }]
-                }
+          <div className="mt-4 grid grid-cols-[96px_1fr] gap-4 sm:grid-cols-[130px_1fr] sm:gap-6 lg:grid-cols-[200px_1fr] lg:gap-8">
+            <div>
+              <Poster
+                movie={movie}
+                showTitle={false}
+                priority
+                sizes="(min-width: 1024px) 200px, 130px"
+                className="shadow-xl shadow-black/50"
               />
             </div>
-            <div className="mt-6 text-xs uppercase tracking-[0.25em] text-primary">
-              {movie.genre.join(" · ")}
-            </div>
-            <h1 className="mt-3 font-display text-6xl leading-[0.95] tracking-tight text-foreground">
-              {movie.title}
-            </h1>
-            {city && (
-              <div className="mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-primary">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 21h18M5 21V7l8-4 8 4v14M8 21v-9a2 2 0 0 1 4 0v9" />
-                </svg>
-                Spilletider i {city.name}
+
+            <div className="min-w-0">
+              <h1 className="font-display text-2xl leading-tight tracking-tight text-foreground sm:text-3xl lg:text-5xl">
+                {movie.title}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:text-sm">
+                <span className="text-foreground">{formatRuntime(movie.runtime)}</span>
+                <Dot />
+                <span>{movie.genre.join(", ")}</span>
+                <Dot />
+                <span>{movie.year}</span>
+                {movie.rating && (
+                  <>
+                    <Dot />
+                    <span>{movie.rating}</span>
+                  </>
+                )}
               </div>
-            )}
-            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-              <Meta label="Instruktør" value={movie.director} />
-              <Dot />
-              <Meta label="Længde" value={formatRuntime(movie.runtime)} />
-              <Dot />
-              <Meta label="År" value={String(movie.year)} />
-              <Dot />
-              <Meta label="Censur" value={movie.rating} />
-            </div>
 
-            <p className="mt-8 max-w-2xl text-base leading-relaxed text-foreground/85">
-              {movie.synopsis}
-            </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <FilterBar
+                  hideRadius
+                  formats={tagOptions.formats}
+                  languages={tagOptions.languages}
+                  events={tagOptions.events}
+                  cities={cityFilterOptions}
+                />
+                {movie.trailerUrl && (
+                  <a
+                    href={movie.trailerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1.5 text-xs font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-secondary"
+                  >
+                    <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current">
+                      <path d="M8 5.5v13l11-6.5-11-6.5Z" />
+                    </svg>
+                    Se trailer
+                  </a>
+                )}
+              </div>
 
-            <div className="mt-10 flex flex-wrap gap-3">
-              <a
-                href="#showtimes"
-                className="rounded-md bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
-                Se spilletider
-              </a>
-              {movie.trailerUrl && (
-                <a
-                  href={movie.trailerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-md border border-border bg-card/60 px-5 py-3 text-sm font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-secondary"
-                >
-                  <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 fill-current">
-                    <path d="M8 5.5v13l11-6.5-11-6.5Z" />
-                  </svg>
-                  Se trailer
-                </a>
+              {quickTimes.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    Næste spilletider{city ? ` i ${city.name}` : ""}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {quickTimes.map((q, i) =>
+                      q.url ? (
+                        <a
+                          key={i}
+                          href={q.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={q.cinema}
+                          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
+                        >
+                          {q.time}
+                        </a>
+                      ) : (
+                        <span
+                          key={i}
+                          className="rounded-md border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
+                        >
+                          {q.time}
+                        </span>
+                      ),
+                    )}
+                    <a
+                      href="#showtimes"
+                      className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Alle tider
+                    </a>
+                  </div>
+                </div>
               )}
             </div>
           </div>
+
+          {movie.synopsis && (
+            <p className="mt-5 max-w-3xl text-sm leading-relaxed text-foreground/80 sm:text-base">
+              {movie.synopsis}
+            </p>
+          )}
         </div>
       </section>
 
-      {cityOptions && cityOptions.length > 0 && (
-        <section className="border-b border-border/60">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-2 px-8 py-5">
-            <span className="mr-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Skift by
-            </span>
-            <Link
-              to="/film/$slug"
-              params={{ slug: movie.slug }}
-              className={`rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
-                city ? "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground" : "border-primary bg-primary text-primary-foreground"
-              }`}
-            >
-              Hele Danmark
-            </Link>
-            {cityOptions.map((c) => (
-              <Link
-                key={c.slug}
-                to="/$city/film/$slug"
-                params={{ city: c.slug, slug: movie.slug }}
-                className={`rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
-                  city?.slug === c.slug
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
-                }`}
-              >
-                {c.name}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section id="showtimes" className="mx-auto max-w-[1400px] px-8 py-16">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <h2 className="font-display text-2xl tracking-tight">
-              Spilletider{city ? ` i ${city.name}` : ""}
-            </h2>
-            <FilterBar formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} />
+      <section id="showtimes" className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="font-display text-xl tracking-tight sm:text-2xl">
+            Spilletider{city ? ` i ${city.name}` : ""}
+          </h2>
+          <div className="flex items-center gap-4">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              {byCinema.length} biografer{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
+              {hasGeo ? ` · inden for ${radius} km` : ""}
+            </div>
             {hasFilters && (
               <button
                 type="button"
@@ -217,14 +254,11 @@ export function MovieDetail({
               </button>
             )}
           </div>
-          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            {byCinema.length} biografer{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}{hasGeo ? ` · inden for ${radius} km` : ""}
-          </div>
         </div>
 
         {byCinema.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border py-16 text-center">
-            <p className="font-display text-xl text-foreground">
+          <div className="rounded-md border border-dashed border-border py-12 text-center">
+            <p className="font-display text-lg text-foreground">
               {city ? `Ingen spilletider i ${city.name} lige nu` : "Ingen spilletider matcher dine filtre"}
             </p>
             {city ? (
@@ -248,14 +282,16 @@ export function MovieDetail({
         ) : (
           <div className="space-y-px overflow-hidden rounded-md bg-border">
             {byCinema.map(({ cinema, days }) => (
-              <div key={cinema.id} className="bg-background p-6 lg:p-8">
-                <div className="flex flex-wrap items-start justify-between gap-6">
+              <div key={cinema.id} className="bg-background p-4 sm:p-6 lg:p-8">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{displayCityOf(cinema.city)}</div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                      {displayCityOf(cinema.city)}
+                    </div>
                     <Link
                       to="/biograf/$slug"
                       params={{ slug: cinema.slug }}
-                      className="mt-1 inline-block font-display text-2xl tracking-tight text-foreground hover:text-primary"
+                      className="mt-1 inline-block font-display text-xl tracking-tight text-foreground hover:text-primary sm:text-2xl"
                     >
                       {cinema.name}
                     </Link>
@@ -263,7 +299,7 @@ export function MovieDetail({
                   </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                   {days.map((d, i) => (
                     <div key={i}>
                       <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -304,14 +340,6 @@ export function MovieDetail({
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex flex-col">
-      <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">{label}</span>
-      <span className="text-foreground">{value}</span>
-    </span>
-  );
-}
 function Dot() {
   return <span className="text-foreground/20">·</span>;
 }

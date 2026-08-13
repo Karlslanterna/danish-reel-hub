@@ -433,8 +433,8 @@ export function FilterBar({
 
       <Popover
         open={moreOpen}
-
         onOpenChange={(open) => {
+
           setMoreOpen(open);
           if (!open) setMoreView("menu");
         }}

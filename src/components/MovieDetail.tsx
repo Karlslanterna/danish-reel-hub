@@ -35,11 +35,10 @@ export function MovieDetail({
     clear,
   } = useFilters();
 
-  // City is routing context: keep the global (persisted) city filter in sync with
-  // the URL so the selection carries across the whole site.
+  // City is routing context: when this page is city-scoped, keep the global
+  // (persisted) city filter in sync so the selection carries across the site.
   useEffect(() => {
-    const next = city?.name ?? null;
-    if (next !== selectedCity) setSelectedCity(next);
+    if (city?.name && city.name !== selectedCity) setSelectedCity(city.name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city?.name]);
 
@@ -166,7 +165,6 @@ export function MovieDetail({
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <FilterBar
-                  hideRadius
                   formats={tagOptions.formats}
                   languages={tagOptions.languages}
                   events={tagOptions.events}

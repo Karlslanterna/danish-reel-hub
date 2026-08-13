@@ -140,7 +140,16 @@ function CityPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
-            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={[{ value: cityName, count: cinemas.length }, ...otherCities.map((c) => ({ value: c.name, count: c.count }))]} />
+            <FilterBar
+              genres={allGenres}
+              formats={tagOptions.formats}
+              languages={tagOptions.languages}
+              events={tagOptions.events}
+              cities={[{ value: cityName, count: cinemas.length }, ...otherCities.map((c) => ({ value: c.name, count: c.count }))]}
+              cinemas={cinemas
+                .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
+                .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
+            />
             {hasFilters && (
               <button
                 type="button"

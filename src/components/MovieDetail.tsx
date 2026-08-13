@@ -32,8 +32,10 @@ export function MovieDetail({
     selectedEvent,
     selectedCity,
     setSelectedCity,
+    selectedCinemaId,
     clear,
   } = useFilters();
+  useCinemaUrlSync(cinemasShowing);
 
   // City is routing context: when this page is city-scoped, keep the global
   // (persisted) city filter in sync so the selection carries across the site.

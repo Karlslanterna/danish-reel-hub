@@ -392,8 +392,7 @@ export function FilterBar({
     [cities],
   );
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent);
-  const [cityOpen, setCityOpen] = useState(false);
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity);
 
   // City selection is part of the URL: picking a city moves the user to the
   // city-scoped version of the current page (and clearing it back to national).

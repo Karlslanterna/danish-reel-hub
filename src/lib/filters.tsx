@@ -219,7 +219,29 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);
   const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
   const setSelectedEvent = useCallback((v: string | null) => setSelectedEventState(v), []);
-  const setSelectedCity = useCallback((v: string | null) => setSelectedCityState(v), []);
+  // Changing city drops a cinema that no longer belongs to the selected city.
+  const setSelectedCity = useCallback((v: string | null) => {
+    setSelectedCityState(v);
+    setSelectedCinemaIdState((prevId) => {
+      if (!prevId) return prevId;
+      clearCinema();
+      return null;
+    });
+  }, [clearCinema]);
+
+  // Picking a cinema implies its city and turns off the distance filter.
+  const setSelectedCinema = useCallback((c: CinemaFilterOption | null) => {
+    if (!c) {
+      clearCinema();
+      return;
+    }
+    setSelectedCinemaIdState(c.id);
+    setSelectedCinemaSlugState(c.slug);
+    setSelectedCinemaNameState(c.name);
+    setSelectedCityState(baseCityOf(c.city));
+    setRadiusState("all");
+  }, [clearCinema]);
+
   const dismissGeo = useCallback(() => setGeoStatus("idle"), []);
 
   const requestLocation = useCallback((onSuccess?: () => void) => {

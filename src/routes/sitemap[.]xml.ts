@@ -10,7 +10,7 @@ type Entry = {
   changefreq: "daily" | "weekly";
 };
 
-const stripPostcode = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
+import { citySlug } from "@/lib/city-slug";
 
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
@@ -45,17 +45,17 @@ export const Route = createFileRoute("/sitemap.xml")({
             changefreq: "daily",
           });
           if (c.city) {
-            const citySlug = stripPostcode(c.city).toLowerCase();
-            if (!citySlug) continue;
-            const prev = cityLastmod.get(citySlug);
+            const slug = citySlug(c.city);
+            if (!slug) continue;
+            const prev = cityLastmod.get(slug);
             const cur = c.created_at ? String(c.created_at).slice(0, 10) : "";
-            if (!prev || (cur && cur > prev)) cityLastmod.set(citySlug, cur);
+            if (!prev || (cur && cur > prev)) cityLastmod.set(slug, cur);
           }
         }
 
-        for (const [citySlug, lastmod] of cityLastmod) {
+        for (const [slug, lastmod] of cityLastmod) {
           entries.push({
-            loc: `${BASE_URL}/by/${encodeURIComponent(citySlug)}`,
+            loc: `${BASE_URL}/${slug}`,
             lastmod: lastmod || undefined,
             changefreq: "weekly",
           });

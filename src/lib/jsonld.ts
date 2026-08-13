@@ -1,4 +1,5 @@
 import { canonicalUrl } from "./canonical";
+import { baseCityOf, citySlug as citySlugOf } from "./city-slug";
 import type { Movie, Cinema, Showtime } from "./cinema-data";
 
 const ld = (obj: unknown) => ({
@@ -33,8 +34,7 @@ export function homeSchemas() {
   ];
 }
 
-const stripPostcode = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
-const citySlugOf = (city: string) => stripPostcode(city).toLowerCase();
+
 
 function breadcrumbSchema(items: { name: string; url: string }[]) {
   return ld({
@@ -121,18 +121,18 @@ export function cinemaSchemas(cinema: Cinema) {
   if (cinema.latitude != null && cinema.longitude != null) {
     obj.geo = { "@type": "GeoCoordinates", latitude: cinema.latitude, longitude: cinema.longitude };
   }
-  const cityName = stripPostcode(cinema.city);
+  const cityName = baseCityOf(cinema.city);
   const citySlug = citySlugOf(cinema.city);
   const crumbs = breadcrumbSchema([
     { name: "Forside", url: canonicalUrl("/") },
-    { name: cityName, url: canonicalUrl(`/by/${citySlug}`) },
+    { name: cityName, url: canonicalUrl(`/${citySlug}`) },
     { name: cinema.name, url: canonicalUrl(`/biograf/${cinema.slug}`) },
   ]);
   return [ld(obj), crumbs];
 }
 
 export function citySchemas(citySlug: string, cityName: string) {
-  const url = canonicalUrl(`/by/${citySlug}`);
+  const url = canonicalUrl(`/${citySlug}`);
   return [
     ld({
       "@context": "https://schema.org",

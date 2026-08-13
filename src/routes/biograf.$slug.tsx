@@ -14,6 +14,7 @@ import {
   type Showtime,
 } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
+import { baseCityOf, citySlug } from "@/lib/city-slug";
 import { cinemaSchemas } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/biograf/$slug")({
@@ -110,11 +111,10 @@ function CinemaPage() {
             <Breadcrumb
               items={[
                 { label: "Forside", to: "/" },
-                { label: "By" },
                 {
-                  label: cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim(),
-                  to: "/by/$city",
-                  params: { city: cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim().toLowerCase() },
+                  label: baseCityOf(cinema.city),
+                  to: "/$city",
+                  params: { city: citySlug(cinema.city) },
                 },
                 { label: cinema.name },
               ]}

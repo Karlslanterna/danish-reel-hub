@@ -291,17 +291,19 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedLanguageState(null);
     setSelectedEventState(null);
     setSelectedCityState(null);
+    clearCinema();
     setGeoStatus("idle");
-  }, []);
+  }, [clearCinema]);
 
   const value = useMemo<FiltersState>(
     () => ({
       radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
+      selectedCinemaId, selectedCinemaSlug, selectedCinemaName,
       geoStatus, geoLoading,
-      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity,
+      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
       requestLocation, dismissGeo, clear,
     }),
-    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoStatus, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, requestLocation, dismissGeo, clear],
+    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName, geoStatus, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema, requestLocation, dismissGeo, clear],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;

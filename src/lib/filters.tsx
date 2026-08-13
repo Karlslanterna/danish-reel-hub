@@ -259,6 +259,8 @@ export function useFilters() {
   return ctx;
 }
 
+const OPEN_CITY_FILTER_EVENT = "lanterna:open-city-filter";
+
 export function GeoNotice({ className = "" }: { className?: string }) {
   const { geoStatus, geoLoading, requestLocation, dismissGeo } = useFilters();
   const { t } = useLanguage();
@@ -266,7 +268,7 @@ export function GeoNotice({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    setCityFilterFound(Boolean(document.querySelector("[data-city-filter]")));
+    setCityFilterFound(Boolean(document.querySelector("[data-more-filters-trigger]")));
   }, []);
 
   if (geoLoading) return null;
@@ -283,9 +285,7 @@ export function GeoNotice({ className = "" }: { className?: string }) {
   const openCityFilter = () => {
     dismissGeo();
     if (typeof document === "undefined") return;
-    const el = document.querySelector("[data-city-filter]") as HTMLElement | null;
-    el?.focus();
-    el?.click();
+    document.dispatchEvent(new CustomEvent(OPEN_CITY_FILTER_EVENT, { bubbles: true }));
   };
 
   return (

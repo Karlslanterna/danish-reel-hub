@@ -128,6 +128,9 @@ function loadPersisted(): Persisted {
       selectedLanguage: str(p.selectedLanguage),
       selectedEvent: str(p.selectedEvent),
       selectedCity: str(p.selectedCity),
+      selectedCinemaId: str(p.selectedCinemaId),
+      selectedCinemaSlug: str(p.selectedCinemaSlug),
+      selectedCinemaName: str(p.selectedCinemaName),
     };
   } catch {
     return EMPTY_PERSISTED;

@@ -43,6 +43,9 @@ export function fmtDateLabel(date: string | null, lang: Lang = "da") {
 
 type Loc = { lat: number; lng: number };
 
+/** Minimal cinema shape the filter UI needs. */
+export type CinemaFilterOption = { id: string; slug: string; name: string; city: string };
+
 type FiltersState = {
   radius: Radius;
   userLoc: Loc | null;
@@ -52,6 +55,9 @@ type FiltersState = {
   selectedLanguage: string | null;
   selectedEvent: string | null;
   selectedCity: string | null;
+  selectedCinemaId: string | null;
+  selectedCinemaSlug: string | null;
+  selectedCinemaName: string | null;
   geoStatus: GeoStatus;
   geoLoading: boolean;
   setRadius: (r: Radius) => void;
@@ -61,6 +67,7 @@ type FiltersState = {
   setSelectedLanguage: (v: string | null) => void;
   setSelectedEvent: (v: string | null) => void;
   setSelectedCity: (v: string | null) => void;
+  setSelectedCinema: (c: CinemaFilterOption | null) => void;
   requestLocation: (onSuccess?: () => void) => void;
   dismissGeo: () => void;
   clear: () => void;

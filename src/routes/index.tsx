@@ -231,6 +231,16 @@ function HomePage() {
     [baseCities],
   );
 
+  // "Near me" constrains which cinemas can be picked; the city constraint is
+  // applied inside FilterBar.
+  const cinemaOptions = useMemo(
+    () =>
+      cinemas
+        .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
+        .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
+    [cinemas, nearbyCinemaIds],
+  );
+
   useEffect(() => {
     setActive(0);
   }, [query]);

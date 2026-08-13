@@ -1,4 +1,5 @@
 import type { Movie } from "@/lib/cinema-data";
+import { toHttpsUrl } from "@/lib/poster-url";
 
 type Props = {
   movie: Movie;
@@ -9,7 +10,7 @@ type Props = {
 };
 
 export function Poster({ movie, className = "", showTitle = true, priority = false, sizes }: Props) {
-  const posterUrl = movie.poster.url;
+  const posterUrl = toHttpsUrl(movie.poster.url);
   const style = {
     "--p-a": movie.poster.a,
     "--p-b": movie.poster.b,

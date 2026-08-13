@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { toHttpsUrl } from "@/lib/poster-url";
 
 export type Poster = {
   a?: string;
@@ -99,7 +100,8 @@ const mapMovie = (r: MovieRow): Movie => ({
   director: r.director,
   rating: r.rating,
   synopsis: r.synopsis,
-  poster: r.poster as Poster,
+  // Upgrade legacy http:// poster links so the browser never loads mixed content.
+  poster: { ...(r.poster as Poster), url: toHttpsUrl((r.poster as Poster)?.url) },
 });
 
 const mapCinema = (r: CinemaRow): Cinema => ({

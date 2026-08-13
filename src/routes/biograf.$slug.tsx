@@ -14,6 +14,7 @@ import {
   type Showtime,
 } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
+import { baseCityOf, citySlug } from "@/lib/city-slug";
 import { cinemaSchemas } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/biograf/$slug")({

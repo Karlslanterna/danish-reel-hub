@@ -76,7 +76,7 @@ function CityPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoLoading, geoError, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoLoading, clear } = useFilters();
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const hasFilters =
     Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || hasTagSelection(tagSel);

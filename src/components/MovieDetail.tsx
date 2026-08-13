@@ -65,18 +65,6 @@ export function MovieDetail({
 
   const cityFilterOptions = (cityOptions ?? []).map((c) => ({ value: c.name, count: c.count }));
 
-  // First few showtimes across cinemas, so a ticket is reachable above the fold.
-  const quickTimes: Array<{ time: string; url: string | null; cinema: string }> = [];
-  for (const { cinema, days } of byCinema) {
-    for (const d of days) {
-      d.times.forEach((t, idx) => {
-        if (quickTimes.length < 6) {
-          quickTimes.push({ time: t, url: d.ticketUrls?.[idx] || d.bookingUrl || null, cinema: cinema.name });
-        }
-      });
-    }
-    if (quickTimes.length >= 6) break;
-  }
 
   return (
     <div className="min-h-screen bg-background">

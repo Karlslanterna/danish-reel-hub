@@ -185,6 +185,7 @@ export function MovieDetail({
             languages={tagOptions.languages}
             events={tagOptions.events}
             cities={cityFilterOptions}
+            cinemas={geoCinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
           />
         </div>
 

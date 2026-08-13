@@ -49,6 +49,9 @@ const dict = {
     "filter.pickLanguage": "Vælg sprog",
     "filter.event": "Arrangement",
     "filter.pickEvent": "Vælg arrangement",
+    "filter.city": "By",
+    "filter.pickCity": "Vælg by",
+    "filter.allCities": "Alle byer",
     "lang.toggle": "English",
   },
   en: {
@@ -95,6 +98,9 @@ const dict = {
     "filter.pickLanguage": "Pick a language",
     "filter.event": "Event",
     "filter.pickEvent": "Pick an event",
+    "filter.city": "City",
+    "filter.pickCity": "Pick a city",
+    "filter.allCities": "All cities",
     "lang.toggle": "Dansk",
   },
 } as const;

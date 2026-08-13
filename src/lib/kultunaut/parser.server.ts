@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { extractTags, mergeTags, emptyTags, normalizeLanguage, type ShowtimeTags } from "@/lib/showtime-tags";
+import { toHttpsUrl } from "@/lib/poster-url";
 
 /**
  * Normalized records produced by the Kultunaut XML parser.
@@ -238,7 +239,8 @@ const parseMovieNode = (n: AnyNode): ParsedMovie | null => {
     child(child(n, "thumbnails"), "thumbnail"),
   ) as AnyNode[];
   const poster = thumbnails.find((t) => attr(t, "type") === "poster") ?? thumbnails[0];
-  const posterUrl = poster ? textOf(child(poster, "imageURL")) : "";
+  // Kultunaut publishes http:// image links; upgrade to https:// to avoid mixed content.
+  const posterUrl = toHttpsUrl(poster ? textOf(child(poster, "imageURL")) : "") ?? "";
 
   const synopsis = pickLocalized(n, "synopsis", "da").value;
 

@@ -4,7 +4,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
 import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
-import { slugifyCity } from "@/lib/city-slug";
+import { slugifyCity, baseCityOf } from "@/lib/city-slug";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";

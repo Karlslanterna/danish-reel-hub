@@ -73,8 +73,9 @@ function CityPage() {
   };
   const {
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
-    selectedCity, setSelectedCity, geoLoading, clear,
+    selectedCity, setSelectedCity, selectedCinemaId, geoLoading, clear,
   } = useFilters();
+  useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
 
   // Keep the global filter state in sync with the city in the URL.
   useEffect(() => {

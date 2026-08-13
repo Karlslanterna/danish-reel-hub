@@ -52,7 +52,7 @@ function logError(event: string, ctx: Record<string, unknown> = {}) {
 }
 
 /** Default Kultunaut feed when no override is configured. */
-const DEFAULT_FEED_URL = "https://kultunaut.dk/perl/export/kalorius.xml";
+const DEFAULT_FEED_URL = "https://www.kultunaut.dk/perl/export/kalorius.xml";
 /** Kultunaut requires this exact User-Agent for access (server-side only). */
 const KULTUNAUT_USER_AGENT = "KarlVictor";
 

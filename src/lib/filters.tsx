@@ -453,7 +453,26 @@ export function FilterBar({
     [cities],
   );
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity);
+  const geoActive = radius !== "all" && Boolean(userLoc);
+
+  // Cinema options are constrained by the city selection (the caller has already
+  // constrained the list by date / radius before passing it in).
+  const cinemaOptions = useMemo(() => {
+    const list = (cinemas ?? []).filter((c) => !selectedCity || baseCityOf(c.city) === selectedCity);
+    return Array.from(new Map(list.map((c) => [c.id, c])).values()).sort((a, b) =>
+      a.name.localeCompare(b.name, "da"),
+    );
+  }, [cinemas, selectedCity]);
+
+  const visibleCinemas = useMemo(() => {
+    const q = cinemaQuery.trim().toLowerCase();
+    if (!q) return cinemaOptions;
+    return cinemaOptions.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q),
+    );
+  }, [cinemaOptions, cinemaQuery]);
+
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity || selectedCinemaId);
 
   // City selection is part of the URL: picking a city moves the user to the
   // city-scoped version of the current page (and clearing it back to national).

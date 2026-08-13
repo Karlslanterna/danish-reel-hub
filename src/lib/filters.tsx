@@ -566,7 +566,6 @@ export function FilterBar({
           {(() => {
             const groups = [
               { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedGenre, set: setSelectedGenre },
-
               { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedFormat, set: setSelectedFormat },
               { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedLanguage, set: setSelectedLanguage },
               { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedEvent, set: setSelectedEvent },
@@ -590,9 +589,60 @@ export function FilterBar({
                       </div>
                     </button>
                   ))}
-                  {groups.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMoreView("cities")}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                  >
+                    <span>{t("filter.city")}</span>
+                    <div className="flex items-center gap-2">
+                      {selectedCity && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCity}</span>}
+                      <ChevronRight size="14" className="text-muted-foreground" />
+                    </div>
+                  </button>
+                  {groups.length === 0 && !selectedCity && (
                     <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
                   )}
+                </div>
+              );
+            }
+
+            if (moreView === "cities") {
+              return (
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMoreView("menu")}
+                    className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
+                  >
+                    <ArrowLeft size="12" />
+                    {t("filter.back")}
+                  </button>
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCity")}</div>
+                  <button
+                    type="button"
+                    onClick={() => applyCity(null)}
+                    className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                      !selectedCity ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {t("filter.allCities")}
+                  </button>
+                  {sortedCities.map((c) => {
+                    const selected = selectedCity === c.value;
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => applyCity(selected ? null : c.value)}
+                        className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                          selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        {c.value} ({c.count})
+                      </button>
+                    );
+                  })}
                 </div>
               );
             }

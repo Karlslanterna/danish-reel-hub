@@ -24,6 +24,9 @@ export type JobStatus = {
 };
 
 const SHOWTIME_BATCH_SIZE = 100;
+/** Films enriched with TMDb metadata per /process call, and a hard loop guard. */
+const ENRICH_BATCH_SIZE = 20;
+const MAX_ENRICH_ROUNDS = 40;
 
 const idFor = (prefix: string, externalId: string) => `${prefix}-${externalId}`;
 

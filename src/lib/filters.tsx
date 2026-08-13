@@ -128,7 +128,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [selectedLanguage, setSelectedLanguageState] = useState<string | null>(null);
   const [selectedEvent, setSelectedEventState] = useState<string | null>(null);
   const [selectedCity, setSelectedCityState] = useState<string | null>(null);
-  const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoLoading, setGeoLoading] = useState(false);
 
   // Hydrate from localStorage on client
@@ -155,6 +155,29 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity]);
 
+  // Watch for geolocation permission changes so a previously saved location is not used after the user revokes access.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("permissions" in navigator)) return;
+    let cleanup: (() => void) | undefined;
+    const run = async () => {
+      try {
+        const res = await (navigator as unknown as { permissions: { query: (o: unknown) => Promise<{ state: string; addEventListener: (type: string, fn: () => void) => void; removeEventListener: (type: string, fn: () => void) => void }> } }).permissions.query({ name: "geolocation" });
+        const onChange = () => {
+          if (res.state === "denied") {
+            setGeoStatus("denied");
+            setUserLoc(null);
+            setRadiusState("all");
+          }
+        };
+        onChange();
+        res.addEventListener("change", onChange);
+        cleanup = () => res.removeEventListener("change", onChange);
+      } catch { /* ignore */ }
+    };
+    run();
+    return () => cleanup?.();
+  }, []);
+
   const setRadius = useCallback((r: Radius) => setRadiusState(r), []);
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
   const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
@@ -162,27 +185,45 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
   const setSelectedEvent = useCallback((v: string | null) => setSelectedEventState(v), []);
   const setSelectedCity = useCallback((v: string | null) => setSelectedCityState(v), []);
+  const dismissGeo = useCallback(() => setGeoStatus("idle"), []);
 
   const requestLocation = useCallback((onSuccess?: () => void) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      setGeoError("Geolokation understøttes ikke");
+      setGeoStatus("unsupported");
       return;
     }
-    setGeoLoading(true);
-    setGeoError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGeoLoading(false);
-        onSuccess?.();
-      },
-      (err) => {
-        setGeoError(err.code === err.PERMISSION_DENIED ? "Adgang nægtet" : "Kunne ikke finde dig");
-        setGeoLoading(false);
-        setRadiusState("all");
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
-    );
+    const run = async () => {
+      try {
+        if ("permissions" in navigator) {
+          const res = await (navigator as unknown as { permissions: { query: (o: unknown) => Promise<{ state: string }> } }).permissions.query({ name: "geolocation" });
+          if (res.state === "denied") {
+            setGeoStatus("denied");
+            setRadiusState("all");
+            return;
+          }
+        }
+      } catch { /* fall through to getCurrentPosition */ }
+      setGeoLoading(true);
+      setGeoStatus("prompt");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setGeoStatus("granted");
+          setGeoLoading(false);
+          onSuccess?.();
+        },
+        (err) => {
+          let status: GeoStatus = "unavailable";
+          if (err.code === err.PERMISSION_DENIED) status = "denied";
+          else if (err.code === err.TIMEOUT) status = "timeout";
+          setGeoStatus(status);
+          setGeoLoading(false);
+          setRadiusState("all");
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+      );
+    };
+    run();
   }, []);
 
   const clear = useCallback(() => {
@@ -193,16 +234,17 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedLanguageState(null);
     setSelectedEventState(null);
     setSelectedCityState(null);
+    setGeoStatus("idle");
   }, []);
 
   const value = useMemo<FiltersState>(
     () => ({
       radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
-      geoError, geoLoading,
+      geoStatus, geoLoading,
       setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity,
-      requestLocation, clear,
+      requestLocation, dismissGeo, clear,
     }),
-    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, requestLocation, clear],
+    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoStatus, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, requestLocation, dismissGeo, clear],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;
@@ -212,6 +254,81 @@ export function useFilters() {
   const ctx = useContext(FiltersContext);
   if (!ctx) throw new Error("useFilters must be used within FiltersProvider");
   return ctx;
+}
+
+export function GeoNotice({ className = "" }: { className?: string }) {
+  const { geoStatus, geoLoading, requestLocation, dismissGeo } = useFilters();
+  const { t } = useLanguage();
+  const [cityFilterFound, setCityFilterFound] = useState(false);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    setCityFilterFound(Boolean(document.querySelector("[data-city-filter]")));
+  }, []);
+
+  if (geoLoading) return null;
+  if (geoStatus === "idle" || geoStatus === "granted" || geoStatus === "prompt") return null;
+
+  const titleKey: Parameters<typeof t>[0] =
+    geoStatus === "denied" ? "geo.denied" :
+    geoStatus === "unsupported" ? "geo.unsupported" :
+    geoStatus === "timeout" ? "geo.timeout" : "geo.unavailable";
+
+  const explainKey: Parameters<typeof t>[0] =
+    geoStatus === "denied" || geoStatus === "unsupported" ? "geo.explain" : "geo.explainNoConnection";
+
+  const openCityFilter = () => {
+    dismissGeo();
+    if (typeof document === "undefined") return;
+    const el = document.querySelector("[data-city-filter]") as HTMLElement | null;
+    el?.focus();
+    el?.click();
+  };
+
+  return (
+    <div className={`rounded-md border border-border bg-card/80 p-3 text-sm ${className}`} role="status" aria-live="polite">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 shrink-0 text-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+            <circle cx="12" cy="10" r="3" />
+            {geoStatus === "denied" && <line x1="2" y1="2" x2="22" y2="22" />}
+          </svg>
+        </div>
+        <div className="flex-1">
+          <p className="font-medium text-foreground">{t(titleKey)}</p>
+          <p className="mt-1 text-muted-foreground">{t(explainKey)}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {geoStatus !== "unsupported" && (
+              <button
+                type="button"
+                onClick={() => requestLocation()}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium uppercase tracking-[0.1em] text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                {t("geo.retry")}
+              </button>
+            )}
+            {cityFilterFound && (
+              <button
+                type="button"
+                onClick={openCityFilter}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium uppercase tracking-[0.1em] text-foreground transition-colors hover:bg-secondary"
+              >
+                {t("geo.pickCity")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={dismissGeo}
+              className="text-xs uppercase tracking-[0.1em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              {t("filter.back")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function FilterBar({

@@ -497,7 +497,19 @@ export function FilterBar({
     }
   };
 
-
+  // The cinema lives in the URL as ?biograf=<slug> so a filtered view is shareable
+  // on the homepage, city pages and movie pages alike.
+  const applyCinema = (c: CinemaFilterOption | null) => {
+    setSelectedCinema(c);
+    setMoreOpen(false);
+    setMoreView("menu");
+    setCinemaQuery("");
+    navigate({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      search: ((prev: any) => ({ ...prev, biograf: c?.slug ?? undefined })) as never,
+      replace: true,
+    });
+  };
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>

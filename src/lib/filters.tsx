@@ -146,6 +146,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [selectedLanguage, setSelectedLanguageState] = useState<string | null>(null);
   const [selectedEvent, setSelectedEventState] = useState<string | null>(null);
   const [selectedCity, setSelectedCityState] = useState<string | null>(null);
+  const [selectedCinemaId, setSelectedCinemaIdState] = useState<string | null>(null);
+  const [selectedCinemaSlug, setSelectedCinemaSlugState] = useState<string | null>(null);
+  const [selectedCinemaName, setSelectedCinemaNameState] = useState<string | null>(null);
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoLoading, setGeoLoading] = useState(false);
 
@@ -160,6 +163,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedLanguageState(p.selectedLanguage);
     setSelectedEventState(p.selectedEvent);
     setSelectedCityState(p.selectedCity);
+    setSelectedCinemaIdState(p.selectedCinemaId);
+    setSelectedCinemaSlugState(p.selectedCinemaSlug);
+    setSelectedCinemaNameState(p.selectedCinemaName);
   }, []);
 
   // Persist
@@ -168,10 +174,10 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity }),
+        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName }),
       );
     } catch { /* ignore */ }
-  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity]);
+  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName]);
 
   // Watch for geolocation permission changes so a previously saved location is not used after the user revokes access.
   // Only surface a notice automatically when a location filter was actually active; otherwise wait for user interaction.

@@ -322,7 +322,7 @@ export function GeoNotice({ className = "" }: { className?: string }) {
               onClick={dismissGeo}
               className="text-xs uppercase tracking-[0.1em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
-              {t("filter.back")}
+              {t("geo.close")}
             </button>
           </div>
         </div>

@@ -100,7 +100,9 @@ function CityPage() {
   }, [radius, userLoc, cinemas]);
 
   const filtered = useMemo(() => {
-    const allowed = nearbyCinemaIds ?? cityCinemaIds;
+    const allowed = selectedCinemaId
+      ? new Set([selectedCinemaId])
+      : (nearbyCinemaIds ?? cityCinemaIds);
     const movieIds = new Set<string>();
     for (const s of showtimes) {
       if (!allowed.has(s.cinemaId)) continue;

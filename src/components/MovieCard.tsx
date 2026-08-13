@@ -3,13 +3,9 @@ import type { Movie } from "@/lib/cinema-data";
 import { formatRuntime } from "@/lib/cinema-data";
 import { Poster } from "./Poster";
 
-export function MovieCard({ movie }: { movie: Movie }) {
-  return (
-    <Link
-      to="/film/$slug"
-      params={{ slug: movie.slug }}
-      className="group block"
-    >
+export function MovieCard({ movie, citySlug }: { movie: Movie; citySlug?: string | null }) {
+  const inner = (
+    <>
       <Poster
         movie={movie}
         showTitle={false}
@@ -25,6 +21,16 @@ export function MovieCard({ movie }: { movie: Movie }) {
           <span>{movie.genre.join(", ")}</span>
         </div>
       </div>
+    </>
+  );
+
+  return citySlug ? (
+    <Link to="/$city/film/$slug" params={{ city: citySlug, slug: movie.slug }} className="group block">
+      {inner}
+    </Link>
+  ) : (
+    <Link to="/film/$slug" params={{ slug: movie.slug }} className="group block">
+      {inner}
     </Link>
   );
 }

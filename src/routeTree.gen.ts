@@ -13,8 +13,10 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CityRouteImport } from './routes/$city'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CityIndexRouteImport } from './routes/$city.index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
 import { Route as ByCityRouteImport } from './routes/by.$city'
 import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
@@ -29,6 +31,7 @@ import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as CityFilmSlugRouteImport } from './routes/$city.film.$slug'
 import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
 import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
 import { Route as AuthenticatedAdminImportJobIdRouteImport } from './routes/_authenticated/admin.import_.$jobId'
@@ -53,6 +56,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CityRoute = CityRouteImport.update({
+  id: '/$city',
+  path: '/$city',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -61,6 +69,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const CityIndexRoute = CityIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CityRoute,
 } as any)
 const FilmSlugRoute = FilmSlugRouteImport.update({
   id: '/film/$slug',
@@ -140,6 +153,11 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CityFilmSlugRoute = CityFilmSlugRouteImport.update({
+  id: '/film/$slug',
+  path: '/film/$slug',
+  getParentRoute: () => CityRoute,
+} as any)
 const ApiPublicKultunautImportStatusRoute =
   ApiPublicKultunautImportStatusRouteImport.update({
     id: '/status',
@@ -161,6 +179,7 @@ const AuthenticatedAdminImportJobIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$city': typeof CityRouteWithChildren
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -170,6 +189,8 @@ export interface FileRoutesByFullPath {
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
+  '/$city/': typeof CityIndexRoute
+  '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
@@ -194,6 +215,8 @@ export interface FileRoutesByTo {
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
+  '/$city': typeof CityIndexRoute
+  '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
@@ -211,6 +234,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/$city': typeof CityRouteWithChildren
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -220,6 +244,8 @@ export interface FileRoutesById {
   '/biograf/$slug': typeof BiografSlugRoute
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
+  '/$city/': typeof CityIndexRoute
+  '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
@@ -237,6 +263,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$city'
     | '/auth'
     | '/mcp'
     | '/reset-password'
@@ -246,6 +273,8 @@ export interface FileRouteTypes {
     | '/biograf/$slug'
     | '/by/$city'
     | '/film/$slug'
+    | '/$city/'
+    | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/admin/analytics'
@@ -270,6 +299,8 @@ export interface FileRouteTypes {
     | '/biograf/$slug'
     | '/by/$city'
     | '/film/$slug'
+    | '/$city'
+    | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/admin/analytics'
@@ -286,6 +317,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/$city'
     | '/auth'
     | '/mcp'
     | '/reset-password'
@@ -295,6 +327,8 @@ export interface FileRouteTypes {
     | '/biograf/$slug'
     | '/by/$city'
     | '/film/$slug'
+    | '/$city/'
+    | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/admin/analytics'
@@ -312,6 +346,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  CityRoute: typeof CityRouteWithChildren
   AuthRoute: typeof AuthRoute
   McpRoute: typeof McpRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -357,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$city': {
+      id: '/$city'
+      path: '/$city'
+      fullPath: '/$city'
+      preLoaderRoute: typeof CityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -370,6 +412,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/$city/': {
+      id: '/$city/'
+      path: '/'
+      fullPath: '/$city/'
+      preLoaderRoute: typeof CityIndexRouteImport
+      parentRoute: typeof CityRoute
     }
     '/film/$slug': {
       id: '/film/$slug'
@@ -469,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$city/film/$slug': {
+      id: '/$city/film/$slug'
+      path: '/film/$slug'
+      fullPath: '/$city/film/$slug'
+      preLoaderRoute: typeof CityFilmSlugRouteImport
+      parentRoute: typeof CityRoute
+    }
     '/api/public/kultunaut-import/status': {
       id: '/api/public/kultunaut-import/status'
       path: '/status'
@@ -514,6 +570,18 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface CityRouteChildren {
+  CityIndexRoute: typeof CityIndexRoute
+  CityFilmSlugRoute: typeof CityFilmSlugRoute
+}
+
+const CityRouteChildren: CityRouteChildren = {
+  CityIndexRoute: CityIndexRoute,
+  CityFilmSlugRoute: CityFilmSlugRoute,
+}
+
+const CityRouteWithChildren = CityRoute._addFileChildren(CityRouteChildren)
+
 interface ApiPublicKultunautImportRouteChildren {
   ApiPublicKultunautImportProcessRoute: typeof ApiPublicKultunautImportProcessRoute
   ApiPublicKultunautImportStatusRoute: typeof ApiPublicKultunautImportStatusRoute
@@ -533,6 +601,7 @@ const ApiPublicKultunautImportRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  CityRoute: CityRouteWithChildren,
   AuthRoute: AuthRoute,
   McpRoute: McpRoute,
   ResetPasswordRoute: ResetPasswordRoute,

@@ -5,7 +5,7 @@ export type Crumb =
   | { label: string; to: "/" }
   | { label: string; to: "/film/$slug"; params: { slug: string } }
   | { label: string; to: "/biograf/$slug"; params: { slug: string } }
-  | { label: string; to: "/by/$city"; params: { city: string } }
+  | { label: string; to: "/$city"; params: { city: string } }
   | { label: string };
 
 export function Breadcrumb({ items }: { items: Crumb[] }) {
@@ -32,7 +32,7 @@ export function Breadcrumb({ items }: { items: Crumb[] }) {
                 ) : item.to === "/biograf/$slug" ? (
                   <Link to="/biograf/$slug" params={item.params} className="hover:text-foreground">{item.label}</Link>
                 ) : (
-                  <Link to="/by/$city" params={item.params} className="hover:text-foreground">{item.label}</Link>
+                  <Link to="/$city" params={item.params} className="hover:text-foreground">{item.label}</Link>
                 )}
               </li>
               {!isLast && (

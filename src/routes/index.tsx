@@ -7,6 +7,7 @@ import { FilterBar, GeoNotice, useFilters, haversineKm, fmtDateLabel } from "@/l
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
+import { slugifyCity } from "@/lib/city-slug";
 import { homeSchemas } from "@/lib/jsonld";
 import { useLanguage } from "@/lib/i18n";
 
@@ -242,7 +243,7 @@ function HomePage() {
     setOpen(false);
     if (s.kind === "movie") navigate({ to: "/film/$slug", params: { slug: s.slug } });
     else if (s.kind === "cinema") navigate({ to: "/biograf/$slug", params: { slug: s.slug } });
-    else navigate({ to: "/by/$city", params: { city: s.city.toLowerCase() } });
+    else navigate({ to: "/$city", params: { city: slugifyCity(s.city) } });
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -406,7 +407,7 @@ function HomePage() {
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((m) => (
-              <MovieCard key={m.id} movie={m} />
+              <MovieCard key={m.id} movie={m} citySlug={selectedCity && !nearbyCinemaIds ? slugifyCity(selectedCity) : null} />
             ))}
           </div>
         )}

@@ -203,7 +203,17 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     return () => cleanup?.();
   }, []);
 
-  const setRadius = useCallback((r: Radius) => setRadiusState(r), []);
+  const clearCinema = useCallback(() => {
+    setSelectedCinemaIdState(null);
+    setSelectedCinemaSlugState(null);
+    setSelectedCinemaNameState(null);
+  }, []);
+
+  // "Near me" and a specific cinema are mutually exclusive filters.
+  const setRadius = useCallback((r: Radius) => {
+    setRadiusState(r);
+    if (r !== "all") clearCinema();
+  }, [clearCinema]);
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
   const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
   const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);

@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
-import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { FilterBar, GeoNotice, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
@@ -76,7 +76,7 @@ function CityPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoLoading, geoError, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoLoading, clear } = useFilters();
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const hasFilters =
     Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || hasTagSelection(tagSel);
@@ -138,6 +138,7 @@ function CityPage() {
       </section>
 
       <section className="mx-auto max-w-[1400px] px-8 py-14">
+        <GeoNotice className="mb-6" />
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Film i {city}</h2>
@@ -154,7 +155,6 @@ function CityPage() {
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>Finder din placering…</div>}
-            {geoError && <div className="text-destructive">{geoError}</div>}
             <div>
               {filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
               {radius !== "all" && userLoc ? ` · inden for ${radius} km` : ""}

@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { FilterBar, GeoNotice, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
@@ -57,7 +57,7 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoError, geoLoading, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoLoading, clear } = useFilters();
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const hasFilters =
     Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || hasTagSelection(tagSel);
@@ -370,6 +370,7 @@ function HomePage() {
 
 
       <section className="mx-auto max-w-[1400px] px-6 py-6 sm:px-8 sm:py-10">
+        <GeoNotice className="mb-4" />
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -386,7 +387,6 @@ function HomePage() {
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>{t("home.locating")}</div>}
-            {geoError && <div className="text-destructive">{geoError}</div>}
             {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
               <div>{nearbyCinemaCount} {t("home.cinemas")} · {filtered.length} {t("home.movies")} {t("home.within")} {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate, lang)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
             )}

@@ -206,6 +206,19 @@ export type Database = {
           slug: string
           synopsis: string
           title: string
+          tmdb_backdrop_url: string | null
+          tmdb_cast: Json
+          tmdb_director: string | null
+          tmdb_fetched_at: string | null
+          tmdb_genres: string[]
+          tmdb_id: number | null
+          tmdb_overview: string | null
+          tmdb_poster_url: string | null
+          tmdb_runtime: number | null
+          tmdb_skip_reason: string | null
+          tmdb_status: string
+          tmdb_trailer_url: string | null
+          tmdb_vote_average: number | null
           trailer_url: string | null
           year: number
         }
@@ -223,6 +236,19 @@ export type Database = {
           slug: string
           synopsis: string
           title: string
+          tmdb_backdrop_url?: string | null
+          tmdb_cast?: Json
+          tmdb_director?: string | null
+          tmdb_fetched_at?: string | null
+          tmdb_genres?: string[]
+          tmdb_id?: number | null
+          tmdb_overview?: string | null
+          tmdb_poster_url?: string | null
+          tmdb_runtime?: number | null
+          tmdb_skip_reason?: string | null
+          tmdb_status?: string
+          tmdb_trailer_url?: string | null
+          tmdb_vote_average?: number | null
           trailer_url?: string | null
           year: number
         }
@@ -240,6 +266,19 @@ export type Database = {
           slug?: string
           synopsis?: string
           title?: string
+          tmdb_backdrop_url?: string | null
+          tmdb_cast?: Json
+          tmdb_director?: string | null
+          tmdb_fetched_at?: string | null
+          tmdb_genres?: string[]
+          tmdb_id?: number | null
+          tmdb_overview?: string | null
+          tmdb_poster_url?: string | null
+          tmdb_runtime?: number | null
+          tmdb_skip_reason?: string | null
+          tmdb_status?: string
+          tmdb_trailer_url?: string | null
+          tmdb_vote_average?: number | null
           trailer_url?: string | null
           year?: number
         }

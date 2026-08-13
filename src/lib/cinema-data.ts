@@ -10,6 +10,8 @@ export type Poster = {
   alt?: string;
 };
 
+export type CastMember = { name: string; character?: string | null; profile_path?: string | null };
+
 export type Movie = {
   id: string;
   slug: string;
@@ -22,6 +24,11 @@ export type Movie = {
   rating: string;
   synopsis: string;
   poster: Poster;
+  /** TMDb extras — always optional so the UI works on Kultunaut data alone. */
+  backdropUrl?: string | null;
+  trailerUrl?: string | null;
+  cast?: CastMember[];
+  voteAverage?: number | null;
 };
 
 export type Cinema = {
@@ -61,6 +68,15 @@ type MovieRow = {
   rating: string;
   synopsis: string;
   poster: unknown;
+  tmdb_runtime?: number | null;
+  tmdb_overview?: string | null;
+  tmdb_genres?: string[] | null;
+  tmdb_poster_url?: string | null;
+  tmdb_backdrop_url?: string | null;
+  tmdb_trailer_url?: string | null;
+  tmdb_cast?: unknown;
+  tmdb_director?: string | null;
+  tmdb_vote_average?: number | string | null;
 };
 
 type CinemaRow = {
@@ -89,20 +105,46 @@ type ShowtimeRow = {
   events: string[] | null;
 };
 
-const mapMovie = (r: MovieRow): Movie => ({
-  id: r.id,
-  slug: r.slug,
-  title: r.title,
-  originalTitle: r.original_title,
-  runtime: r.runtime,
-  genre: r.genre,
-  year: r.year,
-  director: r.director,
-  rating: r.rating,
-  synopsis: r.synopsis,
-  // Upgrade legacy http:// poster links so the browser never loads mixed content.
-  poster: { ...(r.poster as Poster), url: toHttpsUrl((r.poster as Poster)?.url) },
-});
+const nonEmpty = (v: string | null | undefined): string | undefined => {
+  const s = (v ?? "").trim();
+  return s ? s : undefined;
+};
+
+/**
+ * TMDb is preferred for film metadata, Kultunaut is the fallback. The
+ * coalesce is per field, so a partial TMDb record never blanks a field that
+ * Kultunaut does have.
+ */
+const mapMovie = (r: MovieRow): Movie => {
+  const kultunautPoster = r.poster as Poster;
+  const voteAverage =
+    r.tmdb_vote_average === null || r.tmdb_vote_average === undefined
+      ? null
+      : Number(r.tmdb_vote_average);
+
+  return {
+    id: r.id,
+    slug: r.slug,
+    title: r.title,
+    originalTitle: r.original_title,
+    runtime: r.tmdb_runtime && r.tmdb_runtime > 0 ? r.tmdb_runtime : r.runtime,
+    genre: r.tmdb_genres && r.tmdb_genres.length > 0 ? r.tmdb_genres : r.genre,
+    year: r.year,
+    director: nonEmpty(r.tmdb_director) ?? r.director,
+    rating: r.rating,
+    synopsis: nonEmpty(r.tmdb_overview) ?? r.synopsis,
+    // Upgrade legacy http:// poster links so the browser never loads mixed content.
+    poster: {
+      ...kultunautPoster,
+      url: toHttpsUrl(nonEmpty(r.tmdb_poster_url) ?? kultunautPoster?.url),
+    },
+    backdropUrl: toHttpsUrl(r.tmdb_backdrop_url) ?? null,
+    trailerUrl: toHttpsUrl(r.tmdb_trailer_url) ?? null,
+    cast: Array.isArray(r.tmdb_cast) ? (r.tmdb_cast as CastMember[]) : [],
+    voteAverage: Number.isFinite(voteAverage as number) && (voteAverage as number) > 0 ? voteAverage : null,
+  };
+};
+
 
 const mapCinema = (r: CinemaRow): Cinema => ({
   id: r.id,

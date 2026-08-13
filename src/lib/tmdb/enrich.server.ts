@@ -143,9 +143,9 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
 
       // Non-film listings (Børnebiffen, playbacks, lectures…) never exist on
       // TMDb — skip them without spending API calls.
-      let outcome = isNonFilmEvent(movie.title)
-        ? ({ matched: false as const, reason: "ikke en film (arrangement)" } as const)
-        : ({ matched: false as const, reason: "ingen TMDb-resultater" } as const);
+      let outcome: MatchOutcome = isNonFilmEvent(movie.title)
+        ? { matched: false, reason: "ikke en film (arrangement)" }
+        : { matched: false, reason: "ingen TMDb-resultater" };
 
       if (!isNonFilmEvent(movie.title)) {
         // Extra search passes: feed title, embedded original title, DB

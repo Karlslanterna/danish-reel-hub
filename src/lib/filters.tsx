@@ -47,6 +47,7 @@ type FiltersState = {
   selectedFormat: string | null;
   selectedLanguage: string | null;
   selectedEvent: string | null;
+  selectedCity: string | null;
   geoError: string | null;
   geoLoading: boolean;
   setRadius: (r: Radius) => void;
@@ -55,6 +56,7 @@ type FiltersState = {
   setSelectedFormat: (v: string | null) => void;
   setSelectedLanguage: (v: string | null) => void;
   setSelectedEvent: (v: string | null) => void;
+  setSelectedCity: (v: string | null) => void;
   requestLocation: (onSuccess?: () => void) => void;
   clear: () => void;
 };
@@ -71,6 +73,7 @@ type Persisted = {
   selectedFormat: string | null;
   selectedLanguage: string | null;
   selectedEvent: string | null;
+  selectedCity: string | null;
 };
 
 const EMPTY_PERSISTED: Persisted = {
@@ -81,6 +84,7 @@ const EMPTY_PERSISTED: Persisted = {
   selectedFormat: null,
   selectedLanguage: null,
   selectedEvent: null,
+  selectedCity: null,
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
@@ -105,6 +109,7 @@ function loadPersisted(): Persisted {
       selectedFormat: str(p.selectedFormat),
       selectedLanguage: str(p.selectedLanguage),
       selectedEvent: str(p.selectedEvent),
+      selectedCity: str(p.selectedCity),
     };
   } catch {
     return EMPTY_PERSISTED;
@@ -119,6 +124,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [selectedFormat, setSelectedFormatState] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguageState] = useState<string | null>(null);
   const [selectedEvent, setSelectedEventState] = useState<string | null>(null);
+  const [selectedCity, setSelectedCityState] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
 
@@ -132,6 +138,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedFormatState(p.selectedFormat);
     setSelectedLanguageState(p.selectedLanguage);
     setSelectedEventState(p.selectedEvent);
+    setSelectedCityState(p.selectedCity);
   }, []);
 
   // Persist
@@ -140,10 +147,10 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent }),
+        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity }),
       );
     } catch { /* ignore */ }
-  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent]);
+  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity]);
 
   const setRadius = useCallback((r: Radius) => setRadiusState(r), []);
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
@@ -151,6 +158,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);
   const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
   const setSelectedEvent = useCallback((v: string | null) => setSelectedEventState(v), []);
+  const setSelectedCity = useCallback((v: string | null) => setSelectedCityState(v), []);
 
   const requestLocation = useCallback((onSuccess?: () => void) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
@@ -181,16 +189,17 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedFormatState(null);
     setSelectedLanguageState(null);
     setSelectedEventState(null);
+    setSelectedCityState(null);
   }, []);
 
   const value = useMemo<FiltersState>(
     () => ({
-      radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
+      radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
       geoError, geoLoading,
-      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent,
+      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity,
       requestLocation, clear,
     }),
-    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, requestLocation, clear],
+    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoError, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, requestLocation, clear],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;
@@ -209,6 +218,7 @@ export function FilterBar({
   formats,
   languages,
   events,
+  cities,
 }: {
   className?: string;
   hideRadius?: boolean;
@@ -216,16 +226,17 @@ export function FilterBar({
   formats?: string[];
   languages?: string[];
   events?: string[];
+  cities?: Array<{ value: string; count: number }>;
 }) {
   const {
-    radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
-    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent,
+    radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
+    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity,
     requestLocation,
   } = useFilters();
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events">("menu");
+  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities">("menu");
   const { t, lang } = useLanguage();
   const TODAY = todayStr();
   const TOMORROW = tomorrowStr();
@@ -239,7 +250,15 @@ export function FilterBar({
   const sortedLanguages = useMemo(() => sortTagOptions("languages", languages ?? []), [languages]);
   const sortedEvents = useMemo(() => sortTagOptions("events", events ?? []), [events]);
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent);
+  const sortedCities = useMemo(
+    () =>
+      Array.from(new Map((cities ?? []).map((c) => [c.value, c])).values()).sort((a, b) =>
+        a.value.localeCompare(b.value, "da"),
+      ),
+    [cities],
+  );
+
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity);
 
 
   return (
@@ -386,10 +405,19 @@ export function FilterBar({
         <PopoverContent className="max-h-[70vh] w-56 overflow-y-auto p-2" align="start">
           {(() => {
             const groups = [
-              { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres, value: selectedGenre, set: setSelectedGenre },
-              { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats, value: selectedFormat, set: setSelectedFormat },
-              { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages, value: selectedLanguage, set: setSelectedLanguage },
-              { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents, value: selectedEvent, set: setSelectedEvent },
+              {
+                key: "cities" as const,
+                label: t("filter.city"),
+                pick: t("filter.pickCity"),
+                options: sortedCities.map((c) => ({ value: c.value, label: `${c.value} (${c.count})` })),
+                value: selectedCity,
+                set: setSelectedCity,
+                allLabel: t("filter.allCities"),
+              },
+              { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedGenre, set: setSelectedGenre },
+              { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedFormat, set: setSelectedFormat },
+              { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedLanguage, set: setSelectedLanguage },
+              { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedEvent, set: setSelectedEvent },
             ].filter((g) => g.options.length > 0);
 
             if (moreView === "menu") {
@@ -430,18 +458,29 @@ export function FilterBar({
                   {t("filter.back")}
                 </button>
                 <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{active.pick}</div>
+                {active.allLabel && (
+                  <button
+                    type="button"
+                    onClick={() => { active.set(null); setMoreOpen(false); }}
+                    className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                      !active.value ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {active.allLabel}
+                  </button>
+                )}
                 {active.options.map((opt) => {
-                  const selected = active.value === opt;
+                  const selected = active.value === opt.value;
                   return (
                     <button
-                      key={opt}
+                      key={opt.value}
                       type="button"
-                      onClick={() => { active.set(selected ? null : opt); setMoreOpen(false); }}
+                      onClick={() => { active.set(selected ? null : opt.value); setMoreOpen(false); }}
                       className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
                         selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
                       }`}
                     >
-                      {opt}
+                      {opt.label}
                     </button>
                   );
                 })}

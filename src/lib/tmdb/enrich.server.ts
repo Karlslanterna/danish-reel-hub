@@ -6,7 +6,13 @@ import {
   TmdbUnavailableError,
   type TmdbMovieDetails,
 } from "./client.server";
-import { pickMatch, type MatchCandidate } from "./match";
+import {
+  isNonFilmEvent,
+  pickMatch,
+  searchQueries,
+  type MatchCandidate,
+  type MatchOutcome,
+} from "./match";
 
 export type EnrichSummary = {
   processed: number;
@@ -24,6 +30,7 @@ const SKIPPED_TTL_DAYS = 7;
 type MovieRow = {
   id: string;
   title: string;
+  original_title: string | null;
   year: number | null;
   tmdb_status: string | null;
 };
@@ -31,7 +38,7 @@ type MovieRow = {
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 async function selectWork(db: any, limit: number): Promise<{ rows: MovieRow[]; remaining: number }> {
-  const cols = "id, title, year, tmdb_status";
+  const cols = "id, title, original_title, year, tmdb_status";
 
   // 1) never attempted
   const { data: pending, error: pErr } = await db
@@ -139,12 +146,26 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
   for (const movie of work.rows) {
     try {
       const year = movie.year && movie.year > 1880 ? movie.year : null;
-      let candidates = (await searchMovies(movie.title, year ?? undefined)) as MatchCandidate[];
-      if (candidates.length === 0 && year) {
-        candidates = (await searchMovies(movie.title)) as MatchCandidate[];
-      }
 
-      const outcome = pickMatch(movie.title, year, candidates);
+      // Non-film listings (Børnebiffen, playbacks, lectures…) never exist on
+      // TMDb — skip them without spending API calls.
+      let outcome: MatchOutcome = isNonFilmEvent(movie.title)
+        ? { matched: false, reason: "ikke en film (arrangement)" }
+        : { matched: false, reason: "ingen TMDb-resultater" };
+
+      if (!isNonFilmEvent(movie.title)) {
+        // Extra search passes: feed title, embedded original title, DB
+        // original_title, and known Danish aliases. Scoring stays unchanged.
+        for (const query of searchQueries(movie.title, movie.original_title)) {
+          let candidates = (await searchMovies(query, year ?? undefined)) as MatchCandidate[];
+          if (candidates.length === 0 && year) {
+            candidates = (await searchMovies(query)) as MatchCandidate[];
+          }
+          const attempt = pickMatch(query, year, candidates);
+          outcome = attempt;
+          if (attempt.matched) break;
+        }
+      }
       if (!outcome.matched) {
         await supabaseAdmin
           .from("movies")

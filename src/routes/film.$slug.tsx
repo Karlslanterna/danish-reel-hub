@@ -114,15 +114,27 @@ function MoviePage() {
           } as React.CSSProperties}
           className="poster-gradient absolute inset-0 scale-110 opacity-30 blur-3xl"
         />
-        {movie.poster.url && (
+        {/* TMDb backdrop when we have one, otherwise the Kultunaut poster blur. */}
+        {movie.backdropUrl ? (
           <img
-            src={movie.poster.url}
+            src={movie.backdropUrl}
             alt=""
             aria-hidden
-            loading="lazy"
+            loading="eager"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-40"
           />
+        ) : (
+          movie.poster.url && (
+            <img
+              src={movie.poster.url}
+              alt=""
+              aria-hidden
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
+            />
+          )
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
 
@@ -171,6 +183,19 @@ function MoviePage() {
               >
                 Se spilletider
               </a>
+              {movie.trailerUrl && (
+                <a
+                  href={movie.trailerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-md border border-border bg-card/60 px-5 py-3 text-sm font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-secondary"
+                >
+                  <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                    <path d="M8 5.5v13l11-6.5-11-6.5Z" />
+                  </svg>
+                  Se trailer
+                </a>
+              )}
               <button className="rounded-md border border-border px-5 py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
                 + Min liste
               </button>

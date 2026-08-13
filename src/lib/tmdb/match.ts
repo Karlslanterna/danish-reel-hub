@@ -95,3 +95,93 @@ export function pickMatch(
   }
   return { matched: true, id: best.c.id, confidence: best.s };
 }
+
+/**
+ * Listings that are not films: children's programmes, themed screenings,
+ * lectures, concert playbacks and similar. TMDb has no record of these, so
+ * searching for them only burns API calls and produces noise in the log.
+ */
+const NON_FILM_PATTERNS: RegExp[] = [
+  /børnebiff/i,
+  /biffen/i,
+  /\bfilmklub\b/i,
+  /\bforedrag\b/i,
+  /\bdebat\b/i,
+  /\bq\s*&\s*a\b/i,
+  /\bworkshop\b/i,
+  /\bpitchblack playback\b/i,
+  /\blive viewing\b/i,
+  /\blive\s*(?:stream|transmission|optagelse)\b/i,
+  /\bkortfilm\b/i,
+  /\bshort films?\b/i,
+  /\bhygge\b/i,
+  /\bsæson\b/i,
+  /\bmatiné\b/i,
+  /\bopera\b/i,
+  /\bballet\b/i,
+  /\bkoncert\b/i,
+  /\bfestival\b/i,
+  /\bmarathon\b/i,
+  /\bsidste dag\b/i,
+  /\b\d{1,2}\s*-\s*\d{1,2}\s*år\b/i,
+  /\bfra \d{1,2} år\b/i,
+];
+
+export function isNonFilmEvent(title: string): boolean {
+  return NON_FILM_PATTERNS.some((re) => re.test(title));
+}
+
+/**
+ * Danish release titles that TMDb only knows under the original title.
+ * Keys are normalized titles, values are extra search queries.
+ */
+const DANISH_ALIASES: Record<string, string[]> = {
+  hadet: ["La Haine"],
+  vaiana: ["Moana"],
+  "vaiana 2": ["Moana 2"],
+  "pigen holly": ["Breakfast at Tiffany's"],
+  "de utrolige": ["The Incredibles"],
+  "istid": ["Ice Age"],
+  "syng": ["Sing"],
+  "grisen babe": ["Babe"],
+  "troldmandens laerling": ["The Sorcerer's Apprentice"],
+  "biler": ["Cars"],
+  "et vildt liv": ["The Wild Robot"],
+  "flugten fra hoensegaarden": ["Chicken Run"],
+  "shrek": ["Shrek"],
+  "skoenheden og udyret": ["Beauty and the Beast"],
+  "den lille havfrue": ["The Little Mermaid"],
+  "paw patrol dino filmen": ["PAW Patrol: The Dino Movie", "PAW Patrol"],
+  "skolen med magiske dyr filmen": ["The School of Magical Animals"],
+};
+
+/**
+ * Ordered, de-duplicated list of search queries for one film: the feed title,
+ * then any bracketed/dash original title, the DB original title, and finally a
+ * known Danish alias. Matching itself stays as strict as before.
+ */
+export function searchQueries(title: string, originalTitle?: string | null): string[] {
+  const out: string[] = [];
+  const push = (v?: string | null) => {
+    const s = (v ?? "").trim();
+    if (!s) return;
+    if (!out.some((x) => normalizeTitle(x) === normalizeTitle(s))) out.push(s);
+  };
+
+  const base = stripYearSuffix(title);
+  push(base);
+
+  // "Pigen Holly (Breakfast at Tiffany's)" -> "Breakfast at Tiffany's"
+  const paren = base.match(/\(([^)]{2,})\)\s*$/u);
+  if (paren && !/^(?:19|20)\d{2}$/.test(paren[1].trim())) push(paren[1]);
+
+  // "Hadet - La Haine" -> both halves
+  const dash = base.split(/\s+[-–—]\s+/u);
+  if (dash.length === 2) dash.forEach(push);
+
+  push(originalTitle);
+
+  for (const q of DANISH_ALIASES[normalizeTitle(base)] ?? []) push(q);
+
+  return out;
+}

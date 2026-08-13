@@ -58,7 +58,8 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoLoading, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, geoLoading, clear } = useFilters();
+  useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const hasFilters =
     Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || hasTagSelection(tagSel);

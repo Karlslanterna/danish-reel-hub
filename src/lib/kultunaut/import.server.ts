@@ -537,16 +537,65 @@ export async function processJobBatch(
       await supabaseAdmin
         .from("import_jobs")
         .update({
-          phase: "done",
-          status: "completed",
+          phase: "enrich",
+          status: "running",
           message:
-            `Import completed — fjernede ${summary.showtimesDeleted} forældede visninger, ` +
-            `${summary.moviesDeleted} film og ${summary.cinemasDeleted} biografer uden kommende visninger`,
+            `Oprydning færdig — fjernede ${summary.showtimesDeleted} forældede visninger, ` +
+            `${summary.moviesDeleted} film og ${summary.cinemasDeleted} biografer uden kommende visninger. ` +
+            `Henter filmdata fra TMDb…`,
         })
+        .eq("id", jobId);
+      await pushErrors(errors);
+      return { done: false, status: "running", phase: "enrich" };
+    }
+
+    if (job.phase === "enrich") {
+      // Optional metadata step. It must never fail or block the import:
+      // any TMDb problem is logged and the job completes on Kultunaut data.
+      const errors: string[] = [];
+      const payload = (job.payload ?? {}) as { enrichRounds?: number };
+      const round = (payload.enrichRounds ?? 0) + 1;
+      let message = "Import completed";
+
+      try {
+        const { enrichBatch } = await import("@/lib/tmdb/enrich.server");
+        const summary = await enrichBatch(ENRICH_BATCH_SIZE);
+        errors.push(...summary.errors);
+
+        const finished =
+          summary.disabled || summary.remaining === 0 || round >= MAX_ENRICH_ROUNDS;
+
+        if (!finished) {
+          await supabaseAdmin
+            .from("import_jobs")
+            .update({
+              payload: { ...(job.payload as object ?? {}), enrichRounds: round },
+              message: `TMDb-berigelse… ${summary.remaining} film tilbage`,
+            })
+            .eq("id", jobId);
+          await pushErrors(errors);
+          return { done: false, status: "running", phase: "enrich" };
+        }
+
+        message = summary.disabled
+          ? "Import completed — TMDb-berigelse sprunget over (utilgængelig eller ikke konfigureret)"
+          : `Import completed — TMDb: ${summary.matched} beriget, ${summary.skipped} sprunget over`;
+      } catch (err) {
+        errors.push(
+          `TMDb-berigelse fejlede: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        message = "Import completed — TMDb-berigelse fejlede (Kultunaut-data er intakt)";
+      }
+
+      await supabaseAdmin
+        .from("import_jobs")
+        .update({ phase: "done", status: "completed", message })
         .eq("id", jobId);
       await pushErrors(errors);
       return { done: true, status: "completed", phase: "done" };
     }
+
+
 
 
     // Unknown phase: mark done.

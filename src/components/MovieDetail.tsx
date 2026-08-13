@@ -65,18 +65,6 @@ export function MovieDetail({
 
   const cityFilterOptions = (cityOptions ?? []).map((c) => ({ value: c.name, count: c.count }));
 
-  // First few showtimes across cinemas, so a ticket is reachable above the fold.
-  const quickTimes: Array<{ time: string; url: string | null; cinema: string }> = [];
-  for (const { cinema, days } of byCinema) {
-    for (const d of days) {
-      d.times.forEach((t, idx) => {
-        if (quickTimes.length < 6) {
-          quickTimes.push({ time: t, url: d.ticketUrls?.[idx] || d.bookingUrl || null, cinema: cinema.name });
-        }
-      });
-    }
-    if (quickTimes.length >= 6) break;
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -155,21 +143,9 @@ export function MovieDetail({
                 <span>{movie.genre.join(", ")}</span>
                 <Dot />
                 <span>{movie.year}</span>
-                {movie.rating && (
-                  <>
-                    <Dot />
-                    <span>{movie.rating}</span>
-                  </>
-                )}
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <FilterBar
-                  formats={tagOptions.formats}
-                  languages={tagOptions.languages}
-                  events={tagOptions.events}
-                  cities={cityFilterOptions}
-                />
                 {movie.trailerUrl && (
                   <a
                     href={movie.trailerUrl}
@@ -184,43 +160,6 @@ export function MovieDetail({
                   </a>
                 )}
               </div>
-
-              {quickTimes.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                    Næste spilletider{city ? ` i ${city.name}` : ""}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {quickTimes.map((q, i) =>
-                      q.url ? (
-                        <a
-                          key={i}
-                          href={q.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={q.cinema}
-                          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
-                        >
-                          {q.time}
-                        </a>
-                      ) : (
-                        <span
-                          key={i}
-                          className="rounded-md border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
-                        >
-                          {q.time}
-                        </span>
-                      ),
-                    )}
-                    <a
-                      href="#showtimes"
-                      className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Alle tider
-                    </a>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -233,6 +172,15 @@ export function MovieDetail({
       </section>
 
       <section id="showtimes" className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <FilterBar
+            formats={tagOptions.formats}
+            languages={tagOptions.languages}
+            events={tagOptions.events}
+            cities={cityFilterOptions}
+          />
+        </div>
+
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <h2 className="font-display text-xl tracking-tight sm:text-2xl">
             Spilletider{city ? ` i ${city.name}` : ""}

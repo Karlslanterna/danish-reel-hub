@@ -156,6 +156,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity]);
 
   // Watch for geolocation permission changes so a previously saved location is not used after the user revokes access.
+  // Only surface a notice automatically when a location filter was actually active; otherwise wait for user interaction.
   useEffect(() => {
     if (typeof navigator === "undefined" || !("permissions" in navigator)) return;
     let cleanup: (() => void) | undefined;
@@ -164,9 +165,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         const res = await (navigator as unknown as { permissions: { query: (o: unknown) => Promise<{ state: string; addEventListener: (type: string, fn: () => void) => void; removeEventListener: (type: string, fn: () => void) => void }> } }).permissions.query({ name: "geolocation" });
         const onChange = () => {
           if (res.state === "denied") {
-            setGeoStatus("denied");
             setUserLoc(null);
             setRadiusState("all");
+            setGeoStatus((prev) => (prev === "granted" || prev === "prompt" ? "denied" : prev));
           }
         };
         onChange();

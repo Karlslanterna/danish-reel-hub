@@ -696,8 +696,10 @@ export function FilterBar({
                   ))}
                   <button
                     type="button"
+                    disabled={geoActive}
+                    title={geoActive ? t("filter.lockedByGeo") : undefined}
                     onClick={() => setMoreView("cities")}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                   >
                     <span>{t("filter.city")}</span>
                     <div className="flex items-center gap-2">
@@ -705,7 +707,20 @@ export function FilterBar({
                       <ChevronRight size="14" className="text-muted-foreground" />
                     </div>
                   </button>
-                  {groups.length === 0 && !selectedCity && (
+                  {cinemaOptions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMoreView("cinemas")}
+                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                    >
+                      <span>{t("filter.cinema")}</span>
+                      <div className="flex items-center gap-2">
+                        {selectedCinemaName && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCinemaName}</span>}
+                        <ChevronRight size="14" className="text-muted-foreground" />
+                      </div>
+                    </button>
+                  )}
+                  {groups.length === 0 && !selectedCity && cinemaOptions.length === 0 && (
                     <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
                   )}
                 </div>

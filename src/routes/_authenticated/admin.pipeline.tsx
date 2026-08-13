@@ -105,6 +105,10 @@ function formatDuration(seconds: number | null | undefined): string {
 
 function humanizeReason(reason: string, lastSuccessAt: string | null): string {
   const r = reason.toLowerCase();
+  if (r.includes("nægtede adgang") || r.includes("http 403") || r.includes("http 401")) {
+    const status = r.includes("401") ? "401" : "403";
+    return `Kultunaut afviste adgang (HTTP ${status}). Feedet kunne ikke hentes — kontakt Kultunaut om godkendelse af vores adgang.`;
+  }
   if (r.includes("last success was") || r.includes("last scheduled import succeeded")) {
     return lastSuccessAt
       ? `Seneste vellykkede import blev gennemført ${formatDateTime(lastSuccessAt)}.`

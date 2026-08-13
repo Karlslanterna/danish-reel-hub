@@ -49,6 +49,9 @@ type Suggestion =
   | { kind: "cinema"; label: string; sub: string; slug: string }
   | { kind: "city"; label: string; sub: string; city: string };
 
+const displayCityOf = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
+const baseCityOf = (s: string) => displayCityOf(s).replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+
 function HomePage() {
   const { movies, cinemas, showtimeIndex } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; showtimeIndex: ShowtimeIndexRow[] };
   const [query, setQuery] = useState("");
@@ -126,10 +129,6 @@ function HomePage() {
     }
     return ids;
   }, [selectedDate, showtimeIndex, selectedFormat, selectedLanguage, selectedEvent]);
-
-  const displayCityOf = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
-  const baseCityOf = (s: string) =>
-    displayCityOf(s).replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
 
   const cities = useMemo(() => {
     const map = new Map<string, { count: number; raws: string[] }>();

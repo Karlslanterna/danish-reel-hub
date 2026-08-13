@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toHttpsUrl } from "@/lib/poster-url";
+import { sortShowtimes } from "@/lib/showtime-sort";
 
 export type Poster = {
   a?: string;
@@ -201,7 +202,7 @@ export async function fetchShowtimesForMovie(movieId: string): Promise<Showtime[
     .select("*")
     .eq("movie_id", movieId);
   if (error) throw error;
-  return (data ?? []).map(mapShowtime);
+  return sortShowtimes((data ?? []).map(mapShowtime));
 }
 
 export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
@@ -251,7 +252,7 @@ export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; 
 export async function fetchShowtimes(): Promise<Showtime[]> {
   const { data, error } = await supabase.from("showtimes").select("*");
   if (error) throw error;
-  return (data ?? []).map(mapShowtime);
+  return sortShowtimes((data ?? []).map(mapShowtime));
 }
 
 export type ShowtimeIndexRow = {
@@ -293,7 +294,7 @@ export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtim
     .select("*")
     .eq("cinema_id", cinemaId);
   if (error) throw error;
-  return (data ?? []).map(mapShowtime);
+  return sortShowtimes((data ?? []).map(mapShowtime));
 }
 
 export async function fetchMoviesAndShowtimesForCinemas(
@@ -316,5 +317,5 @@ export async function fetchMoviesAndShowtimesForCinemas(
     }
     showtimes.push(mapShowtime(row));
   }
-  return { movies, showtimes };
+  return { movies, showtimes: sortShowtimes(showtimes) };
 }

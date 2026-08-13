@@ -108,7 +108,10 @@ function HomePage() {
     return ids;
   }, [selectedCity, cinemas, nearbyCinemaIds]);
 
-  const activeCinemaIds = nearbyCinemaIds ?? cityCinemaIds;
+  // A specific cinema is the narrowest selection and wins over city / radius.
+  const activeCinemaIds = selectedCinemaId
+    ? new Set([selectedCinemaId])
+    : (nearbyCinemaIds ?? cityCinemaIds);
 
   const nearbyMovieIds = useMemo(() => {
     if (!activeCinemaIds) return null;

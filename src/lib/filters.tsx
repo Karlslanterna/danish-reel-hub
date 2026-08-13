@@ -16,6 +16,8 @@ export const RADIUS_OPTIONS: Array<{ value: Radius; label: string }> = [
   { value: "all", label: "Hele Danmark" },
 ];
 
+export type GeoStatus = "idle" | "prompt" | "granted" | "denied" | "unavailable" | "timeout" | "unsupported";
+
 export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -48,7 +50,7 @@ type FiltersState = {
   selectedLanguage: string | null;
   selectedEvent: string | null;
   selectedCity: string | null;
-  geoError: string | null;
+  geoStatus: GeoStatus;
   geoLoading: boolean;
   setRadius: (r: Radius) => void;
   setSelectedDate: (d: string | null) => void;
@@ -58,6 +60,7 @@ type FiltersState = {
   setSelectedEvent: (v: string | null) => void;
   setSelectedCity: (v: string | null) => void;
   requestLocation: (onSuccess?: () => void) => void;
+  dismissGeo: () => void;
   clear: () => void;
 };
 

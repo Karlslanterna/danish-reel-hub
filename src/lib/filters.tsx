@@ -401,7 +401,8 @@ export function FilterBar({
 
   const applyCity = (cityName: string | null) => {
     setSelectedCity(cityName);
-    setCityOpen(false);
+    setMoreOpen(false);
+    setMoreView("menu");
     const slug = cityName ? slugifyCity(cityName) : null;
     const movie = pathname.match(/^\/(?:[^/]+\/)?film\/([^/?#]+)/);
     if (movie) {

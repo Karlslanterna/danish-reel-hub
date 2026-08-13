@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
-import { FilterBar, GeoNotice, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { FilterBar, GeoNotice, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
@@ -58,10 +58,11 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoLoading, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, geoLoading, clear } = useFilters();
+  useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
   const hasFilters =
-    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || hasTagSelection(tagSel);
+    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || Boolean(selectedCinemaId) || hasTagSelection(tagSel);
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
@@ -107,7 +108,10 @@ function HomePage() {
     return ids;
   }, [selectedCity, cinemas, nearbyCinemaIds]);
 
-  const activeCinemaIds = nearbyCinemaIds ?? cityCinemaIds;
+  // A specific cinema is the narrowest selection and wins over city / radius.
+  const activeCinemaIds = selectedCinemaId
+    ? new Set([selectedCinemaId])
+    : (nearbyCinemaIds ?? cityCinemaIds);
 
   const nearbyMovieIds = useMemo(() => {
     if (!activeCinemaIds) return null;
@@ -225,6 +229,16 @@ function HomePage() {
   const cityOptions = useMemo(
     () => baseCities.map((b) => ({ value: b.city, count: b.cinemas })),
     [baseCities],
+  );
+
+  // "Near me" constrains which cinemas can be picked; the city constraint is
+  // applied inside FilterBar.
+  const cinemaOptions = useMemo(
+    () =>
+      cinemas
+        .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
+        .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
+    [cinemas, nearbyCinemaIds],
   );
 
   useEffect(() => {
@@ -375,7 +389,7 @@ function HomePage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={cityOptions} />
+            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={cityOptions} cinemas={cinemaOptions} />
             {hasFilters && (
               <button
                 type="button"

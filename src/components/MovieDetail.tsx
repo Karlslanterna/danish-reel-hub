@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
-import { FilterBar, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
@@ -32,8 +32,10 @@ export function MovieDetail({
     selectedEvent,
     selectedCity,
     setSelectedCity,
+    selectedCinemaId,
     clear,
   } = useFilters();
+  useCinemaUrlSync(cinemasShowing);
 
   // City is routing context: when this page is city-scoped, keep the global
   // (persisted) city filter in sync so the selection carries across the site.
@@ -46,12 +48,17 @@ export function MovieDetail({
   const tagOptions = collectTagOptions(showtimes);
   const hasGeo = radius !== "all" && userLoc !== null;
 
-  const filteredCinemas = hasGeo
+  const geoCinemas = hasGeo
     ? cinemasShowing.filter((c) => {
         if (c.latitude == null || c.longitude == null) return false;
         return haversineKm(userLoc!, { lat: c.latitude, lng: c.longitude }) <= (radius as number);
       })
     : cinemasShowing;
+
+  // A picked cinema narrows the list to that single venue.
+  const filteredCinemas = selectedCinemaId
+    ? geoCinemas.filter((c) => c.id === selectedCinemaId)
+    : geoCinemas;
 
   const filteredShowtimes = showtimes.filter(
     (s) => (!selectedDate || s.date === selectedDate) && showtimeMatchesTags(s, tagSel),
@@ -178,6 +185,7 @@ export function MovieDetail({
             languages={tagOptions.languages}
             events={tagOptions.events}
             cities={cityFilterOptions}
+            cinemas={geoCinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
           />
         </div>
 

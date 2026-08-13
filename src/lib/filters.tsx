@@ -4,7 +4,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
 import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
-import { slugifyCity } from "@/lib/city-slug";
+import { slugifyCity, baseCityOf } from "@/lib/city-slug";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
@@ -43,6 +43,9 @@ export function fmtDateLabel(date: string | null, lang: Lang = "da") {
 
 type Loc = { lat: number; lng: number };
 
+/** Minimal cinema shape the filter UI needs. */
+export type CinemaFilterOption = { id: string; slug: string; name: string; city: string };
+
 type FiltersState = {
   radius: Radius;
   userLoc: Loc | null;
@@ -52,6 +55,9 @@ type FiltersState = {
   selectedLanguage: string | null;
   selectedEvent: string | null;
   selectedCity: string | null;
+  selectedCinemaId: string | null;
+  selectedCinemaSlug: string | null;
+  selectedCinemaName: string | null;
   geoStatus: GeoStatus;
   geoLoading: boolean;
   setRadius: (r: Radius) => void;
@@ -61,6 +67,7 @@ type FiltersState = {
   setSelectedLanguage: (v: string | null) => void;
   setSelectedEvent: (v: string | null) => void;
   setSelectedCity: (v: string | null) => void;
+  setSelectedCinema: (c: CinemaFilterOption | null) => void;
   requestLocation: (onSuccess?: () => void) => void;
   dismissGeo: () => void;
   clear: () => void;
@@ -79,6 +86,9 @@ type Persisted = {
   selectedLanguage: string | null;
   selectedEvent: string | null;
   selectedCity: string | null;
+  selectedCinemaId: string | null;
+  selectedCinemaSlug: string | null;
+  selectedCinemaName: string | null;
 };
 
 const EMPTY_PERSISTED: Persisted = {
@@ -90,6 +100,9 @@ const EMPTY_PERSISTED: Persisted = {
   selectedLanguage: null,
   selectedEvent: null,
   selectedCity: null,
+  selectedCinemaId: null,
+  selectedCinemaSlug: null,
+  selectedCinemaName: null,
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
@@ -115,6 +128,9 @@ function loadPersisted(): Persisted {
       selectedLanguage: str(p.selectedLanguage),
       selectedEvent: str(p.selectedEvent),
       selectedCity: str(p.selectedCity),
+      selectedCinemaId: str(p.selectedCinemaId),
+      selectedCinemaSlug: str(p.selectedCinemaSlug),
+      selectedCinemaName: str(p.selectedCinemaName),
     };
   } catch {
     return EMPTY_PERSISTED;
@@ -130,6 +146,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [selectedLanguage, setSelectedLanguageState] = useState<string | null>(null);
   const [selectedEvent, setSelectedEventState] = useState<string | null>(null);
   const [selectedCity, setSelectedCityState] = useState<string | null>(null);
+  const [selectedCinemaId, setSelectedCinemaIdState] = useState<string | null>(null);
+  const [selectedCinemaSlug, setSelectedCinemaSlugState] = useState<string | null>(null);
+  const [selectedCinemaName, setSelectedCinemaNameState] = useState<string | null>(null);
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoLoading, setGeoLoading] = useState(false);
 
@@ -144,6 +163,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedLanguageState(p.selectedLanguage);
     setSelectedEventState(p.selectedEvent);
     setSelectedCityState(p.selectedCity);
+    setSelectedCinemaIdState(p.selectedCinemaId);
+    setSelectedCinemaSlugState(p.selectedCinemaSlug);
+    setSelectedCinemaNameState(p.selectedCinemaName);
   }, []);
 
   // Persist
@@ -152,10 +174,10 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity }),
+        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName }),
       );
     } catch { /* ignore */ }
-  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity]);
+  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName]);
 
   // Watch for geolocation permission changes so a previously saved location is not used after the user revokes access.
   // Only surface a notice automatically when a location filter was actually active; otherwise wait for user interaction.
@@ -181,13 +203,45 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     return () => cleanup?.();
   }, []);
 
-  const setRadius = useCallback((r: Radius) => setRadiusState(r), []);
+  const clearCinema = useCallback(() => {
+    setSelectedCinemaIdState(null);
+    setSelectedCinemaSlugState(null);
+    setSelectedCinemaNameState(null);
+  }, []);
+
+  // "Near me" and a specific cinema are mutually exclusive filters.
+  const setRadius = useCallback((r: Radius) => {
+    setRadiusState(r);
+    if (r !== "all") clearCinema();
+  }, [clearCinema]);
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
   const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
   const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);
   const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
   const setSelectedEvent = useCallback((v: string | null) => setSelectedEventState(v), []);
-  const setSelectedCity = useCallback((v: string | null) => setSelectedCityState(v), []);
+  // Changing city drops a cinema that no longer belongs to the selected city.
+  const setSelectedCity = useCallback((v: string | null) => {
+    setSelectedCityState(v);
+    setSelectedCinemaIdState((prevId) => {
+      if (!prevId) return prevId;
+      clearCinema();
+      return null;
+    });
+  }, [clearCinema]);
+
+  // Picking a cinema implies its city and turns off the distance filter.
+  const setSelectedCinema = useCallback((c: CinemaFilterOption | null) => {
+    if (!c) {
+      clearCinema();
+      return;
+    }
+    setSelectedCinemaIdState(c.id);
+    setSelectedCinemaSlugState(c.slug);
+    setSelectedCinemaNameState(c.name);
+    setSelectedCityState(baseCityOf(c.city));
+    setRadiusState("all");
+  }, [clearCinema]);
+
   const dismissGeo = useCallback(() => setGeoStatus("idle"), []);
 
   const requestLocation = useCallback((onSuccess?: () => void) => {
@@ -237,17 +291,19 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedLanguageState(null);
     setSelectedEventState(null);
     setSelectedCityState(null);
+    clearCinema();
     setGeoStatus("idle");
-  }, []);
+  }, [clearCinema]);
 
   const value = useMemo<FiltersState>(
     () => ({
       radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
+      selectedCinemaId, selectedCinemaSlug, selectedCinemaName,
       geoStatus, geoLoading,
-      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity,
+      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
       requestLocation, dismissGeo, clear,
     }),
-    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, geoStatus, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, requestLocation, dismissGeo, clear],
+    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName, geoStatus, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema, requestLocation, dismissGeo, clear],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;
@@ -257,6 +313,22 @@ export function useFilters() {
   const ctx = useContext(FiltersContext);
   if (!ctx) throw new Error("useFilters must be used within FiltersProvider");
   return ctx;
+}
+
+/**
+ * Hydrates the selected cinema from `?biograf=<slug>` on first load / navigation
+ * so a shared URL restores the same filtered view.
+ */
+export function useCinemaUrlSync(cinemas: CinemaFilterOption[]) {
+  const { selectedCinemaSlug, setSelectedCinema } = useFilters();
+  const search = useRouterState({ select: (s) => s.location.search }) as Record<string, unknown>;
+  const slug = typeof search?.biograf === "string" ? search.biograf : null;
+
+  useEffect(() => {
+    if (!slug || slug === selectedCinemaSlug) return;
+    const match = cinemas.find((c) => c.slug === slug);
+    if (match) setSelectedCinema(match);
+  }, [slug, selectedCinemaSlug, cinemas, setSelectedCinema]);
 }
 
 const OPEN_CITY_FILTER_EVENT = "lanterna:open-city-filter";
@@ -342,6 +414,7 @@ export function FilterBar({
   languages,
   events,
   cities,
+  cinemas,
 }: {
   className?: string;
   hideRadius?: boolean;
@@ -350,16 +423,20 @@ export function FilterBar({
   languages?: string[];
   events?: string[];
   cities?: Array<{ value: string; count: number }>;
+  /** Cinemas that are still valid given the page's other active filters (date, radius, …). */
+  cinemas?: CinemaFilterOption[];
 }) {
   const {
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
-    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity,
+    selectedCinemaId, selectedCinemaName,
+    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
     requestLocation,
   } = useFilters();
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities">("menu");
+  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities" | "cinemas">("menu");
+  const [cinemaQuery, setCinemaQuery] = useState("");
   const { t, lang } = useLanguage();
 
   // Allow GeoNotice (or any other caller) to open the city filter inside the more-menu.
@@ -392,7 +469,26 @@ export function FilterBar({
     [cities],
   );
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity);
+  const geoActive = radius !== "all" && Boolean(userLoc);
+
+  // Cinema options are constrained by the city selection (the caller has already
+  // constrained the list by date / radius before passing it in).
+  const cinemaOptions = useMemo(() => {
+    const list = (cinemas ?? []).filter((c) => !selectedCity || baseCityOf(c.city) === selectedCity);
+    return Array.from(new Map(list.map((c) => [c.id, c])).values()).sort((a, b) =>
+      a.name.localeCompare(b.name, "da"),
+    );
+  }, [cinemas, selectedCity]);
+
+  const visibleCinemas = useMemo(() => {
+    const q = cinemaQuery.trim().toLowerCase();
+    if (!q) return cinemaOptions;
+    return cinemaOptions.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q),
+    );
+  }, [cinemaOptions, cinemaQuery]);
+
+  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity || selectedCinemaId);
 
   // City selection is part of the URL: picking a city moves the user to the
   // city-scoped version of the current page (and clearing it back to national).
@@ -417,11 +513,36 @@ export function FilterBar({
     }
   };
 
-
+  // The cinema lives in the URL as ?biograf=<slug> so a filtered view is shareable
+  // on the homepage, city pages and movie pages alike.
+  const applyCinema = (c: CinemaFilterOption | null) => {
+    setSelectedCinema(c);
+    setMoreOpen(false);
+    setMoreView("menu");
+    setCinemaQuery("");
+    navigate({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      search: ((prev: any) => ({ ...prev, biograf: c?.slug ?? undefined })) as never,
+      replace: true,
+    });
+  };
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      {!hideRadius && (
+      {selectedCinemaId && selectedCinemaName && (
+        <button
+          type="button"
+          onClick={() => applyCinema(null)}
+          className="inline-flex max-w-[190px] items-center gap-2 rounded-full border border-primary bg-primary px-4 py-1.5 text-xs uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
+          title={selectedCinemaName}
+        >
+          <span className="truncate">{selectedCinemaName}</span>
+          <span aria-hidden>×</span>
+        </button>
+      )}
+
+      {/* A chosen cinema already pins the location, so distance is hidden. */}
+      {!hideRadius && !selectedCinemaId && (
         <Popover
           open={radiusOpen}
           onOpenChange={(open) => {
@@ -591,8 +712,10 @@ export function FilterBar({
                   ))}
                   <button
                     type="button"
+                    disabled={geoActive}
+                    title={geoActive ? t("filter.lockedByGeo") : undefined}
                     onClick={() => setMoreView("cities")}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                   >
                     <span>{t("filter.city")}</span>
                     <div className="flex items-center gap-2">
@@ -600,7 +723,20 @@ export function FilterBar({
                       <ChevronRight size="14" className="text-muted-foreground" />
                     </div>
                   </button>
-                  {groups.length === 0 && !selectedCity && (
+                  {cinemaOptions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMoreView("cinemas")}
+                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+                    >
+                      <span>{t("filter.cinema")}</span>
+                      <div className="flex items-center gap-2">
+                        {selectedCinemaName && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCinemaName}</span>}
+                        <ChevronRight size="14" className="text-muted-foreground" />
+                      </div>
+                    </button>
+                  )}
+                  {groups.length === 0 && !selectedCity && cinemaOptions.length === 0 && (
                     <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
                   )}
                 </div>
@@ -640,6 +776,58 @@ export function FilterBar({
                         }`}
                       >
                         {c.value} ({c.count})
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            }
+
+            if (moreView === "cinemas") {
+              return (
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMoreView("menu")}
+                    className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:bg-secondary"
+                  >
+                    <ArrowLeft size="12" />
+                    {t("filter.back")}
+                  </button>
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCinema")}</div>
+                  <input
+                    value={cinemaQuery}
+                    onChange={(e) => setCinemaQuery(e.target.value)}
+                    placeholder={t("filter.searchCinema")}
+                    className="mx-1 mb-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyCinema(null)}
+                    className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                      !selectedCinemaId ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {t("filter.allCinemas")}
+                  </button>
+                  {visibleCinemas.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noCinemas")}</div>
+                  )}
+                  {visibleCinemas.map((c) => {
+                    const selected = selectedCinemaId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => applyCinema(selected ? null : c)}
+                        className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                          selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        <span className="block truncate">{c.name}</span>
+                        <span className={`block truncate text-[11px] ${selected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                          {baseCityOf(c.city)}
+                        </span>
                       </button>
                     );
                   })}

@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
-import { FilterBar, GeoNotice, useFilters, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { FilterBar, GeoNotice, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
 import { baseCityOf, cityMatchesSlug, cityOptionsFrom, citySlug, displayCityOf, type CityOption } from "@/lib/city-slug";
@@ -73,8 +73,9 @@ function CityPage() {
   };
   const {
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
-    selectedCity, setSelectedCity, geoLoading, clear,
+    selectedCity, setSelectedCity, selectedCinemaId, geoLoading, clear,
   } = useFilters();
+  useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
 
   // Keep the global filter state in sync with the city in the URL.
   useEffect(() => {
@@ -99,7 +100,9 @@ function CityPage() {
   }, [radius, userLoc, cinemas]);
 
   const filtered = useMemo(() => {
-    const allowed = nearbyCinemaIds ?? cityCinemaIds;
+    const allowed = selectedCinemaId
+      ? new Set([selectedCinemaId])
+      : (nearbyCinemaIds ?? cityCinemaIds);
     const movieIds = new Set<string>();
     for (const s of showtimes) {
       if (!allowed.has(s.cinemaId)) continue;
@@ -108,7 +111,7 @@ function CityPage() {
       movieIds.add(s.movieId);
     }
     return movies.filter((m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)));
-  }, [movies, showtimes, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, nearbyCinemaIds, cityCinemaIds]);
+  }, [movies, showtimes, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, nearbyCinemaIds, cityCinemaIds, selectedCinemaId]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -137,7 +140,16 @@ function CityPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
-            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={[{ value: cityName, count: cinemas.length }, ...otherCities.map((c) => ({ value: c.name, count: c.count }))]} />
+            <FilterBar
+              genres={allGenres}
+              formats={tagOptions.formats}
+              languages={tagOptions.languages}
+              events={tagOptions.events}
+              cities={[{ value: cityName, count: cinemas.length }, ...otherCities.map((c) => ({ value: c.name, count: c.count }))]}
+              cinemas={cinemas
+                .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
+                .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
+            />
             {hasFilters && (
               <button
                 type="button"

@@ -10,6 +10,8 @@ export type Poster = {
   alt?: string;
 };
 
+export type CastMember = { name: string; character?: string | null; profile_path?: string | null };
+
 export type Movie = {
   id: string;
   slug: string;
@@ -22,6 +24,11 @@ export type Movie = {
   rating: string;
   synopsis: string;
   poster: Poster;
+  /** TMDb extras — always optional so the UI works on Kultunaut data alone. */
+  backdropUrl?: string | null;
+  trailerUrl?: string | null;
+  cast?: CastMember[];
+  voteAverage?: number | null;
 };
 
 export type Cinema = {

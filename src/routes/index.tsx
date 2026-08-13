@@ -389,7 +389,7 @@ function HomePage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={cityOptions} />
+            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={cityOptions} cinemas={cinemaOptions} />
             {hasFilters && (
               <button
                 type="button"

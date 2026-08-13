@@ -114,15 +114,27 @@ function MoviePage() {
           } as React.CSSProperties}
           className="poster-gradient absolute inset-0 scale-110 opacity-30 blur-3xl"
         />
-        {movie.poster.url && (
+        {/* TMDb backdrop when we have one, otherwise the Kultunaut poster blur. */}
+        {movie.backdropUrl ? (
           <img
-            src={movie.poster.url}
+            src={movie.backdropUrl}
             alt=""
             aria-hidden
-            loading="lazy"
+            loading="eager"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-40"
           />
+        ) : (
+          movie.poster.url && (
+            <img
+              src={movie.poster.url}
+              alt=""
+              aria-hidden
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover opacity-20 blur-2xl"
+            />
+          )
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
 

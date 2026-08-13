@@ -140,12 +140,26 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
   for (const movie of work.rows) {
     try {
       const year = movie.year && movie.year > 1880 ? movie.year : null;
-      let candidates = (await searchMovies(movie.title, year ?? undefined)) as MatchCandidate[];
-      if (candidates.length === 0 && year) {
-        candidates = (await searchMovies(movie.title)) as MatchCandidate[];
-      }
 
-      const outcome = pickMatch(movie.title, year, candidates);
+      // Non-film listings (Børnebiffen, playbacks, lectures…) never exist on
+      // TMDb — skip them without spending API calls.
+      let outcome = isNonFilmEvent(movie.title)
+        ? ({ matched: false as const, reason: "ikke en film (arrangement)" } as const)
+        : ({ matched: false as const, reason: "ingen TMDb-resultater" } as const);
+
+      if (!isNonFilmEvent(movie.title)) {
+        // Extra search passes: feed title, embedded original title, DB
+        // original_title, and known Danish aliases. Scoring stays unchanged.
+        for (const query of searchQueries(movie.title, movie.original_title)) {
+          let candidates = (await searchMovies(query, year ?? undefined)) as MatchCandidate[];
+          if (candidates.length === 0 && year) {
+            candidates = (await searchMovies(query)) as MatchCandidate[];
+          }
+          const attempt = pickMatch(query, year, candidates);
+          outcome = attempt;
+          if (attempt.matched) break;
+        }
+      }
       if (!outcome.matched) {
         await supabaseAdmin
           .from("movies")

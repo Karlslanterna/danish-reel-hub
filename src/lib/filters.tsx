@@ -4,6 +4,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
 import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
+import { slugifyCity } from "@/lib/city-slug";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -382,6 +384,28 @@ export function FilterBar({
   const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent);
   const [cityOpen, setCityOpen] = useState(false);
 
+  // City selection is part of the URL: picking a city moves the user to the
+  // city-scoped version of the current page (and clearing it back to national).
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const applyCity = (cityName: string | null) => {
+    setSelectedCity(cityName);
+    setCityOpen(false);
+    const slug = cityName ? slugifyCity(cityName) : null;
+    const movie = pathname.match(/^\/(?:[^/]+\/)?film\/([^/?#]+)/);
+    if (movie) {
+      if (slug) navigate({ to: "/$city/film/$slug", params: { city: slug, slug: movie[1] } });
+      else navigate({ to: "/film/$slug", params: { slug: movie[1] } });
+      return;
+    }
+    const isHomeOrCity = /^\/[^/]*$/.test(pathname);
+    if (isHomeOrCity) {
+      if (slug) navigate({ to: "/$city", params: { city: slug } });
+      else navigate({ to: "/" });
+    }
+  };
+
 
 
   return (
@@ -527,7 +551,7 @@ export function FilterBar({
             <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCity")}</div>
             <button
               type="button"
-              onClick={() => { setSelectedCity(null); setCityOpen(false); }}
+              onClick={() => applyCity(null)}
               className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
                 !selectedCity ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
               }`}
@@ -540,7 +564,7 @@ export function FilterBar({
                 <button
                   key={c.value}
                   type="button"
-                  onClick={() => { setSelectedCity(selected ? null : c.value); setCityOpen(false); }}
+                  onClick={() => applyCity(selected ? null : c.value)}
                   className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
                     selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
                   }`}

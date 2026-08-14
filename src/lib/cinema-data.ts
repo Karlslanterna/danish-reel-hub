@@ -48,6 +48,7 @@ export type Cinema = {
   screens: number;
   latitude: number | null;
   longitude: number | null;
+  website: string | null;
 };
 
 export type Showtime = {
@@ -99,6 +100,7 @@ type CinemaRow = {
   screens: number;
   latitude: number | null;
   longitude: number | null;
+  website: string | null;
 };
 
 type ShowtimeRow = {
@@ -169,6 +171,7 @@ const mapCinema = (r: CinemaRow): Cinema => ({
   screens: r.screens,
   latitude: r.latitude,
   longitude: r.longitude,
+  website: r.website ?? null,
 });
 
 const mapShowtime = (r: ShowtimeRow): Showtime => ({

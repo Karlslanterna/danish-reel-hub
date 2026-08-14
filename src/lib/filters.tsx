@@ -714,20 +714,22 @@ export function FilterBar({
                       </div>
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    disabled={geoActive}
-                    title={geoActive ? t("filter.lockedByGeo") : undefined}
-                    onClick={() => setMoreView("cities")}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    <span>{t("filter.city")}</span>
-                    <div className="flex items-center gap-2">
-                      {selectedCity && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCity}</span>}
-                      <ChevronRight size="14" className="text-muted-foreground" />
-                    </div>
-                  </button>
-                  {cinemaOptions.length > 0 && (
+                  {!hideCity && (
+                    <button
+                      type="button"
+                      disabled={geoActive}
+                      title={geoActive ? t("filter.lockedByGeo") : undefined}
+                      onClick={() => setMoreView("cities")}
+                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      <span>{t("filter.city")}</span>
+                      <div className="flex items-center gap-2">
+                        {selectedCity && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCity}</span>}
+                        <ChevronRight size="14" className="text-muted-foreground" />
+                      </div>
+                    </button>
+                  )}
+                  {!hideCinema && cinemaOptions.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setMoreView("cinemas")}
@@ -740,7 +742,7 @@ export function FilterBar({
                       </div>
                     </button>
                   )}
-                  {groups.length === 0 && !selectedCity && cinemaOptions.length === 0 && (
+                  {groups.length === 0 && (hideCity || !selectedCity) && (hideCinema || cinemaOptions.length === 0) && (
                     <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
                   )}
                 </div>

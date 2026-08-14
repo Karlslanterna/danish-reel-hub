@@ -32,7 +32,11 @@ export type Movie = {
   trailerUrl?: string | null;
   cast?: CastMember[];
   voteAverage?: number | null;
+  /** Upcoming screenings across all cinemas — computed in the database. */
+  screeningCount?: number;
+  nextScreeningDate?: string | null;
 };
+
 
 export type Cinema = {
   id: string;

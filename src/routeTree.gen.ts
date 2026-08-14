@@ -21,6 +21,7 @@ import { Route as CityRouteImport } from './routes/$city'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FilmIndexRouteImport } from './routes/film.index'
+import { Route as BiografIndexRouteImport } from './routes/biograf.index'
 import { Route as CityIndexRouteImport } from './routes/$city.index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
 import { Route as ByCityRouteImport } from './routes/by.$city'
@@ -98,6 +99,11 @@ const IndexRoute = IndexRouteImport.update({
 const FilmIndexRoute = FilmIndexRouteImport.update({
   id: '/film/',
   path: '/film/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BiografIndexRoute = BiografIndexRouteImport.update({
+  id: '/biograf/',
+  path: '/biograf/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CityIndexRoute = CityIndexRouteImport.update({
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city/': typeof CityIndexRoute
+  '/biograf/': typeof BiografIndexRoute
   '/film/': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city': typeof CityIndexRoute
+  '/biograf': typeof BiografIndexRoute
   '/film': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -289,6 +297,7 @@ export interface FileRoutesById {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city/': typeof CityIndexRoute
+  '/biograf/': typeof BiografIndexRoute
   '/film/': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city/'
+    | '/biograf/'
     | '/film/'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
@@ -354,6 +364,7 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city'
+    | '/biograf'
     | '/film'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
@@ -387,6 +398,7 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city/'
+    | '/biograf/'
     | '/film/'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
@@ -420,6 +432,7 @@ export interface RootRouteChildren {
   BiografSlugRoute: typeof BiografSlugRoute
   ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
+  BiografIndexRoute: typeof BiografIndexRoute
   FilmIndexRoute: typeof FilmIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -511,6 +524,13 @@ declare module '@tanstack/react-router' {
       path: '/film'
       fullPath: '/film/'
       preLoaderRoute: typeof FilmIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/biograf/': {
+      id: '/biograf/'
+      path: '/biograf'
+      fullPath: '/biograf/'
+      preLoaderRoute: typeof BiografIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$city/': {
@@ -716,6 +736,7 @@ const rootRouteChildren: RootRouteChildren = {
   BiografSlugRoute: BiografSlugRoute,
   ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
+  BiografIndexRoute: BiografIndexRoute,
   FilmIndexRoute: FilmIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,

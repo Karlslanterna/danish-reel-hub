@@ -38,6 +38,7 @@ export function MovieDetail({
     selectedCinemaId,
     clear,
   } = useFilters();
+  const { lang } = useLanguage();
   useCinemaUrlSync(cinemasShowing);
 
   // City is routing context: when this page is city-scoped, keep the global

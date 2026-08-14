@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toHttpsUrl } from "@/lib/poster-url";
 import { sortShowtimes } from "@/lib/showtime-sort";
 import { DEFAULT_MOVIE_SORT, MOVIE_SORT_ORDERS, type MovieSortStrategy } from "@/lib/movie-sort";
+import { windowStart, windowEnd } from "@/lib/date-window";
 
 
 export type Poster = {
@@ -227,7 +228,9 @@ export async function fetchShowtimesForMovie(movieId: string): Promise<Showtime[
   const { data, error } = await supabase
     .from("showtimes")
     .select("*")
-    .eq("movie_id", movieId);
+    .eq("movie_id", movieId)
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   return sortShowtimes((data ?? []).map(mapShowtime));
 }
@@ -236,7 +239,9 @@ export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
   const { data, error } = await supabase
     .from("showtimes")
     .select("movie_id, movies(*)")
-    .eq("cinema_id", cinemaId);
+    .eq("cinema_id", cinemaId)
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   const seen = new Set<string>();
   const out: Movie[] = [];
@@ -252,7 +257,9 @@ export async function fetchCinemasForMovie(movieId: string): Promise<Cinema[]> {
   const { data, error } = await supabase
     .from("showtimes")
     .select("cinema_id, cinemas(*)")
-    .eq("movie_id", movieId);
+    .eq("movie_id", movieId)
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   const seen = new Set<string>();
   const out: Cinema[] = [];
@@ -271,13 +278,21 @@ export function formatRuntime(min: number) {
 }
 
 export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; cinemaId: string }>> {
-  const { data, error } = await supabase.from("showtimes").select("movie_id, cinema_id");
+  const { data, error } = await supabase
+    .from("showtimes")
+    .select("movie_id, cinema_id")
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   return (data ?? []).map((r) => ({ movieId: (r as ShowtimeRow).movie_id, cinemaId: (r as ShowtimeRow).cinema_id }));
 }
 
 export async function fetchShowtimes(): Promise<Showtime[]> {
-  const { data, error } = await supabase.from("showtimes").select("*");
+  const { data, error } = await supabase
+    .from("showtimes")
+    .select("*")
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   return sortShowtimes((data ?? []).map(mapShowtime));
 }
@@ -296,11 +311,11 @@ export type ShowtimeIndexRow = {
  * Fetches only 3 columns and only rows on/after today — one round trip instead of two full-table scans.
  */
 export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
-  const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("showtimes")
     .select("movie_id, cinema_id, date, formats, languages, events")
-    .gte("date", today);
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   return (data ?? []).map((r) => {
     const row = r as Pick<ShowtimeRow, "movie_id" | "cinema_id" | "date" | "formats" | "languages" | "events">;
@@ -319,7 +334,9 @@ export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtim
   const { data, error } = await supabase
     .from("showtimes")
     .select("*")
-    .eq("cinema_id", cinemaId);
+    .eq("cinema_id", cinemaId)
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   return sortShowtimes((data ?? []).map(mapShowtime));
 }
@@ -331,7 +348,9 @@ export async function fetchMoviesAndShowtimesForCinemas(
   const { data, error } = await supabase
     .from("showtimes")
     .select("movie_id, cinema_id, date, times, hall, booking_url, ticket_url, ticket_urls, formats, languages, events, movies(*)")
-    .in("cinema_id", cinemaIds);
+    .in("cinema_id", cinemaIds)
+    .gte("date", windowStart())
+    .lte("date", windowEnd());
   if (error) throw error;
   const rows = (data ?? []) as Array<ShowtimeRow & { movies: MovieRow | null }>;
   const seen = new Set<string>();

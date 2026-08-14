@@ -207,9 +207,20 @@ function HomePage() {
     return out.slice(0, 8);
   }, [query, movies, cinemas, cities, baseCities]);
 
+  // Screenings that survive the active cinema/date/tag filters — they drive the ranking.
+  const matchingScreenings = useMemo(() => {
+    const tagged = hasTagSelection(tagSel);
+    return showtimeIndex.filter((s) => {
+      if (activeCinemaIds && !activeCinemaIds.has(s.cinemaId)) return false;
+      if (selectedDate && s.date !== selectedDate) return false;
+      if (tagged && !showtimeMatchesTags(s, tagSel)) return false;
+      return true;
+    });
+  }, [showtimeIndex, activeCinemaIds, selectedDate, selectedFormat, selectedLanguage, selectedEvent]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return movies.filter(
+    const visible = movies.filter(
       (m) => {
         if (nearbyMovieIds && !nearbyMovieIds.has(m.id)) return false;
         if (dateMovieIds && !dateMovieIds.has(m.id)) return false;
@@ -222,7 +233,10 @@ function HomePage() {
         );
       },
     );
-  }, [query, movies, nearbyMovieIds, dateMovieIds, selectedGenre]);
+    // Unfiltered view keeps the database ranking from `movies_ranked`.
+    const noScreeningFilter = !activeCinemaIds && !selectedDate && !hasTagSelection(tagSel);
+    return noScreeningFilter ? visible : rankMoviesByScreenings(visible, matchingScreenings);
+  }, [query, movies, nearbyMovieIds, dateMovieIds, selectedGenre, matchingScreenings, activeCinemaIds, selectedDate, selectedFormat, selectedLanguage, selectedEvent]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SitemapMoviesDotxmlRouteImport } from './routes/sitemap-movies[.]xml'
 import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -40,6 +41,11 @@ import { Route as AuthenticatedAdminImportJobIdRouteImport } from './routes/_aut
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapMoviesDotxmlRoute = SitemapMoviesDotxmlRouteImport.update({
+  id: '/sitemap-movies.xml',
+  path: '/sitemap-movies.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapCoreDotxmlRoute = SitemapCoreDotxmlRouteImport.update({
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
+  '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
+  '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
+  '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -277,6 +286,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/reset-password'
     | '/sitemap-core.xml'
+    | '/sitemap-movies.xml'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/reset-password'
     | '/sitemap-core.xml'
+    | '/sitemap-movies.xml'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/reset-password'
     | '/sitemap-core.xml'
+    | '/sitemap-movies.xml'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -363,6 +375,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapCoreDotxmlRoute: typeof SitemapCoreDotxmlRoute
+  SitemapMoviesDotxmlRoute: typeof SitemapMoviesDotxmlRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -382,6 +395,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-movies.xml': {
+      id: '/sitemap-movies.xml'
+      path: '/sitemap-movies.xml'
+      fullPath: '/sitemap-movies.xml'
+      preLoaderRoute: typeof SitemapMoviesDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap-core.xml': {
@@ -626,6 +646,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapCoreDotxmlRoute: SitemapCoreDotxmlRoute,
+  SitemapMoviesDotxmlRoute: SitemapMoviesDotxmlRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:

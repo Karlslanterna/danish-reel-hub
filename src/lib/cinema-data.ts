@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toHttpsUrl } from "@/lib/poster-url";
 import { sortShowtimes } from "@/lib/showtime-sort";
+import { DEFAULT_MOVIE_SORT, MOVIE_SORT_ORDERS, type MovieSortStrategy } from "@/lib/movie-sort";
+
 
 export type Poster = {
   a?: string;
@@ -30,7 +32,11 @@ export type Movie = {
   trailerUrl?: string | null;
   cast?: CastMember[];
   voteAverage?: number | null;
+  /** Upcoming screenings across all cinemas — computed in the database. */
+  screeningCount?: number;
+  nextScreeningDate?: string | null;
 };
+
 
 export type Cinema = {
   id: string;
@@ -78,6 +84,9 @@ type MovieRow = {
   tmdb_cast?: unknown;
   tmdb_director?: string | null;
   tmdb_vote_average?: number | string | null;
+  screening_count?: number | string | null;
+  next_screening_date?: string | null;
+
 };
 
 type CinemaRow = {
@@ -143,6 +152,9 @@ const mapMovie = (r: MovieRow): Movie => {
     trailerUrl: toHttpsUrl(r.tmdb_trailer_url) ?? null,
     cast: Array.isArray(r.tmdb_cast) ? (r.tmdb_cast as CastMember[]) : [],
     voteAverage: Number.isFinite(voteAverage as number) && (voteAverage as number) > 0 ? voteAverage : null,
+    screeningCount: Number(r.screening_count ?? 0) || 0,
+    nextScreeningDate: r.next_screening_date ?? null,
+
   };
 };
 
@@ -172,11 +184,23 @@ const mapShowtime = (r: ShowtimeRow): Showtime => ({
   events: r.events ?? [],
 });
 
-export async function fetchMovies(): Promise<Movie[]> {
-  const { data, error } = await supabase.from("movies").select("*").order("title");
+/**
+ * Movies ordered by a named strategy. Ordering happens in the database via the
+ * `movies_ranked` view, which recomputes upcoming-screening counts on read —
+ * so it always reflects the latest import with no extra frontend work.
+ */
+export async function fetchMovies(
+  strategy: MovieSortStrategy = DEFAULT_MOVIE_SORT,
+): Promise<Movie[]> {
+  let query = supabase.from("movies_ranked").select("*");
+  for (const o of MOVIE_SORT_ORDERS[strategy]) {
+    query = query.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
+  }
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((r) => mapMovie(r as MovieRow));
 }
+
 
 export async function fetchCinemas(): Promise<Cinema[]> {
   const { data, error } = await supabase.from("cinemas").select("*").order("name");

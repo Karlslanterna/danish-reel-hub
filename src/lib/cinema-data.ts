@@ -184,11 +184,23 @@ const mapShowtime = (r: ShowtimeRow): Showtime => ({
   events: r.events ?? [],
 });
 
-export async function fetchMovies(): Promise<Movie[]> {
-  const { data, error } = await supabase.from("movies").select("*").order("title");
+/**
+ * Movies ordered by a named strategy. Ordering happens in the database via the
+ * `movies_ranked` view, which recomputes upcoming-screening counts on read —
+ * so it always reflects the latest import with no extra frontend work.
+ */
+export async function fetchMovies(
+  strategy: MovieSortStrategy = DEFAULT_MOVIE_SORT,
+): Promise<Movie[]> {
+  let query = supabase.from("movies_ranked").select("*");
+  for (const o of MOVIE_SORT_ORDERS[strategy]) {
+    query = query.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
+  }
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((r) => mapMovie(r as MovieRow));
 }
+
 
 export async function fetchCinemas(): Promise<Cinema[]> {
   const { data, error } = await supabase.from("cinemas").select("*").order("name");

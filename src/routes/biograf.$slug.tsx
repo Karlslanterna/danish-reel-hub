@@ -98,7 +98,7 @@ function CinemaPage() {
   ).map((m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }));
 
   const withShows = rows.filter((r) => r.shows.length > 0);
-  const withoutShows = rows.filter((r) => r.shows.length === 0);
+  
 
   const cityLabel = cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim();
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(

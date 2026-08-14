@@ -1,6 +1,7 @@
 import { rankMoviesByScreenings } from "@/lib/movie-sort";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { MapPin, Clapperboard, Drama, Clock, Navigation, Globe, Phone } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";

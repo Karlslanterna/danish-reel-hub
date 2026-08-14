@@ -84,6 +84,9 @@ type MovieRow = {
   tmdb_cast?: unknown;
   tmdb_director?: string | null;
   tmdb_vote_average?: number | string | null;
+  screening_count?: number | string | null;
+  next_screening_date?: string | null;
+
 };
 
 type CinemaRow = {

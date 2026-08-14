@@ -12,6 +12,8 @@ import {
 import { cityOptionsFrom, type CityOption } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { movieSchemas } from "@/lib/jsonld";
+import { movieTitle, movieDescription } from "@/lib/seo";
+import { citySlug } from "@/lib/city-slug";
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {
@@ -25,14 +27,19 @@ export const Route = createFileRoute("/film/$slug")({
   },
   head: ({ params, loaderData }) => {
     const href = canonicalUrl(`/film/${params.slug}`);
-    if (!loaderData) return { meta: [], links: [], scripts: [] };
-    const title = `${loaderData.movie.title} — Lanterna`;
-    const description = loaderData.movie.synopsis.slice(0, 155);
-    const image = loaderData.movie.poster.url;
+    if (!loaderData) return { meta: [{ title: "Filmen findes ikke | Lanterna" }, { name: "robots", content: "noindex, follow" }] };
+    const { movie, cinemas, showtimes } = loaderData;
+    const hasScreenings = showtimes.length > 0;
+    const cityCount = new Set(cinemas.map((c) => citySlug(c.city)).filter(Boolean)).size;
+    const title = movieTitle(movie.title);
+    const description = movieDescription(movie.title, cinemas.length, cityCount);
+    const image = movie.poster.url;
     return {
       meta: [
         { title },
         { name: "description", content: description },
+        // No upcoming screenings anywhere -> thin page, keep it out of the index.
+        ...(hasScreenings ? [] : [{ name: "robots", content: "noindex, follow" }]),
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:url", content: href },
@@ -44,8 +51,8 @@ export const Route = createFileRoute("/film/$slug")({
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
       ],
-      links: [{ rel: "canonical", href }],
-      scripts: movieSchemas(loaderData.movie, loaderData.cinemas, loaderData.showtimes),
+      links: [{ rel: "canonical", href: hasScreenings ? href : canonicalUrl("/film") }],
+      scripts: movieSchemas(movie, cinemas, showtimes),
     };
   },
   notFoundComponent: () => (

@@ -18,6 +18,8 @@ import {
 import { canonicalUrl } from "@/lib/canonical";
 import { baseCityOf, citySlug } from "@/lib/city-slug";
 import { cinemaSchemas } from "@/lib/jsonld";
+import { SiteFooter } from "@/components/SiteFooter";
+import { cinemaTitle, cinemaDescription } from "@/lib/seo";
 
 export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
@@ -29,21 +31,26 @@ export const Route = createFileRoute("/biograf/$slug")({
   },
   head: ({ params, loaderData }) => {
     const href = canonicalUrl(`/biograf/${params.slug}`);
-    if (!loaderData) return { meta: [], links: [], scripts: [] };
-    const title = `${loaderData.cinema.name}, ${loaderData.cinema.city} — Lanterna`;
-    const description = loaderData.cinema.description.slice(0, 155);
+    if (!loaderData) return { meta: [{ title: "Biografen findes ikke | Lanterna" }, { name: "robots", content: "noindex, follow" }] };
+    const { cinema, movies, showtimes } = loaderData;
+    const cityLabel = baseCityOf(cinema.city);
+    const hasScreenings = showtimes.length > 0;
+    const title = cinemaTitle(cinema.name);
+    const description = cinemaDescription(cinema.name, cityLabel, movies.length);
     return {
       meta: [
         { title },
         { name: "description", content: description },
+        ...(hasScreenings ? [] : [{ name: "robots", content: "noindex, follow" }]),
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:url", content: href },
+        { property: "og:type", content: "website" },
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
       ],
-      links: [{ rel: "canonical", href }],
-      scripts: cinemaSchemas(loaderData.cinema),
+      links: [{ rel: "canonical", href: hasScreenings ? href : canonicalUrl(`/${citySlug(cinema.city)}`) }],
+      scripts: cinemaSchemas(cinema),
     };
   },
   notFoundComponent: () => (

@@ -78,7 +78,7 @@ function CityPage() {
   };
   const {
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
-    selectedCity, setSelectedCity, selectedCinemaId, geoLoading, clear,
+    selectedCity, setSelectedCity, selectedCinemaId, geoLoading,
   } = useFilters();
   useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
 
@@ -88,7 +88,6 @@ function CityPage() {
   }, [cityName, selectedCity, setSelectedCity]);
 
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
-  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || hasTagSelection(tagSel);
 
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
@@ -158,15 +157,6 @@ function CityPage() {
                 .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
                 .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
             />
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clear}
-                className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                Ryd filtre
-              </button>
-            )}
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>Finder din placering…</div>}

@@ -72,7 +72,7 @@ export function MovieDetail({
     .map((c) => ({ cinema: c, days: filteredShowtimes.filter((s) => s.cinemaId === c.id) }))
     .filter((x) => x.days.length > 0);
 
-  const hasFilters = Boolean(selectedDate) || hasGeo || hasTagSelection(tagSel);
+  
 
   const cityFilterOptions = (cityOptions ?? []).map((c) => ({ value: c.name, count: c.count }));
 
@@ -207,20 +207,9 @@ export function MovieDetail({
           <h2 className="font-display text-xl tracking-tight sm:text-2xl">
             Spilletider{city ? ` i ${city.name}` : ""}
           </h2>
-          <div className="flex items-center gap-4">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {byCinema.length} biografer{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
-              {hasGeo ? ` · inden for ${radius} km` : ""}
-            </div>
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clear}
-                className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                Ryd filtre
-              </button>
-            )}
+          <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            {byCinema.length} biografer{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
+            {hasGeo ? ` · inden for ${radius} km` : ""}
           </div>
         </div>
 

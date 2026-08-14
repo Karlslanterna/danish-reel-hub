@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
+import { Plus, ChevronRight, ArrowLeft, X } from "lucide-react";
 import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
 import { slugifyCity, baseCityOf } from "@/lib/city-slug";
@@ -435,8 +435,12 @@ export function FilterBar({
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
     selectedCinemaId, selectedCinemaName,
     setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
-    requestLocation,
+    requestLocation, clear,
   } = useFilters();
+
+  const hasFilters = Boolean(
+    radius !== "all" || selectedDate || selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity || selectedCinemaId,
+  );
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -888,6 +892,17 @@ export function FilterBar({
         </PopoverContent>
 
       </Popover>
+
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={clear}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+        >
+          <X size="12" strokeWidth={2.5} />
+          {t("home.clearFilters")}
+        </button>
+      )}
     </div>
   );
 }

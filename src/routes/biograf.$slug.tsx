@@ -78,12 +78,11 @@ function CinemaPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, clear } = useFilters();
+  const { selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent } = useFilters();
   const activeDate = selectedDate ?? todayStr();
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
-  const hasFilters = Boolean(selectedDate) || Boolean(selectedGenre) || hasTagSelection(tagSel);
 
   const filteredMovies = useMemo(
     () => (selectedGenre ? movies.filter((m) => m.genre.includes(selectedGenre)) : movies),
@@ -158,15 +157,6 @@ function CinemaPage() {
       <section className="mx-auto max-w-[1400px] px-5 py-8 sm:px-8 sm:py-12">
         <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
           <FilterBar hideRadius hideCity hideCinema genres={allGenres} languages={tagOptions.languages} />
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={clear}
-              className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              Ryd filtre
-            </button>
-          )}
           <div className="ml-auto text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             {withShows.length} film · {fmtDateLabel(activeDate)}
           </div>

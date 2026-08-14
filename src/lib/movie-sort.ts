@@ -47,3 +47,35 @@ export const MOVIE_SORT_LABELS: Record<MovieSortStrategy, { da: string; en: stri
   "top-rated": { da: "Bedst bedømt", en: "Highest rated" },
   title: { da: "Alfabetisk", en: "Alphabetical" },
 };
+
+type RankableEntry = { movieId: string; date: string; times?: string[] };
+type RankableMovie = { id: string; title: string };
+
+/**
+ * Client-side equivalent of the `movies_ranked` ordering, applied to the
+ * screenings that survived the active filters: most screenings first, then
+ * earliest upcoming screening, then title A→Å.
+ */
+export function rankMoviesByScreenings<T extends RankableMovie>(
+  movies: T[],
+  entries: RankableEntry[],
+): T[] {
+  const stats = new Map<string, { count: number; next: string | null }>();
+  for (const e of entries) {
+    const s = stats.get(e.movieId) ?? { count: 0, next: null };
+    s.count += e.times?.length ?? 1;
+    if (!s.next || e.date < s.next) s.next = e.date;
+    stats.set(e.movieId, s);
+  }
+  return [...movies].sort((a, b) => {
+    const sa = stats.get(a.id) ?? { count: 0, next: null };
+    const sb = stats.get(b.id) ?? { count: 0, next: null };
+    if (sb.count !== sa.count) return sb.count - sa.count;
+    if (sa.next !== sb.next) {
+      if (!sa.next) return 1;
+      if (!sb.next) return -1;
+      return sa.next < sb.next ? -1 : 1;
+    }
+    return a.title.localeCompare(b.title, "da");
+  });
+}

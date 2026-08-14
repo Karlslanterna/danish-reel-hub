@@ -152,6 +152,9 @@ const mapMovie = (r: MovieRow): Movie => {
     trailerUrl: toHttpsUrl(r.tmdb_trailer_url) ?? null,
     cast: Array.isArray(r.tmdb_cast) ? (r.tmdb_cast as CastMember[]) : [],
     voteAverage: Number.isFinite(voteAverage as number) && (voteAverage as number) > 0 ? voteAverage : null,
+    screeningCount: Number(r.screening_count ?? 0) || 0,
+    nextScreeningDate: r.next_screening_date ?? null,
+
   };
 };
 

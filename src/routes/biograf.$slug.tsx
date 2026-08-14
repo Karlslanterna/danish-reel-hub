@@ -1,3 +1,4 @@
+import { rankMoviesByScreenings } from "@/lib/movie-sort";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -90,9 +91,10 @@ function CinemaPage() {
     showtimesByMovie.set(s.movieId, arr);
   }
 
-  const rows = filteredMovies
-    .map((m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }))
-    .sort((a, b) => (b.shows.length > 0 ? 1 : 0) - (a.shows.length > 0 ? 1 : 0));
+  const rows = rankMoviesByScreenings(
+    filteredMovies,
+    [...showtimesByMovie.values()].flat(),
+  ).map((m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }));
 
   const withShows = rows.filter((r) => r.shows.length > 0);
   const withoutShows = rows.filter((r) => r.shows.length === 0);

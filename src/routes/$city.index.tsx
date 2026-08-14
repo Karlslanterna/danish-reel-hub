@@ -103,14 +103,17 @@ function CityPage() {
     const allowed = selectedCinemaId
       ? new Set([selectedCinemaId])
       : (nearbyCinemaIds ?? cityCinemaIds);
-    const movieIds = new Set<string>();
-    for (const s of showtimes) {
-      if (!allowed.has(s.cinemaId)) continue;
-      if (selectedDate && s.date !== selectedDate) continue;
-      if (!showtimeMatchesTags(s, tagSel)) continue;
-      movieIds.add(s.movieId);
-    }
-    return movies.filter((m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)));
+    const matching = showtimes.filter(
+      (s) =>
+        allowed.has(s.cinemaId) &&
+        (!selectedDate || s.date === selectedDate) &&
+        showtimeMatchesTags(s, tagSel),
+    );
+    const movieIds = new Set(matching.map((s) => s.movieId));
+    const visible = movies.filter(
+      (m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)),
+    );
+    return rankMoviesByScreenings(visible, matching);
   }, [movies, showtimes, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, nearbyCinemaIds, cityCinemaIds, selectedCinemaId]);
 
   return (

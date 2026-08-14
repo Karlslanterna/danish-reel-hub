@@ -643,11 +643,12 @@ export function FilterBar({
                     setDateOpen(false);
                   }
                 }}
+                startMonth={windowBounds().from}
+                endMonth={windowBounds().to}
                 disabled={(date) => {
                   const check = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  return check < today;
+                  const { from, to } = windowBounds();
+                  return check < from || check > to;
                 }}
                 initialFocus
                 className="pointer-events-auto"

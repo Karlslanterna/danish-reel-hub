@@ -409,6 +409,8 @@ export function GeoNotice({ className = "" }: { className?: string }) {
 export function FilterBar({
   className = "",
   hideRadius = false,
+  hideCity = false,
+  hideCinema = false,
   genres,
   formats,
   languages,
@@ -418,6 +420,8 @@ export function FilterBar({
 }: {
   className?: string;
   hideRadius?: boolean;
+  hideCity?: boolean;
+  hideCinema?: boolean;
   genres?: string[];
   formats?: string[];
   languages?: string[];

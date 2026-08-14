@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, GeoNotice, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
@@ -474,11 +475,7 @@ function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-border/60">
-        <div className="mx-auto max-w-[1400px] px-8 py-8 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Lanterna · 2026
-        </div>
-      </footer>
+      <SiteFooter cinemas={cinemas} />
     </div>
   );
 }

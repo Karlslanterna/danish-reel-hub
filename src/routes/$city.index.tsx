@@ -229,6 +229,7 @@ function CityPage() {
           )}
         </div>
       </section>
+      <SiteFooter cinemas={cinemas} />
     </div>
   );
 }

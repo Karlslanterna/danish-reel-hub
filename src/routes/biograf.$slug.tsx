@@ -304,6 +304,7 @@ function MovieRow({ movie, shows, dim = false }: { movie: Movie; shows: Showtime
           </div>
         </div>
       </div>
+      <SiteFooter cinemas={[cinema]} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
 import { slugifyCity, baseCityOf } from "@/lib/city-slug";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { windowStart, windowEnd, windowBounds } from "@/lib/date-window";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -117,8 +118,8 @@ function loadPersisted(): Persisted {
     const userLoc = p.userLoc && typeof p.userLoc.lat === "number" && typeof p.userLoc.lng === "number" ? p.userLoc : null;
     let selectedDate = typeof p.selectedDate === "string" ? p.selectedDate : null;
     const selectedGenre = typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
-    // drop past dates
-    if (selectedDate && selectedDate < todayStr()) selectedDate = null;
+    // drop dates outside the visible window (past, or beyond +30 days)
+    if (selectedDate && (selectedDate < windowStart() || selectedDate > windowEnd())) selectedDate = null;
     return {
       radius,
       userLoc,
@@ -642,11 +643,12 @@ export function FilterBar({
                     setDateOpen(false);
                   }
                 }}
+                startMonth={windowBounds().from}
+                endMonth={windowBounds().to}
                 disabled={(date) => {
                   const check = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  return check < today;
+                  const { from, to } = windowBounds();
+                  return check < from || check > to;
                 }}
                 initialFocus
                 className="pointer-events-auto"

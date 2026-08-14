@@ -158,15 +158,6 @@ function CityPage() {
                 .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
                 .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
             />
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clear}
-                className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                Ryd filtre
-              </button>
-            )}
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>Finder din placering…</div>}

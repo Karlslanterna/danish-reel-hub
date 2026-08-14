@@ -60,11 +60,9 @@ function HomePage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, geoLoading, clear } = useFilters();
+  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, geoLoading } = useFilters();
   useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
-  const hasFilters =
-    Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || Boolean(selectedCity) || Boolean(selectedCinemaId) || hasTagSelection(tagSel);
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
@@ -406,15 +404,6 @@ function HomePage() {
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={cityOptions} cinemas={cinemaOptions} />
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clear}
-                className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                {t("home.clearFilters")}
-              </button>
-            )}
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>{t("home.locating")}</div>}

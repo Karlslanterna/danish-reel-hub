@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
+import { useLanguage } from "@/lib/i18n";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
@@ -37,6 +38,7 @@ export function MovieDetail({
     selectedCinemaId,
     clear,
   } = useFilters();
+  const { lang } = useLanguage();
   useCinemaUrlSync(cinemasShowing);
 
   // City is routing context: when this page is city-scoped, keep the global
@@ -265,37 +267,47 @@ export function MovieDetail({
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                  {days.map((d, i) => (
-                    <div key={i}>
-                      <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                        {d.date} · {d.hall}
+                <div className="relative mt-4">
+                  <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+                    {days.map((d, i) => (
+                      <div
+                        key={i}
+                        className="flex w-[132px] flex-shrink-0 snap-start flex-col rounded-lg border border-border bg-card/40 p-3 sm:w-[152px]"
+                      >
+                        <div className="rounded-md bg-primary/10 px-2 py-1.5 text-center">
+                          <div className="font-display text-sm font-semibold leading-tight text-foreground">
+                            {fmtDateLabel(d.date, lang)}
+                          </div>
+                          <div className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {d.hall}
+                          </div>
+                        </div>
+                        <div className="mt-2 flex flex-col gap-1.5">
+                          {d.times.map((t, idx) => {
+                            const url = d.ticketUrls?.[idx] || d.bookingUrl;
+                            return url ? (
+                              <a
+                                key={t + idx}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-md bg-primary px-2.5 py-1.5 text-center text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
+                              >
+                                {t}
+                              </a>
+                            ) : (
+                              <span
+                                key={t + idx}
+                                className="rounded-md border border-border bg-background px-2.5 py-1.5 text-center text-sm font-medium tabular-nums text-muted-foreground"
+                              >
+                                {t}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {d.times.map((t, idx) => {
-                          const url = d.ticketUrls?.[idx] || d.bookingUrl;
-                          return url ? (
-                            <a
-                              key={t + idx}
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
-                            >
-                              {t}
-                            </a>
-                          ) : (
-                            <span
-                              key={t + idx}
-                              className="rounded-sm border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
-                            >
-                              {t}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}

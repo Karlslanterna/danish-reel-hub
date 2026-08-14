@@ -98,7 +98,7 @@ function CinemaPage() {
   ).map((m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }));
 
   const withShows = rows.filter((r) => r.shows.length > 0);
-  const withoutShows = rows.filter((r) => r.shows.length === 0);
+  
 
   const cityLabel = cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim();
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -150,7 +150,7 @@ function CinemaPage() {
 
       <section className="mx-auto max-w-[1400px] px-5 py-8 sm:px-8 sm:py-12">
         <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
-          <FilterBar hideRadius genres={allGenres} languages={tagOptions.languages} />
+          <FilterBar hideRadius hideCity hideCinema genres={allGenres} languages={tagOptions.languages} />
           {hasFilters && (
             <button
               type="button"
@@ -165,22 +165,14 @@ function CinemaPage() {
           </div>
         </div>
 
-        {rows.length === 0 ? (
+        {withShows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border py-16 text-center">
-            <p className="font-display text-xl text-foreground">Ingen film på plakaten</p>
+            <p className="font-display text-xl text-foreground">Ingen forestillinger {fmtDateLabel(activeDate).toLowerCase()}</p>
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8">
             {withShows.map(({ movie, shows }) => (
               <MovieRow key={movie.id} movie={movie} shows={shows} />
-            ))}
-            {withoutShows.length > 0 && (
-              <div className="pt-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Ingen forestillinger {fmtDateLabel(activeDate).toLowerCase()}
-              </div>
-            )}
-            {withoutShows.map(({ movie }) => (
-              <MovieRow key={movie.id} movie={movie} shows={[]} dim />
             ))}
           </div>
         )}

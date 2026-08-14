@@ -300,7 +300,44 @@ export function MovieDetail({
           </div>
         )}
       </section>
+
+      {(cityOptions?.length ?? 0) > 0 && (
+        <section className="mx-auto max-w-[1400px] px-4 pb-4 sm:px-6 md:px-8">
+          <h2 className="font-display text-lg tracking-tight sm:text-xl">
+            {movie.title} i andre byer
+          </h2>
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {city && (
+              <li>
+                <Link
+                  to="/film/$slug"
+                  params={{ slug: movie.slug }}
+                  className="inline-block rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Hele Danmark
+                </Link>
+              </li>
+            )}
+            {(cityOptions ?? [])
+              .filter((c) => c.slug !== city?.slug)
+              .map((c) => (
+                <li key={c.slug}>
+                  <Link
+                    to="/$city/film/$slug"
+                    params={{ city: c.slug, slug: movie.slug }}
+                    className="inline-block rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {movie.title} i {c.name}
+                  </Link>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
+      <SiteFooter cinemas={cinemasShowing} />
     </div>
+
   );
 }
 

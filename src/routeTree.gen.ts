@@ -20,6 +20,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CityRouteImport } from './routes/$city'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FilmIndexRouteImport } from './routes/film.index'
 import { Route as CityIndexRouteImport } from './routes/$city.index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
 import { Route as ByCityRouteImport } from './routes/by.$city'
@@ -92,6 +93,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilmIndexRoute = FilmIndexRouteImport.update({
+  id: '/film/',
+  path: '/film/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CityIndexRoute = CityIndexRouteImport.update({
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city/': typeof CityIndexRoute
+  '/film/': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -248,6 +255,7 @@ export interface FileRoutesByTo {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city': typeof CityIndexRoute
+  '/film': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -281,6 +289,7 @@ export interface FileRoutesById {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city/': typeof CityIndexRoute
+  '/film/': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -314,6 +323,7 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city/'
+    | '/film/'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -344,6 +354,7 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city'
+    | '/film'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -376,6 +387,7 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city/'
+    | '/film/'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -408,6 +420,7 @@ export interface RootRouteChildren {
   BiografSlugRoute: typeof BiografSlugRoute
   ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
+  FilmIndexRoute: typeof FilmIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicImportHealthRoute: typeof ApiPublicImportHealthRoute
@@ -491,6 +504,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/film/': {
+      id: '/film/'
+      path: '/film'
+      fullPath: '/film/'
+      preLoaderRoute: typeof FilmIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$city/': {
@@ -696,6 +716,7 @@ const rootRouteChildren: RootRouteChildren = {
   BiografSlugRoute: BiografSlugRoute,
   ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
+  FilmIndexRoute: FilmIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicImportHealthRoute: ApiPublicImportHealthRoute,

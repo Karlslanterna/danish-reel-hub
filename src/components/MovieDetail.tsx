@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
+
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
@@ -142,8 +144,9 @@ export function MovieDetail({
 
             <div className="min-w-0">
               <h1 className="font-display text-2xl leading-tight tracking-tight text-foreground sm:text-3xl lg:text-5xl">
-                {movie.title}
+                {city ? `${movie.title} i ${city.name}` : movie.title}
               </h1>
+
               <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:text-sm">
                 <span className="text-foreground">{formatRuntime(movie.runtime)}</span>
                 <Dot />
@@ -170,11 +173,20 @@ export function MovieDetail({
             </div>
           </div>
 
+          {city && (
+            <p className="mt-5 max-w-3xl text-sm leading-relaxed text-foreground/90 sm:text-base">
+              {cinemasShowing.length > 0
+                ? `${movie.title} spiller i ${city.name} i ${cinemasShowing.length} ${cinemasShowing.length === 1 ? "biograf" : "biografer"}. Herunder finder du alle aktuelle spilletider i ${city.name} og kan købe billetter direkte.`
+                : `${movie.title} har ingen aktuelle spilletider i ${city.name} lige nu. Se filmens spilletider i resten af landet på den landsdækkende filmside.`}
+            </p>
+          )}
+
           {movie.synopsis && (
-            <p className="mt-5 max-w-3xl text-sm leading-relaxed text-foreground/80 sm:text-base">
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-foreground/80 sm:text-base">
               {movie.synopsis}
             </p>
           )}
+
         </div>
       </section>
 
@@ -290,7 +302,44 @@ export function MovieDetail({
           </div>
         )}
       </section>
+
+      {(cityOptions?.length ?? 0) > 0 && (
+        <section className="mx-auto max-w-[1400px] px-4 pb-4 sm:px-6 md:px-8">
+          <h2 className="font-display text-lg tracking-tight sm:text-xl">
+            {movie.title} i andre byer
+          </h2>
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {city && (
+              <li>
+                <Link
+                  to="/film/$slug"
+                  params={{ slug: movie.slug }}
+                  className="inline-block rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Hele Danmark
+                </Link>
+              </li>
+            )}
+            {(cityOptions ?? [])
+              .filter((c) => c.slug !== city?.slug)
+              .map((c) => (
+                <li key={c.slug}>
+                  <Link
+                    to="/$city/film/$slug"
+                    params={{ city: c.slug, slug: movie.slug }}
+                    className="inline-block rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {movie.title} i {c.name}
+                  </Link>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
+      <SiteFooter cinemas={cinemasShowing} />
     </div>
+
   );
 }
 

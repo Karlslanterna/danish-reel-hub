@@ -4,86 +4,41 @@ import { CANONICAL_HOST } from "@/lib/canonical";
 
 const BASE_URL = CANONICAL_HOST;
 
-type Entry = {
-  loc: string;
-  lastmod?: string;
-  changefreq: "daily" | "weekly";
-};
-
-import { citySlug } from "@/lib/city-slug";
-
+/** Sitemap index. Children hold the actual URLs. */
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { loadSitemapData, xmlResponse } = await import("@/lib/sitemap.server");
+        const data = await loadSitemapData(BASE_URL);
 
-        const [moviesRes, cinemasRes] = await Promise.all([
-          supabaseAdmin.from("movies").select("slug, created_at"),
-          supabaseAdmin.from("cinemas").select("slug, city, created_at"),
-        ]);
+        const newest = (arr: { lastmod?: string }[]) =>
+          arr.reduce<string | undefined>((a, e) => (!a || (e.lastmod && e.lastmod > a) ? e.lastmod ?? a : a), undefined);
 
-        const entries: Entry[] = [
-          { loc: `${BASE_URL}/`, changefreq: "daily", lastmod: new Date().toISOString().slice(0, 10) },
+        const children = [
+          { loc: `${BASE_URL}/sitemap-core.xml`, lastmod: newest(data.core) },
+          { loc: `${BASE_URL}/sitemap-movies.xml`, lastmod: newest(data.movies) },
+          { loc: `${BASE_URL}/sitemap-cinemas.xml`, lastmod: newest(data.cinemas) },
+          { loc: `${BASE_URL}/sitemap-city-movies.xml`, lastmod: newest(data.cityMovies) },
         ];
-
-        for (const m of moviesRes.data ?? []) {
-          if (!m.slug) continue;
-          entries.push({
-            loc: `${BASE_URL}/film/${m.slug}`,
-            lastmod: m.created_at ? String(m.created_at).slice(0, 10) : undefined,
-            changefreq: "daily",
-          });
-        }
-
-        const cityLastmod = new Map<string, string>();
-        for (const c of cinemasRes.data ?? []) {
-          if (!c.slug) continue;
-          entries.push({
-            loc: `${BASE_URL}/biograf/${c.slug}`,
-            lastmod: c.created_at ? String(c.created_at).slice(0, 10) : undefined,
-            changefreq: "daily",
-          });
-          if (c.city) {
-            const slug = citySlug(c.city);
-            if (!slug) continue;
-            const prev = cityLastmod.get(slug);
-            const cur = c.created_at ? String(c.created_at).slice(0, 10) : "";
-            if (!prev || (cur && cur > prev)) cityLastmod.set(slug, cur);
-          }
-        }
-
-        for (const [slug, lastmod] of cityLastmod) {
-          entries.push({
-            loc: `${BASE_URL}/${slug}`,
-            lastmod: lastmod || undefined,
-            changefreq: "weekly",
-          });
-        }
 
         const body = [
           `<?xml version="1.0" encoding="UTF-8"?>`,
-          `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
-          ...entries.map((e) =>
+          `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
+          ...children.map((c) =>
             [
-              `  <url>`,
-              `    <loc>${e.loc}</loc>`,
-              e.lastmod ? `    <lastmod>${e.lastmod}</lastmod>` : null,
-              `    <changefreq>${e.changefreq}</changefreq>`,
-              `  </url>`,
+              `  <sitemap>`,
+              `    <loc>${c.loc}</loc>`,
+              c.lastmod ? `    <lastmod>${c.lastmod}</lastmod>` : null,
+              `  </sitemap>`,
             ]
               .filter(Boolean)
               .join("\n"),
           ),
-          `</urlset>`,
+          `</sitemapindex>`,
         ].join("\n");
 
-        return new Response(body, {
-          headers: {
-            "Content-Type": "application/xml; charset=utf-8",
-            "Cache-Control": "public, max-age=3600",
-          },
-        });
+        return xmlResponse(body);
       },
     },
   },

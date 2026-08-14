@@ -14,6 +14,7 @@ import {
 import { baseCityOf, cityMatchesSlug, cityOptionsFrom, citySlug, type CityOption } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { movieSchemas } from "@/lib/jsonld";
+import { cityMovieTitle, cityMovieDescription } from "@/lib/seo";
 
 export const Route = createFileRoute("/$city/film/$slug")({
   loader: async ({ params }) => {
@@ -56,24 +57,27 @@ export const Route = createFileRoute("/$city/film/$slug")({
     };
   },
   head: ({ loaderData }) => {
-    if (!loaderData) return { meta: [{ title: "Filmen findes ikke — Lanterna" }, { name: "robots", content: "noindex" }] };
+    if (!loaderData) return { meta: [{ title: "Filmen findes ikke | Lanterna" }, { name: "robots", content: "noindex, follow" }] };
     const { movie, cityName, canonicalSlug, cinemas, showtimes } = loaderData;
-    const href = canonicalUrl(`/${canonicalSlug}/film/${movie.slug}`);
-    // Canonical points at the national movie page: the city variants are
-    // near-duplicates of the same film content and should consolidate their
-    // signals, while city landing pages (/koebenhavn) rank on their own.
-    const canonical = canonicalUrl(`/film/${movie.slug}`);
-    const title = `${movie.title} i ${cityName} | LANTERNA`;
-    const description =
-      `Se spilletider for ${movie.title} i ${cityName}. ${cinemas.length} ${cinemas.length === 1 ? "biograf" : "biografer"} — book billetter direkte.`.slice(0, 158);
+    const selfHref = canonicalUrl(`/${canonicalSlug}/film/${movie.slug}`);
+    const nationalHref = canonicalUrl(`/film/${movie.slug}`);
+    // Thin-content protection: a city page with no upcoming screenings adds no
+    // value to the index, so it stays crawlable but points its signals at the
+    // national movie page. With screenings it is genuinely unique and
+    // self-canonical.
+    const hasScreenings = showtimes.length > 0;
+    const canonical = hasScreenings ? selfHref : nationalHref;
+    const title = cityMovieTitle(movie.title, cityName);
+    const description = cityMovieDescription(movie.title, cityName, cinemas.length);
     const image = movie.poster.url;
     return {
       meta: [
         { title },
         { name: "description", content: description },
+        ...(hasScreenings ? [] : [{ name: "robots", content: "noindex, follow" }]),
         { property: "og:title", content: title },
         { property: "og:description", content: description },
-        { property: "og:url", content: href },
+        { property: "og:url", content: canonical },
         { property: "og:type", content: "video.movie" },
         ...(image ? [{ property: "og:image", content: image }, { name: "twitter:image", content: image }] : []),
         { name: "twitter:title", content: title },

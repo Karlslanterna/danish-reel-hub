@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SitemapMoviesDotxmlRouteImport } from './routes/sitemap-movies[.]xml'
+import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]xml'
+import { Route as SitemapCityMoviesDotxmlRouteImport } from './routes/sitemap-city-movies[.]xml'
+import { Route as SitemapCinemasDotxmlRouteImport } from './routes/sitemap-cinemas[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CityRouteImport } from './routes/$city'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FilmIndexRouteImport } from './routes/film.index'
+import { Route as BiografIndexRouteImport } from './routes/biograf.index'
 import { Route as CityIndexRouteImport } from './routes/$city.index'
 import { Route as FilmSlugRouteImport } from './routes/film.$slug'
 import { Route as ByCityRouteImport } from './routes/by.$city'
@@ -39,6 +45,26 @@ import { Route as AuthenticatedAdminImportJobIdRouteImport } from './routes/_aut
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapMoviesDotxmlRoute = SitemapMoviesDotxmlRouteImport.update({
+  id: '/sitemap-movies.xml',
+  path: '/sitemap-movies.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapCoreDotxmlRoute = SitemapCoreDotxmlRouteImport.update({
+  id: '/sitemap-core.xml',
+  path: '/sitemap-core.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapCityMoviesDotxmlRoute = SitemapCityMoviesDotxmlRouteImport.update({
+  id: '/sitemap-city-movies.xml',
+  path: '/sitemap-city-movies.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapCinemasDotxmlRoute = SitemapCinemasDotxmlRouteImport.update({
+  id: '/sitemap-cinemas.xml',
+  path: '/sitemap-cinemas.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -68,6 +94,16 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilmIndexRoute = FilmIndexRouteImport.update({
+  id: '/film/',
+  path: '/film/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BiografIndexRoute = BiografIndexRouteImport.update({
+  id: '/biograf/',
+  path: '/biograf/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CityIndexRoute = CityIndexRouteImport.update({
@@ -183,6 +219,10 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
+  '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
+  '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
+  '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -190,6 +230,8 @@ export interface FileRoutesByFullPath {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city/': typeof CityIndexRoute
+  '/biograf/': typeof BiografIndexRoute
+  '/film/': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -209,6 +251,10 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
+  '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
+  '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
+  '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -216,6 +262,8 @@ export interface FileRoutesByTo {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city': typeof CityIndexRoute
+  '/biograf': typeof BiografIndexRoute
+  '/film': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -238,6 +286,10 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
+  '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
+  '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
+  '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -245,6 +297,8 @@ export interface FileRoutesById {
   '/by/$city': typeof ByCityRoute
   '/film/$slug': typeof FilmSlugRoute
   '/$city/': typeof CityIndexRoute
+  '/biograf/': typeof BiografIndexRoute
+  '/film/': typeof FilmIndexRoute
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -267,6 +321,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/mcp'
     | '/reset-password'
+    | '/sitemap-cinemas.xml'
+    | '/sitemap-city-movies.xml'
+    | '/sitemap-core.xml'
+    | '/sitemap-movies.xml'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -274,6 +332,8 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city/'
+    | '/biograf/'
+    | '/film/'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -293,6 +353,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/mcp'
     | '/reset-password'
+    | '/sitemap-cinemas.xml'
+    | '/sitemap-city-movies.xml'
+    | '/sitemap-core.xml'
+    | '/sitemap-movies.xml'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -300,6 +364,8 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city'
+    | '/biograf'
+    | '/film'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -321,6 +387,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/mcp'
     | '/reset-password'
+    | '/sitemap-cinemas.xml'
+    | '/sitemap-city-movies.xml'
+    | '/sitemap-core.xml'
+    | '/sitemap-movies.xml'
     | '/sitemap.xml'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -328,6 +398,8 @@ export interface FileRouteTypes {
     | '/by/$city'
     | '/film/$slug'
     | '/$city/'
+    | '/biograf/'
+    | '/film/'
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -350,12 +422,18 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   McpRoute: typeof McpRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SitemapCinemasDotxmlRoute: typeof SitemapCinemasDotxmlRoute
+  SitemapCityMoviesDotxmlRoute: typeof SitemapCityMoviesDotxmlRoute
+  SitemapCoreDotxmlRoute: typeof SitemapCoreDotxmlRoute
+  SitemapMoviesDotxmlRoute: typeof SitemapMoviesDotxmlRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   BiografSlugRoute: typeof BiografSlugRoute
   ByCityRoute: typeof ByCityRoute
   FilmSlugRoute: typeof FilmSlugRoute
+  BiografIndexRoute: typeof BiografIndexRoute
+  FilmIndexRoute: typeof FilmIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicImportHealthRoute: typeof ApiPublicImportHealthRoute
@@ -369,6 +447,34 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-movies.xml': {
+      id: '/sitemap-movies.xml'
+      path: '/sitemap-movies.xml'
+      fullPath: '/sitemap-movies.xml'
+      preLoaderRoute: typeof SitemapMoviesDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-core.xml': {
+      id: '/sitemap-core.xml'
+      path: '/sitemap-core.xml'
+      fullPath: '/sitemap-core.xml'
+      preLoaderRoute: typeof SitemapCoreDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-city-movies.xml': {
+      id: '/sitemap-city-movies.xml'
+      path: '/sitemap-city-movies.xml'
+      fullPath: '/sitemap-city-movies.xml'
+      preLoaderRoute: typeof SitemapCityMoviesDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-cinemas.xml': {
+      id: '/sitemap-cinemas.xml'
+      path: '/sitemap-cinemas.xml'
+      fullPath: '/sitemap-cinemas.xml'
+      preLoaderRoute: typeof SitemapCinemasDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -411,6 +517,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/film/': {
+      id: '/film/'
+      path: '/film'
+      fullPath: '/film/'
+      preLoaderRoute: typeof FilmIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/biograf/': {
+      id: '/biograf/'
+      path: '/biograf'
+      fullPath: '/biograf/'
+      preLoaderRoute: typeof BiografIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$city/': {
@@ -605,6 +725,10 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   McpRoute: McpRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SitemapCinemasDotxmlRoute: SitemapCinemasDotxmlRoute,
+  SitemapCityMoviesDotxmlRoute: SitemapCityMoviesDotxmlRoute,
+  SitemapCoreDotxmlRoute: SitemapCoreDotxmlRoute,
+  SitemapMoviesDotxmlRoute: SitemapMoviesDotxmlRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
@@ -612,6 +736,8 @@ const rootRouteChildren: RootRouteChildren = {
   BiografSlugRoute: BiografSlugRoute,
   ByCityRoute: ByCityRoute,
   FilmSlugRoute: FilmSlugRoute,
+  BiografIndexRoute: BiografIndexRoute,
+  FilmIndexRoute: FilmIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicImportHealthRoute: ApiPublicImportHealthRoute,

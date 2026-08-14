@@ -9,6 +9,8 @@ import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movi
 import { baseCityOf, cityMatchesSlug, cityOptionsFrom, citySlug, displayCityOf, type CityOption } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { citySchemas } from "@/lib/jsonld";
+import { SiteFooter } from "@/components/SiteFooter";
+import { cityTitle, cityDescription } from "@/lib/seo";
 import { rankMoviesByScreenings } from "@/lib/movie-sort";
 
 export const Route = createFileRoute("/$city/")({
@@ -27,12 +29,14 @@ export const Route = createFileRoute("/$city/")({
   head: ({ loaderData }) => {
     if (!loaderData) return { meta: [{ title: "Byen findes ikke — Lanterna" }, { name: "robots", content: "noindex" }] };
     const href = canonicalUrl(`/${loaderData.canonicalSlug}`);
-    const title = `Film og spilletider i ${loaderData.cityName} | LANTERNA`;
-    const description = `Se alle aktuelle film og spilletider i ${loaderData.cityName}. ${loaderData.cinemas.length} biografer og ${loaderData.movies.length} film på plakaten.`;
+    const title = cityTitle(loaderData.cityName);
+    const description = cityDescription(loaderData.cityName, loaderData.cinemas.length, loaderData.movies.length);
+    const hasScreenings = loaderData.showtimes.length > 0;
     return {
       meta: [
         { title },
         { name: "description", content: description },
+        ...(hasScreenings ? [] : [{ name: "robots", content: "noindex, follow" }]),
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:url", content: href },
@@ -40,7 +44,7 @@ export const Route = createFileRoute("/$city/")({
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
       ],
-      links: [{ rel: "canonical", href }],
+      links: [{ rel: "canonical", href: hasScreenings ? href : canonicalUrl("/biograf") }],
       scripts: citySchemas(loaderData.canonicalSlug, loaderData.cityName),
     };
   },
@@ -225,6 +229,7 @@ function CityPage() {
           )}
         </div>
       </section>
+      <SiteFooter cinemas={cinemas} />
     </div>
   );
 }

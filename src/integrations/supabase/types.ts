@@ -372,6 +372,13 @@ export type Database = {
             referencedRelation: "movies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "showtimes_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies_ranked"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
@@ -397,7 +404,41 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      movies_ranked: {
+        Row: {
+          created_at: string | null
+          director: string | null
+          external_id: string | null
+          genre: string[] | null
+          id: string | null
+          next_screening_date: string | null
+          original_title: string | null
+          poster: Json | null
+          rating: string | null
+          release_date: string | null
+          runtime: number | null
+          screening_count: number | null
+          slug: string | null
+          synopsis: string | null
+          title: string | null
+          tmdb_backdrop_url: string | null
+          tmdb_cast: Json | null
+          tmdb_director: string | null
+          tmdb_fetched_at: string | null
+          tmdb_genres: string[] | null
+          tmdb_id: number | null
+          tmdb_overview: string | null
+          tmdb_poster_url: string | null
+          tmdb_runtime: number | null
+          tmdb_skip_reason: string | null
+          tmdb_status: string | null
+          tmdb_trailer_url: string | null
+          tmdb_vote_average: number | null
+          trailer_url: string | null
+          year: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {

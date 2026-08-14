@@ -78,7 +78,7 @@ function CityPage() {
   };
   const {
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
-    selectedCity, setSelectedCity, selectedCinemaId, geoLoading, clear,
+    selectedCity, setSelectedCity, selectedCinemaId, geoLoading,
   } = useFilters();
   useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
 
@@ -88,7 +88,6 @@ function CityPage() {
   }, [cityName, selectedCity, setSelectedCity]);
 
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
-  const hasFilters = Boolean(selectedDate) || radius !== "all" || Boolean(selectedGenre) || hasTagSelection(tagSel);
 
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);

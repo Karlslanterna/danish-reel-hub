@@ -78,12 +78,11 @@ function CinemaPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, clear } = useFilters();
+  const { selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent } = useFilters();
   const activeDate = selectedDate ?? todayStr();
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
   const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
-  const hasFilters = Boolean(selectedDate) || Boolean(selectedGenre) || hasTagSelection(tagSel);
 
   const filteredMovies = useMemo(
     () => (selectedGenre ? movies.filter((m) => m.genre.includes(selectedGenre)) : movies),

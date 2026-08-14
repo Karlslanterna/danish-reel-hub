@@ -435,8 +435,12 @@ export function FilterBar({
     radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
     selectedCinemaId, selectedCinemaName,
     setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
-    requestLocation,
+    requestLocation, clear,
   } = useFilters();
+
+  const hasFilters = Boolean(
+    radius !== "all" || selectedDate || selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity || selectedCinemaId,
+  );
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);

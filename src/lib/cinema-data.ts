@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toHttpsUrl } from "@/lib/poster-url";
 import { sortShowtimes } from "@/lib/showtime-sort";
+import { DEFAULT_MOVIE_SORT, MOVIE_SORT_ORDERS, type MovieSortStrategy } from "@/lib/movie-sort";
+
 
 export type Poster = {
   a?: string;

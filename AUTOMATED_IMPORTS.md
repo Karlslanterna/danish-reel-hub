@@ -19,10 +19,12 @@ itself is unchanged — the scheduler only *drives* the existing pipeline
 Schedule:
 
 - `kultunaut-daily-import` — `0 2 * * *` (02:00 UTC daily). Starts a run.
-- `kultunaut-import-resume` — `*/5 * * * *`. **Only** resumes a run that is
+- `kultunaut-import-resume` — `*/5 2-4 * * *`. **Only** resumes a run that is
   already in progress; it never starts a new import. This exists because a
   single Worker invocation has a wall-clock budget of 120 s; large catalogs
-  are drained across several invocations.
+  are drained across several invocations. It is limited to the 02–04 UTC
+  window (when the daily run happens) so idle ticks don't spawn Workers all
+  day, which previously caused "Too many dynamic workers" 502s.
 
 No manual intervention is required at any point.
 

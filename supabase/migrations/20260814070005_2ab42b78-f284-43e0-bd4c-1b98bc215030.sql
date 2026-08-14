@@ -1,0 +1,1 @@
+SELECT cron.alter_job((SELECT jobid FROM cron.job WHERE jobname = 'kultunaut-import-resume'), schedule => '*/5 2-4 * * *');

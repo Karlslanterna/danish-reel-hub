@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { MovieCard } from "@/components/MovieCard";
 import { FilterBar, GeoNotice, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
+import { rankMoviesByScreenings } from "@/lib/movie-sort";
 import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
 import { slugifyCity } from "@/lib/city-slug";

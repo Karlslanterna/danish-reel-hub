@@ -892,6 +892,17 @@ export function FilterBar({
         </PopoverContent>
 
       </Popover>
+
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={clear}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+        >
+          <X size="12" strokeWidth={2.5} />
+          {t("home.clearFilters")}
+        </button>
+      )}
     </div>
   );
 }

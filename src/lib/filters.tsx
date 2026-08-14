@@ -118,8 +118,8 @@ function loadPersisted(): Persisted {
     const userLoc = p.userLoc && typeof p.userLoc.lat === "number" && typeof p.userLoc.lng === "number" ? p.userLoc : null;
     let selectedDate = typeof p.selectedDate === "string" ? p.selectedDate : null;
     const selectedGenre = typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
-    // drop past dates
-    if (selectedDate && selectedDate < todayStr()) selectedDate = null;
+    // drop dates outside the visible window (past, or beyond +30 days)
+    if (selectedDate && (selectedDate < windowStart() || selectedDate > windowEnd())) selectedDate = null;
     return {
       radius,
       userLoc,

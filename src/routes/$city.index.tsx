@@ -9,6 +9,7 @@ import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movi
 import { baseCityOf, cityMatchesSlug, cityOptionsFrom, citySlug, displayCityOf, type CityOption } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { citySchemas } from "@/lib/jsonld";
+import { rankMoviesByScreenings } from "@/lib/movie-sort";
 
 export const Route = createFileRoute("/$city/")({
   loader: async ({ params }) => {

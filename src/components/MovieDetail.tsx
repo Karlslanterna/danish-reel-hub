@@ -142,8 +142,9 @@ export function MovieDetail({
 
             <div className="min-w-0">
               <h1 className="font-display text-2xl leading-tight tracking-tight text-foreground sm:text-3xl lg:text-5xl">
-                {movie.title}
+                {city ? `${movie.title} i ${city.name}` : movie.title}
               </h1>
+
               <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:text-sm">
                 <span className="text-foreground">{formatRuntime(movie.runtime)}</span>
                 <Dot />

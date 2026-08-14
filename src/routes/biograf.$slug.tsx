@@ -150,7 +150,7 @@ function CinemaPage() {
 
       <section className="mx-auto max-w-[1400px] px-5 py-8 sm:px-8 sm:py-12">
         <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
-          <FilterBar hideRadius genres={allGenres} languages={tagOptions.languages} />
+          <FilterBar hideRadius hideCity hideCinema genres={allGenres} languages={tagOptions.languages} />
           {hasFilters && (
             <button
               type="button"

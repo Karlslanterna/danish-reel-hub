@@ -171,11 +171,20 @@ export function MovieDetail({
             </div>
           </div>
 
+          {city && (
+            <p className="mt-5 max-w-3xl text-sm leading-relaxed text-foreground/90 sm:text-base">
+              {cinemasShowing.length > 0
+                ? `${movie.title} spiller i ${city.name} i ${cinemasShowing.length} ${cinemasShowing.length === 1 ? "biograf" : "biografer"}. Herunder finder du alle aktuelle spilletider i ${city.name} og kan købe billetter direkte.`
+                : `${movie.title} har ingen aktuelle spilletider i ${city.name} lige nu. Se filmens spilletider i resten af landet på den landsdækkende filmside.`}
+            </p>
+          )}
+
           {movie.synopsis && (
-            <p className="mt-5 max-w-3xl text-sm leading-relaxed text-foreground/80 sm:text-base">
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-foreground/80 sm:text-base">
               {movie.synopsis}
             </p>
           )}
+
         </div>
       </section>
 

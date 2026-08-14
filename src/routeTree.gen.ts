@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SitemapMoviesDotxmlRouteImport } from './routes/sitemap-movies[.]xml'
 import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]xml'
+import { Route as SitemapCinemasDotxmlRouteImport } from './routes/sitemap-cinemas[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -51,6 +52,11 @@ const SitemapMoviesDotxmlRoute = SitemapMoviesDotxmlRouteImport.update({
 const SitemapCoreDotxmlRoute = SitemapCoreDotxmlRouteImport.update({
   id: '/sitemap-core.xml',
   path: '/sitemap-core.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapCinemasDotxmlRoute = SitemapCinemasDotxmlRouteImport.update({
+  id: '/sitemap-cinemas.xml',
+  path: '/sitemap-cinemas.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
   '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
   '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
   '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/mcp'
     | '/reset-password'
+    | '/sitemap-cinemas.xml'
     | '/sitemap-core.xml'
     | '/sitemap-movies.xml'
     | '/sitemap.xml'
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/mcp'
     | '/reset-password'
+    | '/sitemap-cinemas.xml'
     | '/sitemap-core.xml'
     | '/sitemap-movies.xml'
     | '/sitemap.xml'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/mcp'
     | '/reset-password'
+    | '/sitemap-cinemas.xml'
     | '/sitemap-core.xml'
     | '/sitemap-movies.xml'
     | '/sitemap.xml'
@@ -374,6 +386,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   McpRoute: typeof McpRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SitemapCinemasDotxmlRoute: typeof SitemapCinemasDotxmlRoute
   SitemapCoreDotxmlRoute: typeof SitemapCoreDotxmlRoute
   SitemapMoviesDotxmlRoute: typeof SitemapMoviesDotxmlRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -409,6 +422,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap-core.xml'
       fullPath: '/sitemap-core.xml'
       preLoaderRoute: typeof SitemapCoreDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-cinemas.xml': {
+      id: '/sitemap-cinemas.xml'
+      path: '/sitemap-cinemas.xml'
+      fullPath: '/sitemap-cinemas.xml'
+      preLoaderRoute: typeof SitemapCinemasDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -645,6 +665,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   McpRoute: McpRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SitemapCinemasDotxmlRoute: SitemapCinemasDotxmlRoute,
   SitemapCoreDotxmlRoute: SitemapCoreDotxmlRoute,
   SitemapMoviesDotxmlRoute: SitemapMoviesDotxmlRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

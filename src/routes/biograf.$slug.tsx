@@ -165,22 +165,14 @@ function CinemaPage() {
           </div>
         </div>
 
-        {rows.length === 0 ? (
+        {withShows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border py-16 text-center">
-            <p className="font-display text-xl text-foreground">Ingen film på plakaten</p>
+            <p className="font-display text-xl text-foreground">Ingen forestillinger {fmtDateLabel(activeDate).toLowerCase()}</p>
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8">
             {withShows.map(({ movie, shows }) => (
               <MovieRow key={movie.id} movie={movie} shows={shows} />
-            ))}
-            {withoutShows.length > 0 && (
-              <div className="pt-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Ingen forestillinger {fmtDateLabel(activeDate).toLowerCase()}
-              </div>
-            )}
-            {withoutShows.map(({ movie }) => (
-              <MovieRow key={movie.id} movie={movie} shows={[]} dim />
             ))}
           </div>
         )}

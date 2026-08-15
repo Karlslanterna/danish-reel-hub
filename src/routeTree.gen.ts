@@ -33,6 +33,7 @@ import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/publi
 import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
 import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authenticated/admin.pipeline'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
+import { Route as AuthenticatedAdminEbilletRouteImport } from './routes/_authenticated/admin.ebillet'
 import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenticated/admin.denied'
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
@@ -166,6 +167,12 @@ const AuthenticatedAdminImportRoute =
     path: '/admin/import',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminEbilletRoute =
+  AuthenticatedAdminEbilletRouteImport.update({
+    id: '/admin/ebillet',
+    path: '/admin/ebillet',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminDeniedRoute =
   AuthenticatedAdminDeniedRouteImport.update({
     id: '/admin/denied',
@@ -237,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
+  '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
@@ -269,6 +277,7 @@ export interface FileRoutesByTo {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
+  '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
@@ -304,6 +313,7 @@ export interface FileRoutesById {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/admin/denied': typeof AuthenticatedAdminDeniedRoute
+  '/_authenticated/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
@@ -339,6 +349,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/admin/analytics'
     | '/admin/denied'
+    | '/admin/ebillet'
     | '/admin/import'
     | '/admin/pipeline'
     | '/api/public/import-health'
@@ -371,6 +382,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/admin/analytics'
     | '/admin/denied'
+    | '/admin/ebillet'
     | '/admin/import'
     | '/admin/pipeline'
     | '/api/public/import-health'
@@ -405,6 +417,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/admin/analytics'
     | '/_authenticated/admin/denied'
+    | '/_authenticated/admin/ebillet'
     | '/_authenticated/admin/import'
     | '/_authenticated/admin/pipeline'
     | '/api/public/import-health'
@@ -610,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/ebillet': {
+      id: '/_authenticated/admin/ebillet'
+      path: '/admin/ebillet'
+      fullPath: '/admin/ebillet'
+      preLoaderRoute: typeof AuthenticatedAdminEbilletRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/denied': {
       id: '/_authenticated/admin/denied'
       path: '/admin/denied'
@@ -672,6 +692,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminAnalyticsRoute: typeof AuthenticatedAdminAnalyticsRoute
   AuthenticatedAdminDeniedRoute: typeof AuthenticatedAdminDeniedRoute
+  AuthenticatedAdminEbilletRoute: typeof AuthenticatedAdminEbilletRoute
   AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
   AuthenticatedAdminPipelineRoute: typeof AuthenticatedAdminPipelineRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -681,6 +702,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminAnalyticsRoute: AuthenticatedAdminAnalyticsRoute,
   AuthenticatedAdminDeniedRoute: AuthenticatedAdminDeniedRoute,
+  AuthenticatedAdminEbilletRoute: AuthenticatedAdminEbilletRoute,
   AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
   AuthenticatedAdminPipelineRoute: AuthenticatedAdminPipelineRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,

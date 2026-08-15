@@ -20,6 +20,7 @@ export type Database = {
           city: string
           created_at: string
           description: string
+          ebillet_organizer_id: number | null
           external_id: string | null
           id: string
           latitude: number | null
@@ -27,6 +28,7 @@ export type Database = {
           name: string
           screens: number
           slug: string
+          source: string
           website: string | null
         }
         Insert: {
@@ -34,6 +36,7 @@ export type Database = {
           city: string
           created_at?: string
           description: string
+          ebillet_organizer_id?: number | null
           external_id?: string | null
           id: string
           latitude?: number | null
@@ -41,6 +44,7 @@ export type Database = {
           name: string
           screens: number
           slug: string
+          source?: string
           website?: string | null
         }
         Update: {
@@ -48,6 +52,7 @@ export type Database = {
           city?: string
           created_at?: string
           description?: string
+          ebillet_organizer_id?: number | null
           external_id?: string | null
           id?: string
           latitude?: number | null
@@ -55,7 +60,142 @@ export type Database = {
           name?: string
           screens?: number
           slug?: string
+          source?: string
           website?: string | null
+        }
+        Relationships: []
+      }
+      ebillet_organizers: {
+        Row: {
+          address: string | null
+          cinema_id: string | null
+          city: string | null
+          created_at: string
+          discovered_at: string
+          id: number
+          is_active: boolean
+          last_sync_counts: Json
+          last_sync_error: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          location_count: number
+          name: string
+          region: string | null
+          showtime_count: number
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          cinema_id?: string | null
+          city?: string | null
+          created_at?: string
+          discovered_at?: string
+          id: number
+          is_active?: boolean
+          last_sync_counts?: Json
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          location_count?: number
+          name: string
+          region?: string | null
+          showtime_count?: number
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          cinema_id?: string | null
+          city?: string | null
+          created_at?: string
+          discovered_at?: string
+          id?: number
+          is_active?: boolean
+          last_sync_counts?: Json
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          location_count?: number
+          name?: string
+          region?: string | null
+          showtime_count?: number
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ebillet_organizers_cinema_id_fkey"
+            columns: ["cinema_id"]
+            isOneToOne: false
+            referencedRelation: "cinemas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ebillet_sync_runs: {
+        Row: {
+          cinemas_upserted: number
+          created_at: string
+          cursor: number
+          duration_seconds: number | null
+          errors: Json
+          finished_at: string | null
+          id: string
+          kind: string
+          message: string | null
+          movies_upserted: number
+          organizers_active: number
+          organizers_failed: number
+          organizers_found: number
+          organizers_synced: number
+          showtimes_upserted: number
+          started_at: string
+          status: string
+          trigger: string
+          updated_at: string
+        }
+        Insert: {
+          cinemas_upserted?: number
+          created_at?: string
+          cursor?: number
+          duration_seconds?: number | null
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          message?: string | null
+          movies_upserted?: number
+          organizers_active?: number
+          organizers_failed?: number
+          organizers_found?: number
+          organizers_synced?: number
+          showtimes_upserted?: number
+          started_at?: string
+          status?: string
+          trigger?: string
+          updated_at?: string
+        }
+        Update: {
+          cinemas_upserted?: number
+          created_at?: string
+          cursor?: number
+          duration_seconds?: number | null
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          message?: string | null
+          movies_upserted?: number
+          organizers_active?: number
+          organizers_failed?: number
+          organizers_found?: number
+          organizers_synced?: number
+          showtimes_upserted?: number
+          started_at?: string
+          status?: string
+          trigger?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -195,6 +335,8 @@ export type Database = {
         Row: {
           created_at: string
           director: string
+          ebillet_movie_base_id: number | null
+          ebillet_movie_ids: number[]
           external_id: string | null
           genre: string[]
           id: string
@@ -204,6 +346,7 @@ export type Database = {
           release_date: string | null
           runtime: number
           slug: string
+          source: string
           synopsis: string
           title: string
           tmdb_backdrop_url: string | null
@@ -225,6 +368,8 @@ export type Database = {
         Insert: {
           created_at?: string
           director: string
+          ebillet_movie_base_id?: number | null
+          ebillet_movie_ids?: number[]
           external_id?: string | null
           genre?: string[]
           id: string
@@ -234,6 +379,7 @@ export type Database = {
           release_date?: string | null
           runtime: number
           slug: string
+          source?: string
           synopsis: string
           title: string
           tmdb_backdrop_url?: string | null
@@ -255,6 +401,8 @@ export type Database = {
         Update: {
           created_at?: string
           director?: string
+          ebillet_movie_base_id?: number | null
+          ebillet_movie_ids?: number[]
           external_id?: string | null
           genre?: string[]
           id?: string
@@ -264,6 +412,7 @@ export type Database = {
           release_date?: string | null
           runtime?: number
           slug?: string
+          source?: string
           synopsis?: string
           title?: string
           tmdb_backdrop_url?: string | null
@@ -311,13 +460,18 @@ export type Database = {
           cinema_id: string
           created_at: string
           date: string
+          ebillet_showtime_ids: number[]
           events: string[]
           external_id: string | null
           formats: string[]
+          free_seats: number | null
           hall: string
           id: string
           languages: string[]
+          max_price: number | null
+          min_price: number | null
           movie_id: string
+          source: string
           start_time: string | null
           ticket_url: string | null
           ticket_urls: string[]
@@ -328,13 +482,18 @@ export type Database = {
           cinema_id: string
           created_at?: string
           date: string
+          ebillet_showtime_ids?: number[]
           events?: string[]
           external_id?: string | null
           formats?: string[]
+          free_seats?: number | null
           hall: string
           id?: string
           languages?: string[]
+          max_price?: number | null
+          min_price?: number | null
           movie_id: string
+          source?: string
           start_time?: string | null
           ticket_url?: string | null
           ticket_urls?: string[]
@@ -345,13 +504,18 @@ export type Database = {
           cinema_id?: string
           created_at?: string
           date?: string
+          ebillet_showtime_ids?: number[]
           events?: string[]
           external_id?: string | null
           formats?: string[]
+          free_seats?: number | null
           hall?: string
           id?: string
           languages?: string[]
+          max_price?: number | null
+          min_price?: number | null
           movie_id?: string
+          source?: string
           start_time?: string | null
           ticket_url?: string | null
           ticket_urls?: string[]

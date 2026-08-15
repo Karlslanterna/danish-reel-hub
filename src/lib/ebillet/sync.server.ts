@@ -172,6 +172,7 @@ export async function discoverOrganizers(opts: {
 type CinemaRow = {
   id: string;
   name: string;
+  slug: string;
   city: string | null;
   ebillet_organizer_id: number | null;
 };

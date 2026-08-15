@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, Database, Settings2, Menu, UserRound, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Database, Settings2, Menu, UserRound, BarChart3, Ticket } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type NavItem = {
   label: string;
-  to?: "/admin" | "/admin/pipeline" | "/admin/analytics";
+  to?: "/admin" | "/admin/pipeline" | "/admin/analytics" | "/admin/ebillet";
   icon: typeof LayoutDashboard;
   soon?: boolean;
   match: (path: string) => boolean;
@@ -34,6 +34,12 @@ const NAV: NavItem[] = [
     to: "/admin/pipeline",
     icon: Database,
     match: (p) => p.startsWith("/admin/pipeline") || p.startsWith("/admin/import"),
+  },
+  {
+    label: "eBillet-sync",
+    to: "/admin/ebillet",
+    icon: Ticket,
+    match: (p) => p.startsWith("/admin/ebillet"),
   },
   {
     label: "Analytics",

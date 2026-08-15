@@ -225,16 +225,22 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
   const cinemas = await loadAll<CinemaRow>(
     db,
     "cinemas",
-    "id, name, city, ebillet_organizer_id",
+    "id, name, slug, city, ebillet_organizer_id",
   );
   const byOrganizer = cinemas.find((c) => c.ebillet_organizer_id === organizerId);
   const orgCity = organizer.address?.city ?? "";
+  const orgSlug = slugify(organizer.name);
   const byName = cinemas.find(
     (c) =>
       normKey(c.name) === normKey(organizer.name) &&
       (!orgCity || !c.city || normKey(c.city) === normKey(orgCity)),
   );
-  const existingCinema = byOrganizer ?? byName;
+  // A slug collision means the same cinema name already exists. Adopt it when
+  // it isn't claimed by another eBillet organizer; otherwise keep them apart
+  // with a suffixed slug so we never merge two distinct cinemas.
+  const bySlug = cinemas.find((c) => c.slug === orgSlug && c.ebillet_organizer_id === null);
+  const slugTaken = cinemas.some((c) => c.slug === orgSlug);
+  const existingCinema = byOrganizer ?? byName ?? bySlug;
   const cinemaId = existingCinema?.id ?? `eb-${organizerId}`;
 
   const cinemaPatch = {
@@ -248,7 +254,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     const { error } = await db.from("cinemas").upsert(
       {
         id: cinemaId,
-        slug: slugify(organizer.name),
+        slug: slugTaken ? `${orgSlug}-${organizerId}` : orgSlug,
         name: organizer.name,
         city: orgCity || "Danmark",
         address: organizer.address?.roadAndNumber ?? "",
@@ -260,6 +266,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     );
     if (error) throw new Error(`cinema insert ${cinemaId}: ${error.message}`);
   }
+
   counts.cinemas = 1;
 
   await db

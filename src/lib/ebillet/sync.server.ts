@@ -237,12 +237,12 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
   const existingCinema = byOrganizer ?? byName;
   const cinemaId = existingCinema?.id ?? `eb-${organizerId}`;
 
-  const cinemaPatch: Record<string, unknown> = {
+  const cinemaPatch = {
     ebillet_organizer_id: organizerId,
     screens: Math.max(organizer.locations?.length ?? 1, 1),
   };
   if (existingCinema) {
-    const { error } = await db.from("cinemas").update(cinemaPatch).eq("id", cinemaId);
+    const { error } = await db.from("cinemas").update(cinemaPatch as any).eq("id", cinemaId);
     if (error) throw new Error(`cinema update ${cinemaId}: ${error.message}`);
   } else {
     const { error } = await db.from("cinemas").upsert(
@@ -255,7 +255,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
         description: "",
         source: "ebillet",
         ...cinemaPatch,
-      },
+      } as any,
       { onConflict: "id" },
     );
     if (error) throw new Error(`cinema insert ${cinemaId}: ${error.message}`);
@@ -340,7 +340,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
         (v) => typeof v === "string" && v.trim() !== "",
       );
       if (!hasPoster && posterUrl) patch.poster = { url: posterUrl };
-      const { error } = await db.from("movies").update(patch).eq("id", existing.id);
+      const { error } = await db.from("movies").update(patch as any).eq("id", existing.id);
       if (error) throw new Error(`movie update ${existing.id}: ${error.message}`);
       movieIdForGroup.set(group.key, existing.id);
     } else {
@@ -362,7 +362,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
         ebillet_movie_base_id: group.baseId,
         ebillet_movie_ids: group.movieIds,
       };
-      const { error } = await db.from("movies").upsert(row, { onConflict: "id" });
+      const { error } = await db.from("movies").upsert(row as any, { onConflict: "id" });
       if (error) throw new Error(`movie insert ${id}: ${error.message}`);
       dbMovies.push({
         id,

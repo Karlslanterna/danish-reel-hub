@@ -31,8 +31,10 @@ import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
 import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
+import { Route as ApiPublicEbilletSyncRouteImport } from './routes/api/public/ebillet-sync'
 import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authenticated/admin.pipeline'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
+import { Route as AuthenticatedAdminEbilletRouteImport } from './routes/_authenticated/admin.ebillet'
 import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenticated/admin.denied'
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
@@ -154,6 +156,11 @@ const ApiPublicImportHealthRoute = ApiPublicImportHealthRouteImport.update({
   path: '/api/public/import-health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicEbilletSyncRoute = ApiPublicEbilletSyncRouteImport.update({
+  id: '/api/public/ebillet-sync',
+  path: '/api/public/ebillet-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminPipelineRoute =
   AuthenticatedAdminPipelineRouteImport.update({
     id: '/admin/pipeline',
@@ -164,6 +171,12 @@ const AuthenticatedAdminImportRoute =
   AuthenticatedAdminImportRouteImport.update({
     id: '/admin/import',
     path: '/admin/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminEbilletRoute =
+  AuthenticatedAdminEbilletRouteImport.update({
+    id: '/admin/ebillet',
+    path: '/admin/ebillet',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminDeniedRoute =
@@ -237,8 +250,10 @@ export interface FileRoutesByFullPath {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
+  '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -269,8 +284,10 @@ export interface FileRoutesByTo {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
+  '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -304,8 +321,10 @@ export interface FileRoutesById {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/admin/denied': typeof AuthenticatedAdminDeniedRoute
+  '/_authenticated/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -339,8 +358,10 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/admin/analytics'
     | '/admin/denied'
+    | '/admin/ebillet'
     | '/admin/import'
     | '/admin/pipeline'
+    | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
     | '/admin/'
@@ -371,8 +392,10 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/admin/analytics'
     | '/admin/denied'
+    | '/admin/ebillet'
     | '/admin/import'
     | '/admin/pipeline'
+    | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
     | '/admin'
@@ -405,8 +428,10 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/admin/analytics'
     | '/_authenticated/admin/denied'
+    | '/_authenticated/admin/ebillet'
     | '/_authenticated/admin/import'
     | '/_authenticated/admin/pipeline'
+    | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
     | '/_authenticated/admin/'
@@ -436,6 +461,7 @@ export interface RootRouteChildren {
   FilmIndexRoute: typeof FilmIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicEbilletSyncRoute: typeof ApiPublicEbilletSyncRoute
   ApiPublicImportHealthRoute: typeof ApiPublicImportHealthRoute
   ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
 }
@@ -596,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicImportHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ebillet-sync': {
+      id: '/api/public/ebillet-sync'
+      path: '/api/public/ebillet-sync'
+      fullPath: '/api/public/ebillet-sync'
+      preLoaderRoute: typeof ApiPublicEbilletSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/pipeline': {
       id: '/_authenticated/admin/pipeline'
       path: '/admin/pipeline'
@@ -608,6 +641,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/import'
       fullPath: '/admin/import'
       preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/ebillet': {
+      id: '/_authenticated/admin/ebillet'
+      path: '/admin/ebillet'
+      fullPath: '/admin/ebillet'
+      preLoaderRoute: typeof AuthenticatedAdminEbilletRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/denied': {
@@ -672,6 +712,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminAnalyticsRoute: typeof AuthenticatedAdminAnalyticsRoute
   AuthenticatedAdminDeniedRoute: typeof AuthenticatedAdminDeniedRoute
+  AuthenticatedAdminEbilletRoute: typeof AuthenticatedAdminEbilletRoute
   AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
   AuthenticatedAdminPipelineRoute: typeof AuthenticatedAdminPipelineRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -681,6 +722,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminAnalyticsRoute: AuthenticatedAdminAnalyticsRoute,
   AuthenticatedAdminDeniedRoute: AuthenticatedAdminDeniedRoute,
+  AuthenticatedAdminEbilletRoute: AuthenticatedAdminEbilletRoute,
   AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
   AuthenticatedAdminPipelineRoute: AuthenticatedAdminPipelineRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
@@ -740,6 +782,7 @@ const rootRouteChildren: RootRouteChildren = {
   FilmIndexRoute: FilmIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicEbilletSyncRoute: ApiPublicEbilletSyncRoute,
   ApiPublicImportHealthRoute: ApiPublicImportHealthRoute,
   ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,
 }

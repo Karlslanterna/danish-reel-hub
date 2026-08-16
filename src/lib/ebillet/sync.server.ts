@@ -247,20 +247,11 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     "cinemas",
     "id, name, slug, city, ebillet_organizer_id",
   );
-  const byOrganizer = cinemas.find((c) => c.ebillet_organizer_id === organizerId);
   const orgCity = organizer.address?.city ?? "";
-  const orgSlug = slugify(organizer.name);
-  const byName = cinemas.find(
-    (c) =>
-      normKey(c.name) === normKey(organizer.name) &&
-      (!orgCity || !c.city || normKey(c.city) === normKey(orgCity)),
-  );
-  // A slug collision means the same cinema name already exists. Adopt it when
-  // it isn't claimed by another eBillet organizer; otherwise keep them apart
-  // with a suffixed slug so we never merge two distinct cinemas.
-  const bySlug = cinemas.find((c) => c.slug === orgSlug && c.ebillet_organizer_id === null);
-  const slugTaken = cinemas.some((c) => c.slug === orgSlug);
-  const existingCinema = byOrganizer ?? byName ?? bySlug;
+  const matchInput = { id: organizerId, name: organizer.name, city: orgCity };
+  // Reuse the existing (Kultunaut) cinema for the same physical venue whenever
+  // we can identify it; only create a new row for genuinely new venues.
+  const existingCinema = matchCinema(matchInput, cinemas);
   const cinemaId = existingCinema?.id ?? `eb-${organizerId}`;
 
   const cinemaPatch = {
@@ -271,21 +262,38 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     const { error } = await db.from("cinemas").update(cinemaPatch as any).eq("id", cinemaId);
     if (error) throw new Error(`cinema update ${cinemaId}: ${error.message}`);
   } else {
-    const { error } = await db.from("cinemas").upsert(
-      {
-        id: cinemaId,
-        slug: slugTaken ? `${orgSlug}-${organizerId}` : orgSlug,
-        name: organizer.name,
-        city: orgCity || "Danmark",
-        address: organizer.address?.roadAndNumber ?? "",
-        description: "",
-        source: "ebillet",
-        ...cinemaPatch,
-      } as any,
-      { onConflict: "id" },
-    );
-    if (error) throw new Error(`cinema insert ${cinemaId}: ${error.message}`);
+    // cinemas.slug is unique — always insert a slug that is provably free, and
+    // retry once against a live re-read if a concurrent run took it meanwhile.
+    let slug = uniqueCinemaSlug(matchInput, cinemas, cinemaId);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error } = await db.from("cinemas").upsert(
+        {
+          id: cinemaId,
+          slug,
+          name: organizer.name,
+          city: orgCity || "Danmark",
+          address: organizer.address?.roadAndNumber ?? "",
+          description: "",
+          source: "ebillet",
+          ...cinemaPatch,
+        } as any,
+        { onConflict: "id" },
+      );
+      if (!error) break;
+      const isSlugCollision =
+        error.code === "23505" || /cinemas_slug_key|duplicate key/i.test(error.message);
+      if (!isSlugCollision || attempt === 2) {
+        throw new Error(`cinema insert ${cinemaId}: ${error.message}`);
+      }
+      const fresh = await loadAll<CinemaRow>(
+        db,
+        "cinemas",
+        "id, name, slug, city, ebillet_organizer_id",
+      );
+      slug = uniqueCinemaSlug(matchInput, fresh, cinemaId);
+    }
   }
+
 
   counts.cinemas = 1;
 

@@ -453,6 +453,20 @@ export async function processJobBatch(
       const errors: string[] = [];
       let upserted = job.processed_showtimes ?? 0;
 
+      // Source precedence: eBillet > Kultunaut for cinemas covered by an active
+      // eBillet organizer. Kultunaut may still ADD showtimes eBillet doesn't
+      // have, but must never overwrite a row that already carries eBillet data.
+      const coveredCinemaIds = new Set<string>();
+      {
+        const { data: orgs, error: orgErr } = await supabaseAdmin
+          .from("ebillet_organizers")
+          .select("cinema_id")
+          .eq("is_active", true)
+          .not("cinema_id", "is", null);
+        if (orgErr) errors.push(`ebillet coverage lookup: ${orgErr.message}`);
+        for (const o of orgs ?? []) if (o.cinema_id) coveredCinemaIds.add(o.cinema_id);
+      }
+
       for (const row of slice) {
         const startTimeIso = row.times[0]
           ? new Date(`${row.date}T${row.times[0]}`).toISOString()
@@ -461,14 +475,25 @@ export async function processJobBatch(
 
         const { data: existing } = await supabaseAdmin
           .from("showtimes")
-          .select("id")
+          .select("id, source")
           .eq("movie_id", row.movie_id)
           .eq("cinema_id", row.cinema_id)
           .eq("date", row.date)
           .eq("hall", row.hall)
           .maybeSingle();
 
+        // Rule 2/6: an eBillet-sourced row wins — leave it untouched.
+        if (
+          existing &&
+          coveredCinemaIds.has(row.cinema_id) &&
+          (existing.source ?? "").includes("ebillet")
+        ) {
+          upserted++;
+          continue;
+        }
+
         if (existing) {
+
           const { error } = await supabaseAdmin
             .from("showtimes")
             .update({

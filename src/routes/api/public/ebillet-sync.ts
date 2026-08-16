@@ -28,13 +28,18 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
             "@/lib/ebillet/sync.server"
           );
           await reapStaleEbilletRuns(60);
-          // Leave headroom for the serverless runtime so the resumable cursor
-          // is persisted before the invocation is forcibly terminated.
-          const result = await runEbilletJob({
-            kind: mode,
-            trigger: "cron",
-            budgetMs: 60_000,
-          });
+
+          // Each runEbilletJob("sync") call handles exactly one organizer and
+          // commits the cursor, so the cron invocation simply repeats batches
+          // until it runs out of wall-clock budget. Nothing is lost when the
+          // runtime terminates us mid-way — the next cron tick resumes.
+          const deadline = Date.now() + 60_000;
+          let result = await runEbilletJob({ kind: mode, trigger: "cron", budgetMs: 60_000 });
+          if (mode === "sync") {
+            while (!result.done && Date.now() < deadline) {
+              result = await runEbilletJob({ kind: "sync", trigger: "cron" });
+            }
+          }
           return Response.json(result, {
             status: result.status === "failed" ? 500 : 200,
             headers: { "cache-control": "no-store" },
@@ -44,6 +49,7 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
           console.error("[ebillet] run crashed:", message);
           return Response.json({ status: "failed", reason: message }, { status: 500 });
         }
+
       },
     },
   },

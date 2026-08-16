@@ -18,19 +18,15 @@ export const normalizeMovieTitle = (value: string): string =>
     .replace(/^-+|-+$/g, "");
 
 /**
- * A title alone is not a safe identity for a film. Prefer title + year;
- * only fall back to title-only when both records have no year.
+ * Film identity is title + year. A missing year never gets merged with a
+ * dated record: that is safer than collapsing two distinct films.
  */
 export const movieIdentityKey = (movie: MovieIdentity): string => {
   const title = normalizeMovieTitle(movie.title);
-  if (movie.year != null && Number.isFinite(movie.year)) return `${title}|${movie.year}`;
-  return `${title}|unknown-year`;
+  const year = movie.year != null && Number.isFinite(movie.year) ? movie.year : "unknown";
+  return `${title}|${year}`;
 };
 
 export function sameMovieIdentity(a: MovieIdentity, b: MovieIdentity): boolean {
-  if (movieIdentityKey(a) === movieIdentityKey(b)) return true;
-  // A yearless source record may safely match a dated record only when the
-  // yearless record has no original-title signal that distinguishes it.
-  if (a.year == null && b.year == null) return normalizeMovieTitle(a.title) === normalizeMovieTitle(b.title);
-  return false;
+  return movieIdentityKey(a) === movieIdentityKey(b);
 }

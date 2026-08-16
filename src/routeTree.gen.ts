@@ -9,79 +9,44 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as SitemapMoviesDotxmlRouteImport } from './routes/sitemap-movies[.]xml'
-import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]xml'
-import { Route as SitemapCityMoviesDotxmlRouteImport } from './routes/sitemap-city-movies[.]xml'
-import { Route as SitemapCinemasDotxmlRouteImport } from './routes/sitemap-cinemas[.]xml'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as AuthRouteImport } from './routes/auth'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as CityRouteImport } from './routes/$city'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as FilmIndexRouteImport } from './routes/film.index'
-import { Route as BiografIndexRouteImport } from './routes/biograf.index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SitemapCinemasDotxmlRouteImport } from './routes/sitemap-cinemas[.]xml'
+import { Route as SitemapCityMoviesDotxmlRouteImport } from './routes/sitemap-city-movies[.]xml'
+import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]xml'
+import { Route as SitemapMoviesDotxmlRouteImport } from './routes/sitemap-movies[.]xml'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as CityIndexRouteImport } from './routes/$city.index'
-import { Route as FilmSlugRouteImport } from './routes/film.$slug'
-import { Route as ByCityRouteImport } from './routes/by.$city'
-import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
-import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
-import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
-import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
-import { Route as ApiPublicEbilletSyncRouteImport } from './routes/api/public/ebillet-sync'
-import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authenticated/admin.pipeline'
-import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
-import { Route as AuthenticatedAdminEbilletRouteImport } from './routes/_authenticated/admin.ebillet'
-import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenticated/admin.denied'
-import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
-import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as BiografIndexRouteImport } from './routes/biograf.index'
+import { Route as BiografSlugRouteImport } from './routes/biograf.$slug'
+import { Route as ByCityRouteImport } from './routes/by.$city'
+import { Route as FilmIndexRouteImport } from './routes/film.index'
+import { Route as FilmSlugRouteImport } from './routes/film.$slug'
 import { Route as CityFilmSlugRouteImport } from './routes/$city.film.$slug'
-import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
-import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
+import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenticated/admin.denied'
+import { Route as AuthenticatedAdminEbilletRouteImport } from './routes/_authenticated/admin.ebillet'
+import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
+import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authenticated/admin.pipeline'
+import { Route as ApiPublicEbilletSyncRouteImport } from './routes/api/public/ebillet-sync'
+import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
+import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
 import { Route as AuthenticatedAdminImportJobIdRouteImport } from './routes/_authenticated/admin.import_.$jobId'
+import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
+import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapMoviesDotxmlRoute = SitemapMoviesDotxmlRouteImport.update({
-  id: '/sitemap-movies.xml',
-  path: '/sitemap-movies.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapCoreDotxmlRoute = SitemapCoreDotxmlRouteImport.update({
-  id: '/sitemap-core.xml',
-  path: '/sitemap-core.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapCityMoviesDotxmlRoute = SitemapCityMoviesDotxmlRouteImport.update({
-  id: '/sitemap-city-movies.xml',
-  path: '/sitemap-city-movies.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapCinemasDotxmlRoute = SitemapCinemasDotxmlRouteImport.update({
-  id: '/sitemap-cinemas.xml',
-  path: '/sitemap-cinemas.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CityRoute = CityRouteImport.update({
@@ -93,19 +58,44 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FilmIndexRoute = FilmIndexRouteImport.update({
-  id: '/film/',
-  path: '/film/',
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BiografIndexRoute = BiografIndexRouteImport.update({
-  id: '/biograf/',
-  path: '/biograf/',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapCinemasDotxmlRoute = SitemapCinemasDotxmlRouteImport.update({
+  id: '/sitemap-cinemas.xml',
+  path: '/sitemap-cinemas.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapCityMoviesDotxmlRoute = SitemapCityMoviesDotxmlRouteImport.update({
+  id: '/sitemap-city-movies.xml',
+  path: '/sitemap-city-movies.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapCoreDotxmlRoute = SitemapCoreDotxmlRouteImport.update({
+  id: '/sitemap-core.xml',
+  path: '/sitemap-core.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapMoviesDotxmlRoute = SitemapMoviesDotxmlRouteImport.update({
+  id: '/sitemap-movies.xml',
+  path: '/sitemap-movies.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CityIndexRoute = CityIndexRouteImport.update({
@@ -113,14 +103,21 @@ const CityIndexRoute = CityIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CityRoute,
 } as any)
-const FilmSlugRoute = FilmSlugRouteImport.update({
-  id: '/film/$slug',
-  path: '/film/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ByCityRoute = ByCityRouteImport.update({
-  id: '/by/$city',
-  path: '/by/$city',
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const BiografIndexRoute = BiografIndexRouteImport.update({
+  id: '/biograf/',
+  path: '/biograf/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BiografSlugRoute = BiografSlugRouteImport.update({
@@ -128,16 +125,35 @@ const BiografSlugRoute = BiografSlugRouteImport.update({
   path: '/biograf/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
+const ByCityRoute = ByCityRouteImport.update({
+  id: '/by/$city',
+  path: '/by/$city',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilmIndexRoute = FilmIndexRouteImport.update({
+  id: '/film/',
+  path: '/film/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilmSlugRoute = FilmSlugRouteImport.update({
+  id: '/film/$slug',
+  path: '/film/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CityFilmSlugRoute = CityFilmSlugRouteImport.update({
+  id: '/film/$slug',
+  path: '/film/$slug',
+  getParentRoute: () => CityRoute,
+} as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
@@ -145,38 +161,10 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ApiPublicKultunautImportRoute =
-  ApiPublicKultunautImportRouteImport.update({
-    id: '/api/public/kultunaut-import',
-    path: '/api/public/kultunaut-import',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicImportHealthRoute = ApiPublicImportHealthRouteImport.update({
-  id: '/api/public/import-health',
-  path: '/api/public/import-health',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicEbilletSyncRoute = ApiPublicEbilletSyncRouteImport.update({
-  id: '/api/public/ebillet-sync',
-  path: '/api/public/ebillet-sync',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedAdminPipelineRoute =
-  AuthenticatedAdminPipelineRouteImport.update({
-    id: '/admin/pipeline',
-    path: '/admin/pipeline',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAdminImportRoute =
-  AuthenticatedAdminImportRouteImport.update({
-    id: '/admin/import',
-    path: '/admin/import',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAdminEbilletRoute =
-  AuthenticatedAdminEbilletRouteImport.update({
-    id: '/admin/ebillet',
-    path: '/admin/ebillet',
+const AuthenticatedAdminAnalyticsRoute =
+  AuthenticatedAdminAnalyticsRouteImport.update({
+    id: '/admin/analytics',
+    path: '/admin/analytics',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminDeniedRoute =
@@ -185,33 +173,45 @@ const AuthenticatedAdminDeniedRoute =
     path: '/admin/denied',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminAnalyticsRoute =
-  AuthenticatedAdminAnalyticsRouteImport.update({
-    id: '/admin/analytics',
-    path: '/admin/analytics',
+const AuthenticatedAdminEbilletRoute =
+  AuthenticatedAdminEbilletRouteImport.update({
+    id: '/admin/ebillet',
+    path: '/admin/ebillet',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const Char91DotmcpChar93InvokeToolToolRoute =
-  Char91DotmcpChar93InvokeToolToolRouteImport.update({
-    id: '/.mcp/invoke-tool/$tool',
-    path: '/.mcp/invoke-tool/$tool',
-    getParentRoute: () => rootRouteImport,
+const AuthenticatedAdminImportRoute =
+  AuthenticatedAdminImportRouteImport.update({
+    id: '/admin/import',
+    path: '/admin/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
+const AuthenticatedAdminPipelineRoute =
+  AuthenticatedAdminPipelineRouteImport.update({
+    id: '/admin/pipeline',
+    path: '/admin/pipeline',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicEbilletSyncRoute = ApiPublicEbilletSyncRouteImport.update({
+  id: '/api/public/ebillet-sync',
+  path: '/api/public/ebillet-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CityFilmSlugRoute = CityFilmSlugRouteImport.update({
-  id: '/film/$slug',
-  path: '/film/$slug',
-  getParentRoute: () => CityRoute,
+const ApiPublicImportHealthRoute = ApiPublicImportHealthRouteImport.update({
+  id: '/api/public/import-health',
+  path: '/api/public/import-health',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicKultunautImportStatusRoute =
-  ApiPublicKultunautImportStatusRouteImport.update({
-    id: '/status',
-    path: '/status',
-    getParentRoute: () => ApiPublicKultunautImportRoute,
+const ApiPublicKultunautImportRoute =
+  ApiPublicKultunautImportRouteImport.update({
+    id: '/api/public/kultunaut-import',
+    path: '/api/public/kultunaut-import',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedAdminImportJobIdRoute =
+  AuthenticatedAdminImportJobIdRouteImport.update({
+    id: '/admin/import_/$jobId',
+    path: '/admin/import/$jobId',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const ApiPublicKultunautImportProcessRoute =
   ApiPublicKultunautImportProcessRouteImport.update({
@@ -219,11 +219,11 @@ const ApiPublicKultunautImportProcessRoute =
     path: '/process',
     getParentRoute: () => ApiPublicKultunautImportRoute,
   } as any)
-const AuthenticatedAdminImportJobIdRoute =
-  AuthenticatedAdminImportJobIdRouteImport.update({
-    id: '/admin/import_/$jobId',
-    path: '/admin/import/$jobId',
-    getParentRoute: () => AuthenticatedRouteRoute,
+const ApiPublicKultunautImportStatusRoute =
+  ApiPublicKultunautImportStatusRouteImport.update({
+    id: '/status',
+    path: '/status',
+    getParentRoute: () => ApiPublicKultunautImportRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -468,60 +468,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap-movies.xml': {
-      id: '/sitemap-movies.xml'
-      path: '/sitemap-movies.xml'
-      fullPath: '/sitemap-movies.xml'
-      preLoaderRoute: typeof SitemapMoviesDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap-core.xml': {
-      id: '/sitemap-core.xml'
-      path: '/sitemap-core.xml'
-      fullPath: '/sitemap-core.xml'
-      preLoaderRoute: typeof SitemapCoreDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap-city-movies.xml': {
-      id: '/sitemap-city-movies.xml'
-      path: '/sitemap-city-movies.xml'
-      fullPath: '/sitemap-city-movies.xml'
-      preLoaderRoute: typeof SitemapCityMoviesDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap-cinemas.xml': {
-      id: '/sitemap-cinemas.xml'
-      path: '/sitemap-cinemas.xml'
-      fullPath: '/sitemap-cinemas.xml'
-      preLoaderRoute: typeof SitemapCinemasDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$city': {
@@ -538,25 +489,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/film/': {
-      id: '/film/'
-      path: '/film'
-      fullPath: '/film/'
-      preLoaderRoute: typeof FilmIndexRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/biograf/': {
-      id: '/biograf/'
-      path: '/biograf'
-      fullPath: '/biograf/'
-      preLoaderRoute: typeof BiografIndexRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-cinemas.xml': {
+      id: '/sitemap-cinemas.xml'
+      path: '/sitemap-cinemas.xml'
+      fullPath: '/sitemap-cinemas.xml'
+      preLoaderRoute: typeof SitemapCinemasDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-city-movies.xml': {
+      id: '/sitemap-city-movies.xml'
+      path: '/sitemap-city-movies.xml'
+      fullPath: '/sitemap-city-movies.xml'
+      preLoaderRoute: typeof SitemapCityMoviesDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-core.xml': {
+      id: '/sitemap-core.xml'
+      path: '/sitemap-core.xml'
+      fullPath: '/sitemap-core.xml'
+      preLoaderRoute: typeof SitemapCoreDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-movies.xml': {
+      id: '/sitemap-movies.xml'
+      path: '/sitemap-movies.xml'
+      fullPath: '/sitemap-movies.xml'
+      preLoaderRoute: typeof SitemapMoviesDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$city/': {
@@ -566,25 +552,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CityIndexRouteImport
       parentRoute: typeof CityRoute
     }
-    '/film/$slug': {
-      id: '/film/$slug'
-      path: '/film/$slug'
-      fullPath: '/film/$slug'
-      preLoaderRoute: typeof FilmSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/by/$city': {
-      id: '/by/$city'
-      path: '/by/$city'
-      fullPath: '/by/$city'
-      preLoaderRoute: typeof ByCityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/biograf/$slug': {
-      id: '/biograf/$slug'
-      path: '/biograf/$slug'
-      fullPath: '/biograf/$slug'
-      preLoaderRoute: typeof BiografSlugRouteImport
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.well-known/oauth-protected-resource': {
@@ -594,88 +566,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/.mcp/list-tools': {
-      id: '/.mcp/list-tools'
-      path: '/.mcp/list-tools'
-      fullPath: '/.mcp/list-tools'
-      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+    '/biograf/': {
+      id: '/biograf/'
+      path: '/biograf'
+      fullPath: '/biograf/'
+      preLoaderRoute: typeof BiografIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin/': {
-      id: '/_authenticated/admin/'
-      path: '/admin'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/api/public/kultunaut-import': {
-      id: '/api/public/kultunaut-import'
-      path: '/api/public/kultunaut-import'
-      fullPath: '/api/public/kultunaut-import'
-      preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
+    '/biograf/$slug': {
+      id: '/biograf/$slug'
+      path: '/biograf/$slug'
+      fullPath: '/biograf/$slug'
+      preLoaderRoute: typeof BiografSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/import-health': {
-      id: '/api/public/import-health'
-      path: '/api/public/import-health'
-      fullPath: '/api/public/import-health'
-      preLoaderRoute: typeof ApiPublicImportHealthRouteImport
+    '/by/$city': {
+      id: '/by/$city'
+      path: '/by/$city'
+      fullPath: '/by/$city'
+      preLoaderRoute: typeof ByCityRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/ebillet-sync': {
-      id: '/api/public/ebillet-sync'
-      path: '/api/public/ebillet-sync'
-      fullPath: '/api/public/ebillet-sync'
-      preLoaderRoute: typeof ApiPublicEbilletSyncRouteImport
+    '/film/': {
+      id: '/film/'
+      path: '/film'
+      fullPath: '/film/'
+      preLoaderRoute: typeof FilmIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin/pipeline': {
-      id: '/_authenticated/admin/pipeline'
-      path: '/admin/pipeline'
-      fullPath: '/admin/pipeline'
-      preLoaderRoute: typeof AuthenticatedAdminPipelineRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/import': {
-      id: '/_authenticated/admin/import'
-      path: '/admin/import'
-      fullPath: '/admin/import'
-      preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/ebillet': {
-      id: '/_authenticated/admin/ebillet'
-      path: '/admin/ebillet'
-      fullPath: '/admin/ebillet'
-      preLoaderRoute: typeof AuthenticatedAdminEbilletRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/denied': {
-      id: '/_authenticated/admin/denied'
-      path: '/admin/denied'
-      fullPath: '/admin/denied'
-      preLoaderRoute: typeof AuthenticatedAdminDeniedRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/analytics': {
-      id: '/_authenticated/admin/analytics'
-      path: '/admin/analytics'
-      fullPath: '/admin/analytics'
-      preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.lovable/oauth/consent': {
-      id: '/.lovable/oauth/consent'
-      path: '/.lovable/oauth/consent'
-      fullPath: '/.lovable/oauth/consent'
-      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+    '/film/$slug': {
+      id: '/film/$slug'
+      path: '/film/$slug'
+      fullPath: '/film/$slug'
+      preLoaderRoute: typeof FilmSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$city/film/$slug': {
@@ -685,12 +608,89 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CityFilmSlugRouteImport
       parentRoute: typeof CityRoute
     }
-    '/api/public/kultunaut-import/status': {
-      id: '/api/public/kultunaut-import/status'
-      path: '/status'
-      fullPath: '/api/public/kultunaut-import/status'
-      preLoaderRoute: typeof ApiPublicKultunautImportStatusRouteImport
-      parentRoute: typeof ApiPublicKultunautImportRoute
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/analytics': {
+      id: '/_authenticated/admin/analytics'
+      path: '/admin/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/denied': {
+      id: '/_authenticated/admin/denied'
+      path: '/admin/denied'
+      fullPath: '/admin/denied'
+      preLoaderRoute: typeof AuthenticatedAdminDeniedRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/ebillet': {
+      id: '/_authenticated/admin/ebillet'
+      path: '/admin/ebillet'
+      fullPath: '/admin/ebillet'
+      preLoaderRoute: typeof AuthenticatedAdminEbilletRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/import': {
+      id: '/_authenticated/admin/import'
+      path: '/admin/import'
+      fullPath: '/admin/import'
+      preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/pipeline': {
+      id: '/_authenticated/admin/pipeline'
+      path: '/admin/pipeline'
+      fullPath: '/admin/pipeline'
+      preLoaderRoute: typeof AuthenticatedAdminPipelineRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/ebillet-sync': {
+      id: '/api/public/ebillet-sync'
+      path: '/api/public/ebillet-sync'
+      fullPath: '/api/public/ebillet-sync'
+      preLoaderRoute: typeof ApiPublicEbilletSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/import-health': {
+      id: '/api/public/import-health'
+      path: '/api/public/import-health'
+      fullPath: '/api/public/import-health'
+      preLoaderRoute: typeof ApiPublicImportHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/kultunaut-import': {
+      id: '/api/public/kultunaut-import'
+      path: '/api/public/kultunaut-import'
+      fullPath: '/api/public/kultunaut-import'
+      preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/import_/$jobId': {
+      id: '/_authenticated/admin/import_/$jobId'
+      path: '/admin/import/$jobId'
+      fullPath: '/admin/import/$jobId'
+      preLoaderRoute: typeof AuthenticatedAdminImportJobIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/kultunaut-import/process': {
       id: '/api/public/kultunaut-import/process'
@@ -699,12 +699,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicKultunautImportProcessRouteImport
       parentRoute: typeof ApiPublicKultunautImportRoute
     }
-    '/_authenticated/admin/import_/$jobId': {
-      id: '/_authenticated/admin/import_/$jobId'
-      path: '/admin/import/$jobId'
-      fullPath: '/admin/import/$jobId'
-      preLoaderRoute: typeof AuthenticatedAdminImportJobIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+    '/api/public/kultunaut-import/status': {
+      id: '/api/public/kultunaut-import/status'
+      path: '/status'
+      fullPath: '/api/public/kultunaut-import/status'
+      preLoaderRoute: typeof ApiPublicKultunautImportStatusRouteImport
+      parentRoute: typeof ApiPublicKultunautImportRoute
     }
   }
 }

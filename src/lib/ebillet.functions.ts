@@ -5,17 +5,28 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 async function assertAdmin(context: { supabase: unknown; userId: string }) {
   const { supabase, userId } = context as {
     supabase: {
-      rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+      from: (table: string) => {
+        select: (cols: string) => {
+          eq: (col: string, val: unknown) => {
+            eq: (col: string, val: unknown) => {
+              maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+            };
+          };
+        };
+      };
     };
     userId: string;
   };
-  const { data, error } = await supabase.rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
   if (error) throw new Error("Forbidden: role lookup failed");
-  if (data !== true) throw new Error("Forbidden: admin role required");
+  if (!data) throw new Error("Forbidden: admin role required");
 }
+
 
 /** Overview of the eBillet integration: organizers + latest runs. */
 export const ebilletOverview = createServerFn({ method: "GET" })

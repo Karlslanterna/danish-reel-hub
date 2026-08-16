@@ -24,6 +24,7 @@ import {
   parseRuntimeMinutes,
   type EbilletMoviesResponse,
 } from "./api.server";
+import { classifyOrganizer } from "./venue-filter";
 
 export const DEFAULT_MAX_ORGANIZER_ID = 400;
 const DISCOVERY_BATCH = 10;
@@ -150,7 +151,7 @@ export async function discoverOrganizers(opts: {
           region: o.region,
           location_count: o.locationCount,
           showtime_count: o.showtimeCount,
-          is_active: o.showtimeCount > 0,
+          is_active: o.showtimeCount > 0 && classifyOrganizer(o).isCinema,
         }));
         const { error } = await db.from("ebillet_organizers").upsert(rows, { onConflict: "id" });
         if (error) errors.push(`register ${ids[0]}-${ids[ids.length - 1]}: ${error.message}`);
@@ -219,6 +220,24 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
   const payload = await fetchOrganizerPayload([organizerId]);
   const organizer = payload.organizers.find((o) => o.id === organizerId);
   if (!organizer) throw new Error(`Organizer ${organizerId} findes ikke hos eBillet`);
+
+  // Only actual cinemas may enter Lanterna. Non-cinema venues (museums,
+  // planetariums, …) are deactivated here so they are never created as
+  // cinemas and are skipped by later syncs. See ./venue-filter.
+  const classification = classifyOrganizer({ id: organizerId, name: organizer.name });
+  if (!classification.isCinema) {
+    await db
+      .from("ebillet_organizers")
+      .update({
+        is_active: false,
+        last_synced_at: new Date().toISOString(),
+        last_sync_status: "skipped",
+        last_sync_error: classification.reason,
+      })
+      .eq("id", organizerId);
+    log("organizer_skipped", { organizerId, reason: classification.reason });
+    return { cinemas: 0, movies: 0, showtimes: 0 };
+  }
 
   const counts: OrganizerSyncCounts = { cinemas: 0, movies: 0, showtimes: 0 };
 
@@ -520,7 +539,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
       last_sync_error: null,
       last_sync_counts: counts,
       showtime_count: payload.showtimes.length,
-      is_active: payload.showtimes.length > 0,
+      is_active: payload.showtimes.length > 0 && classification.isCinema,
     })
     .eq("id", organizerId);
 

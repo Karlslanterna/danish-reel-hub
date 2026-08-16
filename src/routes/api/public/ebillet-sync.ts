@@ -28,7 +28,13 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
             "@/lib/ebillet/sync.server"
           );
           await reapStaleEbilletRuns(60);
-          const result = await runEbilletJob({ kind: mode, trigger: "cron" });
+          // Leave headroom for the serverless runtime so the resumable cursor
+          // is persisted before the invocation is forcibly terminated.
+          const result = await runEbilletJob({
+            kind: mode,
+            trigger: "cron",
+            budgetMs: 60_000,
+          });
           return Response.json(result, {
             status: result.status === "failed" ? 500 : 200,
             headers: { "cache-control": "no-store" },

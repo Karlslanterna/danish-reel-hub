@@ -2,40 +2,29 @@
 -- eBillet is authoritative for cinemas linked to an active eBillet organizer.
 -- Kultunaut must never populate or mutate showtimes for those cinemas.
 
--- Backfill source for legacy rows where the source was omitted.
 UPDATE public.showtimes s
 SET source = CASE
   WHEN EXISTS (
-    SELECT 1
-    FROM public.ebillet_organizers eo
-    WHERE eo.cinema_id = s.cinema_id
-      AND eo.is_active = true
+    SELECT 1 FROM public.ebillet_organizers eo
+    WHERE eo.cinema_id = s.cinema_id AND eo.is_active = true
   ) THEN 'ebillet'
   ELSE 'kultunaut'
 END
 WHERE s.source IS NULL OR btrim(s.source) = '';
 
--- Remove legacy Kultunaut/unknown rows from eBillet-authoritative cinemas.
 DELETE FROM public.showtimes s
 WHERE EXISTS (
-  SELECT 1
-  FROM public.ebillet_organizers eo
-  WHERE eo.cinema_id = s.cinema_id
-    AND eo.is_active = true
+  SELECT 1 FROM public.ebillet_organizers eo
+  WHERE eo.cinema_id = s.cinema_id AND eo.is_active = true
 )
 AND COALESCE(s.source, '') <> 'ebillet';
 
--- Never allow a write to create a non-eBillet source on an eBillet cinema.
 CREATE OR REPLACE FUNCTION public.enforce_ebillet_showtime_source()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF EXISTS (
-    SELECT 1
-    FROM public.ebillet_organizers eo
-    WHERE eo.cinema_id = NEW.cinema_id
-      AND eo.is_active = true
+    SELECT 1 FROM public.ebillet_organizers eo
+    WHERE eo.cinema_id = NEW.cinema_id AND eo.is_active = true
   ) THEN
     NEW.source := 'ebillet';
   ELSIF NEW.source IS NULL OR btrim(NEW.source) = '' THEN
@@ -48,10 +37,28 @@ $$;
 DROP TRIGGER IF EXISTS trg_enforce_ebillet_showtime_source ON public.showtimes;
 CREATE TRIGGER trg_enforce_ebillet_showtime_source
 BEFORE INSERT OR UPDATE OF cinema_id, source ON public.showtimes
-FOR EACH ROW
-EXECUTE FUNCTION public.enforce_ebillet_showtime_source();
+FOR EACH ROW EXECUTE FUNCTION public.enforce_ebillet_showtime_source();
 
--- Prevent a Kultunaut update from silently replacing the source of an
--- eBillet-authoritative row: the trigger above rewrites it to eBillet.
+-- When a cinema becomes eBillet-covered later, purge any old Kultunaut rows
+-- immediately instead of waiting for the next import.
+CREATE OR REPLACE FUNCTION public.enforce_ebillet_cinema_coverage()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.is_active = true AND NEW.cinema_id IS NOT NULL THEN
+    DELETE FROM public.showtimes
+    WHERE cinema_id = NEW.cinema_id
+      AND COALESCE(source, '') <> 'ebillet';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_ebillet_cinema_coverage ON public.ebillet_organizers;
+CREATE TRIGGER trg_enforce_ebillet_cinema_coverage
+AFTER INSERT OR UPDATE OF cinema_id, is_active ON public.ebillet_organizers
+FOR EACH ROW EXECUTE FUNCTION public.enforce_ebillet_cinema_coverage();
+
 COMMENT ON FUNCTION public.enforce_ebillet_showtime_source() IS
   'Keeps showtime source authoritative: active eBillet cinema => ebillet; otherwise default to kultunaut.';
+COMMENT ON FUNCTION public.enforce_ebillet_cinema_coverage() IS
+  'Removes legacy non-eBillet showtimes when an organizer becomes active for a cinema.';

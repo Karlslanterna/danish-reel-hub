@@ -182,6 +182,7 @@ type CinemaRow = {
 type MovieRow = {
   id: string;
   title: string;
+  year: number | null;
   runtime: number | null;
   synopsis: string | null;
   director: string | null;

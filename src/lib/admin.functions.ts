@@ -2,33 +2,45 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// Verify the caller has the 'admin' role via the has_role() SECURITY DEFINER
-// function. Throws Unauthorized if not, which the client turns into a redirect.
-async function assertAdmin(context: { supabase: ReturnType<typeof Object>; userId: string }) {
-  const { supabase, userId } = context as {
-    supabase: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
-    userId: string;
+// Verify the caller has the 'admin' role. Reads the caller's own rows in
+// user_roles (RLS-scoped to auth.uid()), so no SECURITY DEFINER RPC is exposed
+// to the API. Throws Forbidden if not, which the client turns into a redirect.
+type AuthedContext = {
+  supabase: {
+    from: (table: string) => {
+      select: (cols: string) => {
+        eq: (col: string, val: unknown) => {
+          eq: (col: string, val: unknown) => {
+            maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+          };
+        };
+      };
+    };
   };
-  const { data, error } = await supabase.rpc("has_role", {
-    _user_id: userId,
-    _role: "admin",
-  });
-  if (error) throw new Error("Forbidden: role lookup failed");
-  if (data !== true) throw new Error("Forbidden: admin role required");
+  userId: string;
+};
+
+async function isAdmin(context: unknown): Promise<boolean> {
+  const { supabase, userId } = context as AuthedContext;
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (error) return false;
+  return !!data;
+}
+
+async function assertAdmin(context: unknown) {
+  if (!(await isAdmin(context))) throw new Error("Forbidden: admin role required");
 }
 
 /** Returns true if the current signed-in user is an admin. */
 export const checkIsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data, error } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    if (error) return { isAdmin: false };
-    return { isAdmin: data === true };
-  });
+  .handler(async ({ context }) => ({ isAdmin: await isAdmin(context) }));
+
 
 /** Create a new Kultunaut import job. Admin only. */
 export const adminCreateImportJob = createServerFn({ method: "POST" })

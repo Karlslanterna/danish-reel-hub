@@ -748,13 +748,15 @@ export async function runEbilletJob(opts: {
   const startedAt = Date.now();
 
   // Resume an in-flight run of the same kind, otherwise claim a new one.
-  const { data: inFlight } = await db
+  const { data: inFlightRows } = await db
     .from("ebillet_sync_runs")
     .select("*")
     .eq("status", "running")
-    .maybeSingle();
+    .order("started_at", { ascending: true })
+    .limit(1);
 
-  let run = inFlight as RunRow | null;
+  let run = ((inFlightRows ?? [])[0] ?? null) as RunRow | null;
+
   if (run && run.kind !== opts.kind) {
     // Another kind is mid-flight; drain it instead of racing it.
     opts = { ...opts, kind: run.kind as "discover" | "sync" };

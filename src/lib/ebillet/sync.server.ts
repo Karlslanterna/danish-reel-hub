@@ -209,6 +209,77 @@ async function loadAll<T>(
   return out;
 }
 
+const CINEMA_COLUMNS = "id, name, slug, city, ebillet_organizer_id";
+
+const dedupeById = <T extends { id: string | number }>(rows: T[]): T[] => {
+  const map = new Map<string | number, T>();
+  for (const row of rows) if (!map.has(row.id)) map.set(row.id, row);
+  return [...map.values()];
+};
+
+/**
+ * Only the cinemas that could plausibly match this organizer — loading the
+ * whole table once per organizer does not scale.
+ */
+async function loadCinemaCandidates(
+  db: any,
+  org: { id: number; name: string; city: string },
+): Promise<CinemaRow[]> {
+  const bareCity = org.city.replace(/^\s*(?:DK[-\s]?)?\d{3,4}\b/iu, "").trim();
+  const base = slugify(org.name);
+  const slugs = [
+    base,
+    slugify(`${org.name} ${bareCity}`),
+    bareCity ? `${base}-${slugify(bareCity)}` : base,
+    `${base}-${org.id}`,
+  ];
+  const firstToken = org.name.trim().split(/\s+/)[0] ?? org.name;
+
+  const [byOrg, bySlug, byName] = await Promise.all([
+    db.from("cinemas").select(CINEMA_COLUMNS).eq("ebillet_organizer_id", org.id),
+    db.from("cinemas").select(CINEMA_COLUMNS).in("slug", [...new Set(slugs)]),
+    db.from("cinemas").select(CINEMA_COLUMNS).ilike("name", `${firstToken}%`).limit(50),
+  ]);
+  for (const res of [byOrg, bySlug, byName]) {
+    if (res.error) throw new Error(`cinemas: ${res.error.message}`);
+  }
+  return dedupeById<CinemaRow>([
+    ...(byOrg.data ?? []),
+    ...(bySlug.data ?? []),
+    ...(byName.data ?? []),
+  ]);
+}
+
+const MOVIE_COLUMNS =
+  "id, title, year, runtime, synopsis, director, genre, poster, trailer_url, ebillet_movie_base_id, ebillet_movie_ids";
+
+/** Targeted movie lookup: only rows that could match this payload. */
+async function loadMovieCandidates(
+  db: any,
+  baseIds: number[],
+  movieIds: number[],
+  titles: string[],
+): Promise<MovieRow[]> {
+  const queries: Array<Promise<{ data: MovieRow[] | null; error: { message: string } | null }>> = [];
+  if (baseIds.length > 0) {
+    queries.push(db.from("movies").select(MOVIE_COLUMNS).in("ebillet_movie_base_id", baseIds));
+  }
+  if (movieIds.length > 0) {
+    queries.push(db.from("movies").select(MOVIE_COLUMNS).overlaps("ebillet_movie_ids", movieIds));
+  }
+  if (titles.length > 0) {
+    queries.push(db.from("movies").select(MOVIE_COLUMNS).in("title", titles));
+  }
+  const results = await Promise.all(queries);
+  const rows: MovieRow[] = [];
+  for (const res of results) {
+    if (res.error) throw new Error(`movies: ${res.error.message}`);
+    rows.push(...(res.data ?? []));
+  }
+  return dedupeById(rows);
+}
+
+
 // --------------------------------------------------------------------- sync
 
 /**

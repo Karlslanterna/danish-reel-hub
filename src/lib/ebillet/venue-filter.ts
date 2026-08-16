@@ -16,32 +16,24 @@ export const EXCLUDED_ORGANIZER_IDS: ReadonlySet<number> = new Set<number>([]);
 /**
  * Name/word patterns that identify a non-cinema venue. Matched against the
  * organizer name (accent- and case-insensitive, word-boundary aware).
+ * Kept deliberately narrow so real cinemas with unusual names are not lost.
  */
 export const NON_CINEMA_NAME_PATTERNS: readonly RegExp[] = [
   /\bmuseum(er|et|s)?\b/,
   /\bmuseet\b/,
-  /\bplanetarium\b/,
-  /\bfort\b/,
-  /\bkalk\b/,
-  /\bakvarium\b/,
+  /\bplanetarium(et)?\b/,
+  /\bplanetariet\b/,
+  /\bakvarium(et)?\b/,
   /\bzoo\b/,
-  /\bteater|teatret\b/,
-  /\bkoncerthus/,
-  /\bbibliotek/,
-  /\bforsamlingshus/,
-  /\bkirke\b/,
-  /\bidraetsanlaeg|\bstadion\b/,
-  /\bslot(tet)?\b/,
-  /\bvidenscenter|\bscience\s?center\b/,
+  /\bscience\s?center\b/,
+  /\bvidenscenter\b/,
 ];
 
 /** Explicit allow-list: venues that match a pattern but ARE cinemas. */
 export const ALLOWED_ORGANIZER_NAMES: readonly string[] = [
-  "fortbio",
   "museumsbio",
-  "teaterbio",
-  "teaterbiografen",
 ];
+
 
 function normalize(value: string): string {
   return value

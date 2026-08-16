@@ -210,11 +210,14 @@ async function loadAll<T>(
   db: any,
   table: string,
   columns: string,
+  filter?: (query: any) => any,
 ): Promise<T[]> {
   const out: T[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from(table).select(columns).range(from, from + PAGE - 1);
+    let query = db.from(table).select(columns);
+    if (filter) query = filter(query);
+    const { data, error } = await query.range(from, from + PAGE - 1);
     if (error) throw new Error(`${table}: ${error.message}`);
     const rows = (data ?? []) as T[];
     out.push(...rows);

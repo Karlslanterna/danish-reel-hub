@@ -66,12 +66,13 @@ function EbilletPage() {
     try {
       let result = (await fn()) as { message?: string | null; done?: boolean };
 
-      // eBillet syncs are deliberately checkpointed to stay below the server
-      // runtime limit. Continue by issuing the next short invocation until the
-      // persisted run reports done. This turns one button click into a complete
-      // sync without requiring the user to press the button for every batch.
+      // Sync All is durable: every call handles exactly one organizer and
+      // checkpoints the cursor. Keep issuing short invocations until the
+      // persisted run reports done, so one click completes the whole list.
       if (label === "sync") {
-        while (result?.done === false) {
+        let guard = 0;
+        while (result?.done === false && guard < 500) {
+          guard += 1;
           await overview.refetch();
           result = (await syncAll({ data: undefined as never })) as {
             message?: string | null;
@@ -79,6 +80,7 @@ function EbilletPage() {
           };
         }
       }
+
 
       setNote(
         result?.message ??

@@ -813,6 +813,9 @@ export async function runEbilletJob(opts: {
         })
         .eq("id", run.id);
     } else {
+      // Durable batching: exactly ONE organizer per invocation. The cursor is
+      // claimed with an optimistic compare-and-set, so two concurrent
+      // invocations can never sync the same organizer or race the run forward.
       const { data: organizers, error: orgErr } = await db
         .from("ebillet_organizers")
         .select("id")
@@ -822,9 +825,43 @@ export async function runEbilletJob(opts: {
       const ids = (organizers ?? []).map((o: { id: number }) => o.id);
       run.organizers_active = ids.length;
 
-      let index = run.cursor;
-      while (index < ids.length) {
-        if (Date.now() - startedAt > budgetMs) break;
+      const index = run.cursor ?? 0;
+
+      if (index >= ids.length) {
+        done = true;
+        message = `Synkroniserede ${run.organizers_synced}/${ids.length} biografer`;
+        await db
+          .from("ebillet_sync_runs")
+          .update({ cursor: 0, organizers_active: ids.length, message })
+          .eq("id", run.id);
+      } else {
+        const { data: claimed } = await db
+          .from("ebillet_sync_runs")
+          .update({ cursor: index + 1, organizers_active: ids.length })
+          .eq("id", run.id)
+          .eq("status", "running")
+          .eq("cursor", index)
+          .select("id");
+
+        if (!claimed || claimed.length === 0) {
+          // Another invocation already claimed this slot; do no work.
+          return {
+            runId: run.id,
+            kind: "sync",
+            status: "running",
+            organizersFound: run.organizers_found,
+            organizersActive: ids.length,
+            organizersSynced: run.organizers_synced,
+            organizersFailed: run.organizers_failed,
+            cinemas: run.cinemas_upserted,
+            movies: run.movies_upserted,
+            showtimes: run.showtimes_upserted,
+            errors: errors.slice(-20),
+            message: "En anden kørsel arbejder allerede på denne biograf",
+            done: false,
+          };
+        }
+
         const organizerId = ids[index];
         try {
           const c = await syncOrganizer(organizerId);
@@ -846,29 +883,30 @@ export async function runEbilletJob(opts: {
             })
             .eq("id", organizerId);
         }
-        index += 1;
+
+        const next = index + 1;
+        done = next >= ids.length;
+        message = done
+          ? `Synkroniserede ${run.organizers_synced}/${ids.length} biografer`
+          : `Synkroniserer… ${next}/${ids.length}`;
+
+        await db
+          .from("ebillet_sync_runs")
+          .update({
+            cursor: done ? 0 : next,
+            organizers_active: ids.length,
+            organizers_synced: run.organizers_synced,
+            organizers_failed: run.organizers_failed,
+            cinemas_upserted: run.cinemas_upserted,
+            movies_upserted: run.movies_upserted,
+            showtimes_upserted: run.showtimes_upserted,
+            errors: errors.slice(-200),
+            message,
+          })
+          .eq("id", run.id);
       }
-
-      done = index >= ids.length;
-      message = done
-        ? `Synkroniserede ${run.organizers_synced}/${ids.length} biografer`
-        : `Synkroniserer… ${index}/${ids.length}`;
-
-      await db
-        .from("ebillet_sync_runs")
-        .update({
-          cursor: done ? 0 : index,
-          organizers_active: ids.length,
-          organizers_synced: run.organizers_synced,
-          organizers_failed: run.organizers_failed,
-          cinemas_upserted: run.cinemas_upserted,
-          movies_upserted: run.movies_upserted,
-          showtimes_upserted: run.showtimes_upserted,
-          errors: errors.slice(-200),
-          message,
-        })
-        .eq("id", run.id);
     }
+
 
     if (done) await finishRun(db, run, "completed", message);
 

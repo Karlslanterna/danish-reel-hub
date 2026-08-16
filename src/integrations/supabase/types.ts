@@ -605,13 +605,6 @@ export type Database = {
       }
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
       slugify: { Args: { value: string }; Returns: string }
     }
     Enums: {

@@ -46,7 +46,7 @@ if (proc && typeof proc.on === "function") {
   proc.on("uncaughtException", (error: unknown) => {
     if (isClientAbort(error)) return;
     record(error);
-    throw error;
+    console.error(error);
   });
 }
 

@@ -64,10 +64,25 @@ function EbilletPage() {
     setError(null);
     setNote(null);
     try {
-      const result = (await fn()) as { message?: string | null; done?: boolean };
+      let result = (await fn()) as { message?: string | null; done?: boolean };
+
+      // eBillet syncs are deliberately checkpointed to stay below the server
+      // runtime limit. Continue by issuing the next short invocation until the
+      // persisted run reports done. This turns one button click into a complete
+      // sync without requiring the user to press the button for every batch.
+      if (label === "sync") {
+        while (result?.done === false) {
+          await overview.refetch();
+          result = (await syncAll({ data: undefined as never })) as {
+            message?: string | null;
+            done?: boolean;
+          };
+        }
+      }
+
       setNote(
         result?.message ??
-          (result?.done === false ? "Kørslen fortsætter — tryk igen for næste del." : "Færdig."),
+          (result?.done === false ? "Kørslen fortsætter." : "Færdig."),
       );
       await overview.refetch();
     } catch (err) {

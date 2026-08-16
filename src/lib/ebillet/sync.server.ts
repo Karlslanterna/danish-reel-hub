@@ -26,6 +26,19 @@ import {
 } from "./api.server";
 import { classifyOrganizer } from "./venue-filter";
 import { matchCinema, uniqueCinemaSlug } from "./cinema-match";
+import {
+  diffShowtimes,
+  matchMovie,
+  validateSnapshot,
+  type DesiredShowtime,
+  type ExistingShowtime,
+} from "./reconcile";
+
+const chunked = <T>(items: T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+};
 
 export const DEFAULT_MAX_ORGANIZER_ID = 400;
 const DISCOVERY_BATCH = 10;

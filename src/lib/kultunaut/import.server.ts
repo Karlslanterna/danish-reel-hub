@@ -453,9 +453,9 @@ export async function processJobBatch(
       const errors: string[] = [];
       let upserted = job.processed_showtimes ?? 0;
 
-      // Source precedence: eBillet > Kultunaut for cinemas covered by an active
-      // eBillet organizer. Kultunaut may still ADD showtimes eBillet doesn't
-      // have, but must never overwrite a row that already carries eBillet data.
+      // Source authority: eBillet owns the showtimes of every cinema linked to
+      // an active eBillet organizer — Kultunaut must not write there at all.
+      // Kultunaut remains authoritative for all other cinemas.
       const coveredCinemaIds = new Set<string>();
       {
         const { data: orgs, error: orgErr } = await supabaseAdmin
@@ -468,8 +468,14 @@ export async function processJobBatch(
       }
 
       for (const row of slice) {
-        let times = row.times;
-        let ticketUrls = row.ticket_urls;
+        const times = row.times;
+        const ticketUrls = row.ticket_urls;
+
+        if (coveredCinemaIds.has(row.cinema_id)) {
+          // eBillet-authoritative cinema: skip silently.
+          upserted++;
+          continue;
+        }
 
         const { data: existing } = await supabaseAdmin
           .from("showtimes")
@@ -480,43 +486,7 @@ export async function processJobBatch(
           .eq("hall", row.hall)
           .maybeSingle();
 
-        if (coveredCinemaIds.has(row.cinema_id)) {
-          // Rule 2/6: an eBillet-sourced row wins — leave it untouched.
-          if (existing && (existing.source ?? "").includes("ebillet")) {
-            upserted++;
-            continue;
-          }
 
-          // Rule 4: keep only the Kultunaut times eBillet doesn't already
-          // cover for this movie/cinema/date (hall naming differs per source).
-          const { data: ebRows, error: ebErr } = await supabaseAdmin
-            .from("showtimes")
-            .select("times, source")
-            .eq("movie_id", row.movie_id)
-            .eq("cinema_id", row.cinema_id)
-            .eq("date", row.date);
-          if (ebErr) errors.push(`ebillet overlap lookup: ${ebErr.message}`);
-          const ebTimes = new Set<string>();
-          for (const r of ebRows ?? []) {
-            if (!(r.source ?? "").includes("ebillet")) continue;
-            for (const t of r.times ?? []) ebTimes.add(String(t).slice(0, 5));
-          }
-          if (ebTimes.size > 0) {
-            const keep = times
-              .map((t, i) => ({ t, u: ticketUrls[i] ?? "" }))
-              .filter((x) => !ebTimes.has(String(x.t).slice(0, 5)));
-            times = keep.map((x) => x.t);
-            ticketUrls = keep.map((x) => x.u);
-            if (times.length === 0) {
-              // Everything is already covered by eBillet — drop the stale
-              // Kultunaut duplicate rather than keeping an empty row.
-              if (existing) {
-                await supabaseAdmin.from("showtimes").delete().eq("id", existing.id);
-              }
-              continue;
-            }
-          }
-        }
 
         const startTimeIso = times[0]
           ? new Date(`${row.date}T${times[0]}`).toISOString()

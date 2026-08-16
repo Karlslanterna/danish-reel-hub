@@ -26,6 +26,19 @@ import {
 } from "./api.server";
 import { classifyOrganizer } from "./venue-filter";
 import { matchCinema, uniqueCinemaSlug } from "./cinema-match";
+import {
+  diffShowtimes,
+  matchMovie,
+  validateSnapshot,
+  type DesiredShowtime,
+  type ExistingShowtime,
+} from "./reconcile";
+
+const chunked = <T>(items: T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+};
 
 export const DEFAULT_MAX_ORGANIZER_ID = 400;
 const DISCOVERY_BATCH = 10;
@@ -182,6 +195,7 @@ type CinemaRow = {
 type MovieRow = {
   id: string;
   title: string;
+  year: number | null;
   runtime: number | null;
   synopsis: string | null;
   director: string | null;
@@ -196,11 +210,14 @@ async function loadAll<T>(
   db: any,
   table: string,
   columns: string,
+  filter?: (query: any) => any,
 ): Promise<T[]> {
   const out: T[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db.from(table).select(columns).range(from, from + PAGE - 1);
+    let query = db.from(table).select(columns);
+    if (filter) query = filter(query);
+    const { data, error } = await query.range(from, from + PAGE - 1);
     if (error) throw new Error(`${table}: ${error.message}`);
     const rows = (data ?? []) as T[];
     out.push(...rows);
@@ -208,6 +225,77 @@ async function loadAll<T>(
   }
   return out;
 }
+
+const CINEMA_COLUMNS = "id, name, slug, city, ebillet_organizer_id";
+
+const dedupeById = <T extends { id: string | number }>(rows: T[]): T[] => {
+  const map = new Map<string | number, T>();
+  for (const row of rows) if (!map.has(row.id)) map.set(row.id, row);
+  return [...map.values()];
+};
+
+/**
+ * Only the cinemas that could plausibly match this organizer — loading the
+ * whole table once per organizer does not scale.
+ */
+async function loadCinemaCandidates(
+  db: any,
+  org: { id: number; name: string; city: string },
+): Promise<CinemaRow[]> {
+  const bareCity = org.city.replace(/^\s*(?:DK[-\s]?)?\d{3,4}\b/iu, "").trim();
+  const base = slugify(org.name);
+  const slugs = [
+    base,
+    slugify(`${org.name} ${bareCity}`),
+    bareCity ? `${base}-${slugify(bareCity)}` : base,
+    `${base}-${org.id}`,
+  ];
+  const firstToken = org.name.trim().split(/\s+/)[0] ?? org.name;
+
+  const [byOrg, bySlug, byName] = await Promise.all([
+    db.from("cinemas").select(CINEMA_COLUMNS).eq("ebillet_organizer_id", org.id),
+    db.from("cinemas").select(CINEMA_COLUMNS).in("slug", [...new Set(slugs)]),
+    db.from("cinemas").select(CINEMA_COLUMNS).ilike("name", `${firstToken}%`).limit(50),
+  ]);
+  for (const res of [byOrg, bySlug, byName]) {
+    if (res.error) throw new Error(`cinemas: ${res.error.message}`);
+  }
+  return dedupeById<CinemaRow>([
+    ...(byOrg.data ?? []),
+    ...(bySlug.data ?? []),
+    ...(byName.data ?? []),
+  ]);
+}
+
+const MOVIE_COLUMNS =
+  "id, title, year, runtime, synopsis, director, genre, poster, trailer_url, ebillet_movie_base_id, ebillet_movie_ids";
+
+/** Targeted movie lookup: only rows that could match this payload. */
+async function loadMovieCandidates(
+  db: any,
+  baseIds: number[],
+  movieIds: number[],
+  titles: string[],
+): Promise<MovieRow[]> {
+  const queries: Array<Promise<{ data: MovieRow[] | null; error: { message: string } | null }>> = [];
+  if (baseIds.length > 0) {
+    queries.push(db.from("movies").select(MOVIE_COLUMNS).in("ebillet_movie_base_id", baseIds));
+  }
+  if (movieIds.length > 0) {
+    queries.push(db.from("movies").select(MOVIE_COLUMNS).overlaps("ebillet_movie_ids", movieIds));
+  }
+  if (titles.length > 0) {
+    queries.push(db.from("movies").select(MOVIE_COLUMNS).in("title", titles));
+  }
+  const results = await Promise.all(queries);
+  const rows: MovieRow[] = [];
+  for (const res of results) {
+    if (res.error) throw new Error(`movies: ${res.error.message}`);
+    rows.push(...(res.data ?? []));
+  }
+  return dedupeById(rows);
+}
+
 
 // --------------------------------------------------------------------- sync
 
@@ -243,13 +331,9 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
   const counts: OrganizerSyncCounts = { cinemas: 0, movies: 0, showtimes: 0 };
 
   // ---- 1. Cinema ---------------------------------------------------------
-  const cinemas = await loadAll<CinemaRow>(
-    db,
-    "cinemas",
-    "id, name, slug, city, ebillet_organizer_id",
-  );
   const orgCity = organizer.address?.city ?? "";
   const matchInput = { id: organizerId, name: organizer.name, city: orgCity };
+  const cinemas = await loadCinemaCandidates(db, matchInput);
   // Reuse the existing (Kultunaut) cinema for the same physical venue whenever
   // we can identify it; only create a new row for genuinely new venues.
   const existingCinema = matchCinema(matchInput, cinemas);
@@ -264,7 +348,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     if (error) throw new Error(`cinema update ${cinemaId}: ${error.message}`);
   } else {
     // cinemas.slug is unique — always insert a slug that is provably free, and
-    // retry once against a live re-read if a concurrent run took it meanwhile.
+    // retry against a live re-read if a concurrent run took it meanwhile.
     let slug = uniqueCinemaSlug(matchInput, cinemas, cinemaId);
     for (let attempt = 0; attempt < 3; attempt++) {
       const { error } = await db.from("cinemas").upsert(
@@ -286,15 +370,10 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
       if (!isSlugCollision || attempt === 2) {
         throw new Error(`cinema insert ${cinemaId}: ${error.message}`);
       }
-      const fresh = await loadAll<CinemaRow>(
-        db,
-        "cinemas",
-        "id, name, slug, city, ebillet_organizer_id",
-      );
+      const fresh = await loadAll<CinemaRow>(db, "cinemas", CINEMA_COLUMNS);
       slug = uniqueCinemaSlug(matchInput, fresh, cinemaId);
     }
   }
-
 
   counts.cinemas = 1;
 
@@ -303,7 +382,32 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     .update({ cinema_id: cinemaId })
     .eq("id", organizerId);
 
-  // ---- 2. Movies ---------------------------------------------------------
+  // ---- 2. Snapshot validation -------------------------------------------
+  // Everything below is destructive for this cinema, so refuse to proceed on
+  // a payload we cannot trust.
+  const { count: existingEbilletRows } = await db
+    .from("showtimes")
+    .select("id", { count: "exact", head: true })
+    .eq("cinema_id", cinemaId)
+    .like("source", "%ebillet%");
+
+  const validation = validateSnapshot(organizerId, payload, {
+    existingRowCount: existingEbilletRows ?? 0,
+  });
+  if (!validation.ok) {
+    logError("snapshot_rejected", { organizerId, reason: validation.reason });
+    await db
+      .from("ebillet_organizers")
+      .update({
+        last_synced_at: new Date().toISOString(),
+        last_sync_status: "rejected",
+        last_sync_error: validation.reason.slice(0, 500),
+      })
+      .eq("id", organizerId);
+    throw new Error(`Payload afvist: ${validation.reason}`);
+  }
+
+  // ---- 3. Movies ---------------------------------------------------------
   // eBillet models a film as a "movie base" with one or more concrete
   // "movies" (versions: dubbed, 3D, original …). We collapse versions into
   // a single Lanterna movie, keyed by baseId when available.
@@ -322,32 +426,34 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     groups.set(key, g);
   }
 
-  const dbMovies = await loadAll<MovieRow>(
+  const groupList = [...groups.values()];
+  const groupTitle = (group: Group): string => {
+    const primary = movieById.get(group.primary);
+    const base = group.baseId ? baseById.get(group.baseId) : undefined;
+    return (base?.name ?? primary?.name ?? "").trim();
+  };
+
+  const dbMovies = await loadMovieCandidates(
     db,
-    "movies",
-    "id, title, runtime, synopsis, director, genre, poster, trailer_url, ebillet_movie_base_id, ebillet_movie_ids",
+    groupList.map((g) => g.baseId).filter((id): id is number => id != null),
+    groupList.flatMap((g) => g.movieIds),
+    groupList.map(groupTitle).filter(Boolean),
   );
   const movieIdForGroup = new Map<string, string>();
 
-  for (const group of groups.values()) {
+  for (const group of groupList) {
     const primary = movieById.get(group.primary)!;
     const base = group.baseId ? baseById.get(group.baseId) : undefined;
-    const title = (base?.name ?? primary.name ?? "").trim();
+    const title = groupTitle(group);
     if (!title) continue;
-
-    const existing =
-      dbMovies.find(
-        (m) =>
-          (group.baseId && m.ebillet_movie_base_id === group.baseId) ||
-          group.movieIds.some((id) => (m.ebillet_movie_ids ?? []).includes(id)),
-      ) ?? dbMovies.find((m) => normKey(m.title) === normKey(title));
 
     const poster = base?.posters ?? primary.posters ?? {};
     const posterUrl = poster.hd || poster.large || poster.small || null;
     const runtime = parseRuntimeMinutes(primary.length);
-    const year = primary.openingDate
+    const parsedYear = primary.openingDate
       ? Number.parseInt(primary.openingDate.slice(0, 4), 10)
-      : 0;
+      : Number.NaN;
+    const year = Number.isFinite(parsedYear) && parsedYear > 1900 ? parsedYear : 0;
     const genres = primary.genre
       ? primary.genre.split(/[,/]/).map((g) => g.trim()).filter(Boolean)
       : [];
@@ -356,29 +462,51 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
       .replace(/\s+/g, " ")
       .trim();
 
-    if (existing) {
+    // Id-first matching; a bare normalised title is not enough to merge.
+    const existing = matchMovie(
+      {
+        baseId: group.baseId,
+        movieIds: group.movieIds,
+        title,
+        year: year > 0 ? year : null,
+      },
+      dbMovies.map((m) => ({
+        id: m.id,
+        title: m.title,
+        year: m.year && m.year > 0 ? m.year : null,
+        ebillet_movie_base_id: m.ebillet_movie_base_id,
+        ebillet_movie_ids: m.ebillet_movie_ids,
+      })),
+    );
+    const existingRow = existing ? dbMovies.find((m) => m.id === existing.id)! : null;
+
+    if (existingRow) {
       // Supplement only: never clobber good Kultunaut data.
       const mergedIds = Array.from(
-        new Set([...(existing.ebillet_movie_ids ?? []), ...group.movieIds]),
+        new Set([...(existingRow.ebillet_movie_ids ?? []), ...group.movieIds]),
       );
       const patch: Record<string, unknown> = { ebillet_movie_ids: mergedIds };
-      if (group.baseId && !existing.ebillet_movie_base_id) {
+      if (group.baseId && !existingRow.ebillet_movie_base_id) {
         patch.ebillet_movie_base_id = group.baseId;
       }
-      if (!existing.runtime && runtime > 0) patch.runtime = runtime;
-      if (isBlank(existing.synopsis) && synopsis) patch.synopsis = synopsis;
-      if (isBlank(existing.director) && primary.directors?.length) {
+      if (!existingRow.runtime && runtime > 0) patch.runtime = runtime;
+      if (isBlank(existingRow.synopsis) && synopsis) patch.synopsis = synopsis;
+      if (isBlank(existingRow.director) && primary.directors?.length) {
         patch.director = primary.directors.join(", ");
       }
-      if ((existing.genre ?? []).length === 0 && genres.length > 0) patch.genre = genres;
-      if (isBlank(existing.trailer_url) && primary.trailer) patch.trailer_url = primary.trailer;
-      const hasPoster = Object.values(existing.poster ?? {}).some(
+      if ((existingRow.genre ?? []).length === 0 && genres.length > 0) patch.genre = genres;
+      if (isBlank(existingRow.trailer_url) && primary.trailer) {
+        patch.trailer_url = primary.trailer;
+      }
+      const hasPoster = Object.values(existingRow.poster ?? {}).some(
         (v) => typeof v === "string" && v.trim() !== "",
       );
       if (!hasPoster && posterUrl) patch.poster = { url: posterUrl };
-      const { error } = await db.from("movies").update(patch as any).eq("id", existing.id);
-      if (error) throw new Error(`movie update ${existing.id}: ${error.message}`);
-      movieIdForGroup.set(group.key, existing.id);
+      const { error } = await db.from("movies").update(patch as any).eq("id", existingRow.id);
+      if (error) throw new Error(`movie update ${existingRow.id}: ${error.message}`);
+      existingRow.ebillet_movie_ids = mergedIds;
+      if (group.baseId) existingRow.ebillet_movie_base_id = group.baseId;
+      movieIdForGroup.set(group.key, existingRow.id);
     } else {
       const id = `eb-${group.key}`;
       const row = {
@@ -388,7 +516,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
         original_title: primary.originalName || null,
         runtime,
         genre: genres,
-        year: Number.isFinite(year) && year > 1900 ? year : 0,
+        year,
         director: primary.directors?.join(", ") ?? "",
         rating: primary.ageCensoring ?? "",
         synopsis,
@@ -403,6 +531,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
       dbMovies.push({
         id,
         title,
+        year,
         runtime,
         synopsis,
         director: row.director,
@@ -418,7 +547,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
   }
   counts.movies = Math.max(counts.movies, groups.size);
 
-  // ---- 3. Showtimes ------------------------------------------------------
+  // ---- 4. Showtimes: snapshot reconciliation -----------------------------
   const typeName = new Map(payload.showtimeTypes.map((t) => [String(t.id), t.name]));
 
   type Grouped = {
@@ -451,17 +580,17 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     const hall = (st.locationName ?? "").trim() || "Sal";
     const gk = `${movieId}|${date}|${hall}`;
     const fresh: Grouped = {
-        movie_id: movieId,
-        cinema_id: cinemaId,
-        date,
-        hall,
-        timeUrls: new Map<string, string>(),
-        showtimeIds: [],
-        formats: [],
-        languages: [],
-        events: [],
-        freeSeats: null,
-        minPrice: null,
+      movie_id: movieId,
+      cinema_id: cinemaId,
+      date,
+      hall,
+      timeUrls: new Map<string, string>(),
+      showtimeIds: [],
+      formats: [],
+      languages: [],
+      events: [],
+      freeSeats: null,
+      minPrice: null,
       maxPrice: null,
     };
     const g = grouped.get(gk) ?? fresh;
@@ -485,59 +614,70 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     grouped.set(gk, g);
   }
 
-  for (const g of grouped.values()) {
+  const desired: DesiredShowtime[] = [...grouped.values()].map((g) => {
     const times = Array.from(g.timeUrls.keys()).sort();
     const ticketUrls = times.map((t) => g.timeUrls.get(t) ?? "");
     const primaryUrl = ticketUrls.find((u) => u) ?? null;
-    const startTime = times[0] ? new Date(`${g.date}T${times[0]}:00`).toISOString() : null;
-
-    const { data: existing } = await db
-      .from("showtimes")
-      .select("id, source, times, ticket_urls")
-      .eq("movie_id", g.movie_id)
-      .eq("cinema_id", g.cinema_id)
-      .eq("date", g.date)
-      .eq("hall", g.hall)
-      .maybeSingle();
-
-    const base = {
+    return {
+      movie_id: g.movie_id,
+      cinema_id: g.cinema_id,
+      date: g.date,
+      hall: g.hall,
       times,
       ticket_url: primaryUrl,
       ticket_urls: ticketUrls,
       booking_url: primaryUrl,
-      start_time: startTime,
+      start_time: times[0] ? new Date(`${g.date}T${times[0]}:00`).toISOString() : null,
       formats: g.formats,
-      events: g.events,
       languages: g.languages,
+      events: g.events,
       ebillet_showtime_ids: g.showtimeIds,
       free_seats: g.freeSeats,
       min_price: g.minPrice,
       max_price: g.maxPrice,
+      external_id: `eb-${organizerId}-${g.showtimeIds[0]}`,
     };
+  });
 
-    if (existing) {
+  // One targeted read for the whole cinema instead of a SELECT per showtime.
+  const currentRows = await loadAll<ExistingShowtime>(
+    db,
+    "showtimes",
+    "id, movie_id, date, hall, source, ebillet_showtime_ids",
+    (q: any) => q.eq("cinema_id", cinemaId),
+  );
+
+  const diff = diffShowtimes(currentRows, desired, { allowDeletes: validation.allowDeletes });
+
+  if (diff.inserts.length > 0) {
+    for (const chunk of chunked(diff.inserts, 200)) {
       const { error } = await db
         .from("showtimes")
-        .update({
-          ...base,
-          source: existing.source === "kultunaut" ? "kultunaut+ebillet" : "ebillet",
-        })
-        .eq("id", existing.id);
-      if (error) throw new Error(`showtime update: ${error.message}`);
-    } else {
-      const { error } = await db.from("showtimes").insert({
-        movie_id: g.movie_id,
-        cinema_id: g.cinema_id,
-        date: g.date,
-        hall: g.hall,
-        source: "ebillet",
-        external_id: `eb-${organizerId}-${g.showtimeIds[0]}`,
-        ...base,
-      });
+        .insert(chunk.map((row) => ({ ...row, source: "ebillet" })) as any);
       if (error) throw new Error(`showtime insert: ${error.message}`);
     }
-    counts.showtimes += 1;
   }
+  for (const chunk of chunked(diff.updates, 50)) {
+    const results = await Promise.all(
+      chunk.map(({ id, row }) =>
+        db
+          .from("showtimes")
+          .update({ ...row, source: "ebillet" } as any)
+          .eq("id", id),
+      ),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) throw new Error(`showtime update: ${failed.error.message}`);
+  }
+  if (diff.deleteIds.length > 0) {
+    for (const chunk of chunked(diff.deleteIds, 200)) {
+      const { error } = await db.from("showtimes").delete().in("id", chunk);
+      if (error) throw new Error(`showtime delete: ${error.message}`);
+    }
+    log("stale_showtimes_removed", { organizerId, cinemaId, removed: diff.deleteIds.length });
+  }
+  counts.showtimes = desired.length;
+
 
   await db
     .from("ebillet_organizers")

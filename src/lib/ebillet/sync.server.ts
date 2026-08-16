@@ -25,6 +25,7 @@ import {
   type EbilletMoviesResponse,
 } from "./api.server";
 import { classifyOrganizer } from "./venue-filter";
+import { matchCinema, uniqueCinemaSlug } from "./cinema-match";
 
 export const DEFAULT_MAX_ORGANIZER_ID = 400;
 const DISCOVERY_BATCH = 10;

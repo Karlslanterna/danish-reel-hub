@@ -450,9 +450,7 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
     const time = st.dateTime.slice(11, 16);
     const hall = (st.locationName ?? "").trim() || "Sal";
     const gk = `${movieId}|${date}|${hall}`;
-    const g =
-      grouped.get(gk) ??
-      ({
+    const fresh: Grouped = {
         movie_id: movieId,
         cinema_id: cinemaId,
         date,
@@ -464,8 +462,9 @@ export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncC
         events: [],
         freeSeats: null,
         minPrice: null,
-        maxPrice: null,
-      } satisfies Grouped);
+      maxPrice: null,
+    };
+    const g = grouped.get(gk) ?? fresh;
 
     g.timeUrls.set(time, ebilletBookingUrl(organizerId, st.movieId, st.id));
     if (!g.showtimeIds.includes(st.id)) g.showtimeIds.push(st.id);

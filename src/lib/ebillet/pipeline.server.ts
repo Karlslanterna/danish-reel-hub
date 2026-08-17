@@ -1,21 +1,30 @@
 /**
  * eBillet import pipeline — the active path.
  *
- *   fetch -> validate -> normalize -> resolve -> stage -> promote -> mark
+ *   fetch -> snapshot -> validate -> resolve -> normalize -> stage -> promote
  *
  * Compared to the legacy `sync.server.ts` orchestration this module:
- *  - records every payload as an `import_snapshots` row before touching data,
+ *  - records every payload as an `import_snapshots` row before canonical writes,
+ *  - validates the payload before creating/updating cinemas, movies or screenings,
  *  - resolves identity through `source_entity_refs` instead of re-matching
  *    names on every run,
  *  - writes one row per physical screening into `screenings`,
- *  - performs all destructive work inside the scoped `promote_screenings` RPC,
- *  - keeps the legacy `showtimes` read model in sync for the current frontend.
+ *  - performs destructive work only inside the scoped `promote_screenings` RPC.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { fetchOrganizerPayload, type EbilletMoviesResponse } from "./api.server";
-import { buildMovieGroups, normalizeEbilletScreenings, type EbilletMovieGroup } from "./normalize";
+import {
+  buildMovieGroups,
+  normalizeEbilletScreenings,
+  type EbilletMovieGroup,
+} from "./normalize";
 import { matchMovie, validateSnapshot } from "./reconcile";
-import { matchCinema, slugifyName, uniqueCinemaSlug, type MatchCinema } from "./cinema-match";
+import {
+  matchCinema,
+  slugifyName,
+  uniqueCinemaSlug,
+  type MatchCinema,
+} from "./cinema-match";
 import { classifyOrganizer } from "./venue-filter";
 import { loadRefs, recordUnresolved, upsertRefs } from "@/lib/pipeline/identity.server";
 import {
@@ -67,6 +76,34 @@ const dedupeById = <T extends { id: string | number }>(rows: T[]): T[] => {
 
 // ------------------------------------------------------------------ resolve
 
+/**
+ * Read-only lookup used before validation. It deliberately does no fuzzy/name
+ * matching and performs no writes: only an already persisted mapping counts as
+ * existing production state during snapshot validation.
+ */
+async function findKnownCinemaId(organizerId: number): Promise<string | null> {
+  const refs = await loadRefs("ebillet", "cinema", [String(organizerId)]);
+  const mapped = refs.get(String(organizerId));
+  if (mapped) return mapped.canonicalId;
+
+  const [{ data: organizer, error: organizerError }, { data: cinema, error: cinemaError }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("ebillet_organizers")
+        .select("cinema_id")
+        .eq("id", organizerId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("cinemas")
+        .select("id")
+        .eq("ebillet_organizer_id", organizerId)
+        .maybeSingle(),
+    ]);
+  if (organizerError) throw new Error(`organizer lookup ${organizerId}: ${organizerError.message}`);
+  if (cinemaError) throw new Error(`cinema lookup ${organizerId}: ${cinemaError.message}`);
+  return organizer?.cinema_id ?? cinema?.id ?? null;
+}
+
 /** Bind an organizer to its canonical cinema: ref first, then a match, else create. */
 async function resolveCinema(
   organizerId: number,
@@ -94,14 +131,22 @@ async function resolveCinema(
   const matchInput = { id: organizerId, name: organizer.name, city };
   const bareCity = city.replace(/^\s*(?:DK[-\s]?)?\d{3,4}\b/iu, "").trim();
   const base = slugifyName(organizer.name);
-  const slugs = [...new Set([base, slugifyName(`${organizer.name} ${bareCity}`), `${base}-${organizerId}`])];
+  const slugs = [
+    ...new Set([base, slugifyName(`${organizer.name} ${bareCity}`), `${base}-${organizerId}`]),
+  ];
   const firstToken = organizer.name.trim().split(/\s+/)[0] ?? organizer.name;
   const [byOrg, bySlug, byName] = await Promise.all([
     supabaseAdmin.from("cinemas").select(CINEMA_COLUMNS).eq("ebillet_organizer_id", organizerId),
     supabaseAdmin.from("cinemas").select(CINEMA_COLUMNS).in("slug", slugs),
-    supabaseAdmin.from("cinemas").select(CINEMA_COLUMNS).ilike("name", `${firstToken}%`).limit(50),
+    supabaseAdmin
+      .from("cinemas")
+      .select(CINEMA_COLUMNS)
+      .ilike("name", `${firstToken}%`)
+      .limit(50),
   ]);
-  for (const r of [byOrg, bySlug, byName]) if (r.error) throw new Error(`cinemas: ${r.error.message}`);
+  for (const r of [byOrg, bySlug, byName]) {
+    if (r.error) throw new Error(`cinemas: ${r.error.message}`);
+  }
   const candidates = dedupeById<CinemaRow>([
     ...((byOrg.data ?? []) as CinemaRow[]),
     ...((bySlug.data ?? []) as CinemaRow[]),
@@ -149,7 +194,9 @@ async function resolveCinema(
     );
     if (!error) break;
     const collision = error.code === "23505" || /slug|duplicate key/i.test(error.message);
-    if (!collision || attempt === 2) throw new Error(`cinema insert ${cinemaId}: ${error.message}`);
+    if (!collision || attempt === 2) {
+      throw new Error(`cinema insert ${cinemaId}: ${error.message}`);
+    }
     const { data: fresh } = await supabaseAdmin.from("cinemas").select(CINEMA_COLUMNS);
     slug = uniqueCinemaSlug(matchInput, (fresh ?? []) as CinemaRow[], cinemaId);
   }
@@ -172,7 +219,11 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
   const resolved = new Map<string, string>();
   if (groups.length === 0) return resolved;
 
-  const refs = await loadRefs("ebillet", "movie", groups.map((g) => g.ref));
+  const refs = await loadRefs(
+    "ebillet",
+    "movie",
+    groups.map((g) => g.ref),
+  );
   const pending = groups.filter((g) => {
     const known = refs.get(g.ref);
     if (known) resolved.set(g.ref, known.canonicalId);
@@ -183,13 +234,22 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
   const baseIds = pending.map((g) => g.baseId).filter((v): v is number => v != null);
   const movieIds = pending.flatMap((g) => g.movieIds);
   const titles = pending.map((g) => g.title);
-  const queries = [] as Array<PromiseLike<{ data: MovieRow[] | null; error: { message: string } | null }>>;
-  if (baseIds.length)
-    queries.push(supabaseAdmin.from("movies").select(MOVIE_COLUMNS).in("ebillet_movie_base_id", baseIds) as never);
-  if (movieIds.length)
-    queries.push(supabaseAdmin.from("movies").select(MOVIE_COLUMNS).overlaps("ebillet_movie_ids", movieIds) as never);
-  if (titles.length)
+  const queries = [] as Array<
+    PromiseLike<{ data: MovieRow[] | null; error: { message: string } | null }>
+  >;
+  if (baseIds.length) {
+    queries.push(
+      supabaseAdmin.from("movies").select(MOVIE_COLUMNS).in("ebillet_movie_base_id", baseIds) as never,
+    );
+  }
+  if (movieIds.length) {
+    queries.push(
+      supabaseAdmin.from("movies").select(MOVIE_COLUMNS).overlaps("ebillet_movie_ids", movieIds) as never,
+    );
+  }
+  if (titles.length) {
     queries.push(supabaseAdmin.from("movies").select(MOVIE_COLUMNS).in("title", titles) as never);
+  }
   const results = await Promise.all(queries);
   const candidates: MovieRow[] = [];
   for (const r of results) {
@@ -230,7 +290,10 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
         (v) => typeof v === "string" && v.trim() !== "",
       );
       if (!hasPoster && group.posterUrl) patch.poster = { url: group.posterUrl };
-      const { error } = await supabaseAdmin.from("movies").update(patch as never).eq("id", row.id);
+      const { error } = await supabaseAdmin
+        .from("movies")
+        .update(patch as never)
+        .eq("id", row.id);
       if (error) throw new Error(`movie update ${row.id}: ${error.message}`);
       row.ebillet_movie_ids = mergedIds;
       resolved.set(group.ref, row.id);
@@ -317,8 +380,22 @@ export async function runOrganizerPipeline(organizerId: number): Promise<Organiz
   const organizer = payload.organizers.find((o) => o.id === organizerId);
   if (!organizer) throw new Error(`Organizer ${organizerId} findes ikke hos eBillet`);
 
+  // Persist the payload before any canonical movie/cinema/screening mutation.
+  const snapshot = await createSnapshot({
+    source: "ebillet",
+    scopeType: "organizer",
+    scopeExternalId: String(organizerId),
+    payload,
+  });
+
+  const screeningCount = payload.showtimes.filter((s) => s.organizerId === organizerId).length;
   const classification = classifyOrganizer({ id: organizerId, name: organizer.name });
   if (!classification.isCinema) {
+    await applyValidation(snapshot.id, {
+      verdict: "incomplete",
+      reasons: [classification.reason],
+      stats: { showtimes: screeningCount },
+    });
     await supabaseAdmin
       .from("ebillet_organizers")
       .update({
@@ -333,6 +410,7 @@ export async function runOrganizerPipeline(organizerId: number): Promise<Organiz
       cinemaId: null,
       skipped: true,
       reason: classification.reason,
+      snapshotId: snapshot.id,
       movies: 0,
       screenings: 0,
       upserted: 0,
@@ -340,54 +418,85 @@ export async function runOrganizerPipeline(organizerId: number): Promise<Organiz
     };
   }
 
-  const { cinemaId } = await resolveCinema(organizerId, payload);
-  await supabaseAdmin
-    .from("ebillet_organizers")
-    .update({ cinema_id: cinemaId })
-    .eq("id", organizerId);
+  // Validation needs existing-row context but must not create or mutate the
+  // cinema just to obtain it. Only persisted identity links are trusted here.
+  const knownCinemaId = await findKnownCinemaId(organizerId);
+  let existingRows = 0;
+  if (knownCinemaId) {
+    const { count, error } = await supabaseAdmin
+      .from("screenings")
+      .select("id", { count: "exact", head: true })
+      .eq("cinema_id", knownCinemaId)
+      .eq("source", "ebillet");
+    if (error) throw new Error(`existing screenings ${knownCinemaId}: ${error.message}`);
+    existingRows = count ?? 0;
+  }
 
-  const snapshot = await createSnapshot({
-    source: "ebillet",
-    scopeType: "organizer",
-    scopeExternalId: String(organizerId),
-    payload,
-  });
-
-  const { count: existingRows } = await supabaseAdmin
-    .from("screenings")
-    .select("id", { count: "exact", head: true })
-    .eq("cinema_id", cinemaId)
-    .eq("source", "ebillet");
-
-  const verdictRaw = validateSnapshot(organizerId, payload, {
-    existingRowCount: existingRows ?? 0,
-  });
-  const screeningCount = payload.showtimes.filter((s) => s.organizerId === organizerId).length;
+  const verdictRaw = validateSnapshot(organizerId, payload, { existingRowCount: existingRows });
   const promotable = await applyValidation(snapshot.id, {
     verdict: verdictRaw.ok ? (screeningCount > 0 ? "complete" : "valid-empty") : "incomplete",
     reasons: verdictRaw.ok ? [] : [verdictRaw.reason],
     stats: {
       showtimes: screeningCount,
       movies: payload.movies.length,
-      existingRows: existingRows ?? 0,
+      existingRows,
+      knownCinemaId,
     },
   });
 
   if (!promotable) {
+    const reason = verdictRaw.ok ? "afvist" : verdictRaw.reason;
     await supabaseAdmin
       .from("ebillet_organizers")
       .update({
         last_synced_at: nowIso(),
         last_sync_status: "rejected",
-        last_sync_error: (verdictRaw.ok ? "afvist" : verdictRaw.reason).slice(0, 500),
+        last_sync_error: reason.slice(0, 500),
       })
       .eq("id", organizerId);
-    throw new Error(`Payload afvist: ${verdictRaw.ok ? "ukendt" : verdictRaw.reason}`);
+    throw new Error(`Payload afvist: ${reason}`);
   }
+
+  // A new organizer with a valid but empty snapshot has nothing canonical to
+  // create yet. Keep the registry entry and snapshot, and let discovery/queueing
+  // pick it up when eBillet later exposes screenings.
+  if (!knownCinemaId && screeningCount === 0) {
+    await supabaseAdmin
+      .from("import_snapshots")
+      .update({ status: "promoted" })
+      .eq("id", snapshot.id);
+    await supabaseAdmin
+      .from("ebillet_organizers")
+      .update({
+        is_active: false,
+        showtime_count: 0,
+        last_synced_at: nowIso(),
+        last_sync_status: "success",
+        last_sync_error: null,
+        last_sync_counts: { cinemas: 0, movies: 0, showtimes: 0 },
+      })
+      .eq("id", organizerId);
+    return {
+      organizerId,
+      cinemaId: null,
+      skipped: false,
+      snapshotId: snapshot.id,
+      movies: 0,
+      screenings: 0,
+      upserted: 0,
+      deleted: 0,
+    };
+  }
+
+  // Canonical writes start only after the snapshot has passed validation.
+  const { cinemaId } = await resolveCinema(organizerId, payload);
+  await supabaseAdmin
+    .from("ebillet_organizers")
+    .update({ cinema_id: cinemaId })
+    .eq("id", organizerId);
 
   const groups = buildMovieGroups(payload);
   const movieIdByRef = await resolveMovies(groups);
-
   const normalized = normalizeEbilletScreenings(organizerId, payload).filter((s) =>
     movieIdByRef.has(s.sourceMovieRef),
   );

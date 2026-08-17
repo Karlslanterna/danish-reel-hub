@@ -59,4 +59,71 @@ describe("eBillet normalization", () => {
     const groups = buildMovieGroups(payload, NOW);
     expect(groups.map((g) => g.ref)).toEqual(["base-10"]);
   });
+
+  it("collapses multiple booking ids for one physical screening deterministically", () => {
+    const duplicated: EbilletMoviesResponse = {
+      ...payload,
+      showtimes: [
+        {
+          id: 51,
+          movieId: 100,
+          movieBaseId: 10,
+          locationId: 1,
+          locationName: "Sal 1",
+          organizerId: ORG,
+          dateTime: "2026-08-20T20:00:00",
+          freeSeats: 91,
+          buyInfo: { enabled: true },
+        },
+        {
+          id: 41,
+          movieId: 100,
+          movieBaseId: 10,
+          locationId: 1,
+          locationName: "Sal 1",
+          organizerId: ORG,
+          dateTime: "2026-08-20T20:00:00",
+          freeSeats: 100,
+          buyInfo: { enabled: true },
+        },
+      ],
+    };
+
+    const screenings = normalizeEbilletScreenings(ORG, duplicated, NOW);
+    expect(screenings).toHaveLength(1);
+    expect(screenings[0]?.sourceRef).toBe("eb-108-41");
+    expect(screenings[0]?.freeSeats).toBe(100);
+  });
+
+  it("prefers a bookable duplicate over a lower disabled booking id", () => {
+    const duplicated: EbilletMoviesResponse = {
+      ...payload,
+      showtimes: [
+        {
+          id: 40,
+          movieId: 100,
+          movieBaseId: 10,
+          locationId: 1,
+          locationName: "Sal 1",
+          organizerId: ORG,
+          dateTime: "2026-08-20T20:00:00",
+          buyInfo: { enabled: false },
+        },
+        {
+          id: 50,
+          movieId: 100,
+          movieBaseId: 10,
+          locationId: 1,
+          locationName: "Sal 1",
+          organizerId: ORG,
+          dateTime: "2026-08-20T20:00:00",
+          buyInfo: { enabled: true },
+        },
+      ],
+    };
+
+    const screenings = normalizeEbilletScreenings(ORG, duplicated, NOW);
+    expect(screenings).toHaveLength(1);
+    expect(screenings[0]?.sourceRef).toBe("eb-108-50");
+  });
 });

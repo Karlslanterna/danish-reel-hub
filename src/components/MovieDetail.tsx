@@ -5,9 +5,15 @@ import { SiteFooter } from "@/components/SiteFooter";
 
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
-import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
+import {
+  FilterBar,
+  useFilters,
+  useCinemaUrlSync,
+  haversineKm,
+  fmtDateLabel,
+} from "@/lib/filters";
 import { useLanguage } from "@/lib/i18n";
-import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
+import { collectTagOptions, showtimeMatchesTags } from "@/lib/showtime-tags";
 import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
 
@@ -48,7 +54,11 @@ export function MovieDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city?.name]);
 
-  const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
+  const tagSel = {
+    format: selectedFormat,
+    language: selectedLanguage,
+    event: selectedEvent,
+  };
   const tagOptions = collectTagOptions(showtimes);
   const hasGeo = radius !== "all" && userLoc !== null;
 
@@ -72,28 +82,27 @@ export function MovieDetail({
     .map((c) => ({ cinema: c, days: filteredShowtimes.filter((s) => s.cinemaId === c.id) }))
     .filter((x) => x.days.length > 0);
 
-  
-
-  const cityFilterOptions = (cityOptions ?? []).map((c) => ({ value: c.name, count: c.count }));
-
+  const cityFilterOptions = (cityOptions ?? []).map((c) => ({
+    value: c.name,
+    count: c.count,
+  }));
 
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
       <section className="relative overflow-hidden border-b border-border/60">
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-[30vh] md:h-[45vh]"
-        >
+        <div aria-hidden className="absolute inset-x-0 top-0 h-[30vh] md:h-[45vh]">
           <div
             aria-hidden
-            style={{
-              "--p-a": movie.poster.a ?? "#8f332d",
-              "--p-b": movie.poster.b ?? "#0b2545",
-              "--p-c": movie.poster.c ?? "#111111",
-              "--p-d": movie.poster.d ?? "#05070a",
-            } as React.CSSProperties}
+            style={
+              {
+                "--p-a": movie.poster.a ?? "#8f332d",
+                "--p-b": movie.poster.b ?? "#0b2545",
+                "--p-c": movie.poster.c ?? "#111111",
+                "--p-d": movie.poster.d ?? "#05070a",
+              } as React.CSSProperties
+            }
             className="poster-gradient absolute inset-0 scale-110 opacity-25 blur-3xl"
           />
           {movie.backdropUrl ? (
@@ -188,18 +197,25 @@ export function MovieDetail({
               {movie.synopsis}
             </p>
           )}
-
         </div>
       </section>
 
-      <section id="showtimes" className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12">
+      <section
+        id="showtimes"
+        className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12"
+      >
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <FilterBar
             formats={tagOptions.formats}
             languages={tagOptions.languages}
             events={tagOptions.events}
             cities={cityFilterOptions}
-            cinemas={geoCinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
+            cinemas={geoCinemas.map((c) => ({
+              id: c.id,
+              slug: c.slug,
+              name: c.name,
+              city: c.city,
+            }))}
           />
         </div>
 
@@ -216,7 +232,9 @@ export function MovieDetail({
         {byCinema.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-12 text-center">
             <p className="font-display text-lg text-foreground">
-              {city ? `Ingen spilletider i ${city.name} lige nu` : "Ingen spilletider matcher dine filtre"}
+              {city
+                ? `Ingen spilletider i ${city.name} lige nu`
+                : "Ingen spilletider matcher dine filtre"}
             </p>
             {city ? (
               <Link
@@ -340,7 +358,6 @@ export function MovieDetail({
 
       <SiteFooter cinemas={cinemasShowing} />
     </div>
-
   );
 }
 

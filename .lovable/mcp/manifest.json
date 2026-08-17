@@ -81,7 +81,7 @@
       {
         "name": "get_showtimes",
         "title": "Get showtimes",
-        "description": "List showtimes filtered by movie id/slug, cinema id/slug, and/or date (YYYY-MM-DD). At least one filter is required.",
+        "description": "List physical cinema screenings filtered by movie id/slug, cinema id/slug, and/or date (YYYY-MM-DD). At least one filter is required.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -92,7 +92,7 @@
           "type": "object",
           "properties": {
             "movie_id": {
-              "description": "Movie id (uuid).",
+              "description": "Movie id.",
               "type": "string"
             },
             "movie_slug": {
@@ -108,7 +108,7 @@
               "type": "string"
             },
             "date": {
-              "description": "Date in YYYY-MM-DD. Defaults to today if no other filters narrow it.",
+              "description": "Local Danish date in YYYY-MM-DD.",
               "type": "string"
             },
             "limit": {

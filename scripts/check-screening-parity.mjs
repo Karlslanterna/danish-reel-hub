@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 
 const PAGE_SIZE = 1000;
 const WINDOW_DAYS = 30;
+const MIN_KULTUNAUT_HORIZON_DAYS = 21;
 
 function copenhagenDate(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -17,6 +18,14 @@ function addDays(isoDate, days) {
   return new Date(Date.UTC(year, month - 1, day + days, 12)).toISOString().slice(0, 10);
 }
 
+function daysBetween(start, end) {
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(ey, em - 1, ed, 12) - Date.UTC(sy, sm - 1, sd, 12)) / 86_400_000,
+  );
+}
+
 async function loadPublicConfig() {
   const text = await fs.readFile(
     new URL("../src/integrations/supabase/public-config.ts", import.meta.url),
@@ -28,14 +37,12 @@ async function loadPublicConfig() {
   return { url, key };
 }
 
-async function fetchAll({ baseUrl, key, table, select, dateColumn, start, end }) {
+async function fetchPages({ baseUrl, key, table, select, configure }) {
   const rows = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const url = new URL(`/rest/v1/${table}`, baseUrl);
     url.searchParams.set("select", select);
-    url.searchParams.set(dateColumn, `gte.${start}`);
-    url.searchParams.append(dateColumn, `lte.${end}`);
-    url.searchParams.set("order", `${dateColumn}.asc`);
+    configure?.(url);
     const response = await fetch(url, {
       headers: {
         apikey: key,
@@ -52,6 +59,20 @@ async function fetchAll({ baseUrl, key, table, select, dateColumn, start, end })
     if (page.length < PAGE_SIZE) break;
   }
   return rows;
+}
+
+async function fetchWindow({ baseUrl, key, table, select, dateColumn, start, end }) {
+  return fetchPages({
+    baseUrl,
+    key,
+    table,
+    select,
+    configure: (url) => {
+      url.searchParams.set(dateColumn, `gte.${start}`);
+      url.searchParams.append(dateColumn, `lte.${end}`);
+      url.searchParams.set("order", `${dateColumn}.asc`);
+    },
+  });
 }
 
 const normTime = (value) => String(value ?? "").slice(0, 5);
@@ -133,8 +154,8 @@ const start = copenhagenDate();
 const end = addDays(start, WINDOW_DAYS);
 const { url, key } = await loadPublicConfig();
 
-const [screenings, showtimes] = await Promise.all([
-  fetchAll({
+const [screenings, showtimes, cinemas] = await Promise.all([
+  fetchWindow({
     baseUrl: url,
     key,
     table: "screenings",
@@ -143,7 +164,7 @@ const [screenings, showtimes] = await Promise.all([
     start,
     end,
   }),
-  fetchAll({
+  fetchWindow({
     baseUrl: url,
     key,
     table: "showtimes",
@@ -152,11 +173,33 @@ const [screenings, showtimes] = await Promise.all([
     start,
     end,
   }),
+  fetchPages({
+    baseUrl: url,
+    key,
+    table: "cinemas",
+    select: "id,slug,ebillet_organizer_id",
+  }),
 ]);
 
 const canonical = canonicalGroups(screenings);
 const legacy = legacyGroups(showtimes);
 const mismatches = compare(canonical, legacy);
+
+const ebilletOwnedCinemaIds = new Set(
+  cinemas.filter((cinema) => cinema.ebillet_organizer_id != null).map((cinema) => cinema.id),
+);
+const authorityViolations = screenings.filter(
+  (screening) =>
+    screening.source === "kultunaut" && ebilletOwnedCinemaIds.has(screening.cinema_id),
+);
+const kultunautDates = screenings
+  .filter((screening) => screening.source === "kultunaut")
+  .map((screening) => screening.local_date)
+  .sort();
+const kultunautLastDate = kultunautDates.at(-1) ?? null;
+const kultunautHorizonDays = kultunautLastDate ? daysBetween(start, kultunautLastDate) : 0;
+const kultunautCoverageOk =
+  kultunautDates.length > 0 && kultunautHorizonDays >= MIN_KULTUNAUT_HORIZON_DAYS;
 
 console.log(
   JSON.stringify(
@@ -166,10 +209,25 @@ console.log(
       legacy: sourceCounts(legacy),
       mismatchCount: mismatches.length,
       mismatches: mismatches.slice(0, 25),
+      kultunaut: {
+        lastDate: kultunautLastDate,
+        horizonDays: kultunautHorizonDays,
+        minimumHorizonDays: MIN_KULTUNAUT_HORIZON_DAYS,
+        coverageOk: kultunautCoverageOk,
+        authorityViolationCount: authorityViolations.length,
+        authorityViolations: authorityViolations.slice(0, 10).map((row) => ({
+          cinemaId: row.cinema_id,
+          movieId: row.movie_id,
+          date: row.local_date,
+          time: row.local_time,
+        })),
+      },
     },
     null,
     2,
   ),
 );
 
-if (mismatches.length > 0) process.exit(1);
+if (mismatches.length > 0 || authorityViolations.length > 0 || !kultunautCoverageOk) {
+  process.exit(1);
+}

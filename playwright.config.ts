@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: isExternalTarget
     ? undefined
     : {
-        command: "bun run dev",
+        command: "npm run dev",
         url: baseURL,
         reuseExistingServer: true,
         timeout: 120_000,

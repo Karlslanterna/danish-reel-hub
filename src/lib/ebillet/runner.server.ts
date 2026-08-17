@@ -6,9 +6,9 @@
  * lease makes a crashed job reclaimable on the next scheduler tick.
  *
  * A sync cycle is finite: organizers are enqueued only when there are no
- * queued/running organizer jobs. Without that guard, a completed organizer
- * would immediately be queued again on the next loop iteration and the queue
- * could never drain to zero.
+ * queued/running organizer jobs. Scheduled resume calls are explicitly unable
+ * to create a fresh cycle, so a frequent resume cron can drain a long cycle
+ * without turning into an accidental continuous sync loop.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -44,16 +44,25 @@ type QueueRpcResult = {
   error: { message: string } | null;
 };
 
+export type EbilletQueueOptions = {
+  /** False for resume-only scheduler ticks: drain existing work, never enqueue. */
+  allowStart?: boolean;
+  /** Explicit operator action may bypass the normal freshness interval. */
+  forceQueue?: boolean;
+};
+
 /** Avoid immediately starting a fresh full scan after the previous one drains. */
 export const EBILLET_MIN_CYCLE_INTERVAL_MS = 15 * 60 * 1000;
 
 export function shouldStartEbilletCycle(input: {
   activeRuns: number;
   lastCompletedAt: string | null;
+  allowStart?: boolean;
   force?: boolean;
   nowMs?: number;
   minIntervalMs?: number;
 }): boolean {
+  if (input.allowStart === false) return false;
   if (input.activeRuns > 0) return false;
   if (input.force) return true;
   if (!input.lastCompletedAt) return true;
@@ -109,7 +118,7 @@ const stateToStatus = (state: RunState): EbilletQueueResult["status"] =>
  * being hammered repeatedly inside the same request.
  */
 export async function runNextEbilletOrganizer(
-  opts: { forceQueue?: boolean } = {},
+  opts: EbilletQueueOptions = {},
 ): Promise<EbilletQueueResult> {
   await reapExpiredRuns("ebillet");
 
@@ -121,6 +130,7 @@ export async function runNextEbilletOrganizer(
       shouldStartEbilletCycle({
         activeRuns: activeBefore,
         lastCompletedAt,
+        allowStart: opts.allowStart ?? true,
         force: opts.forceQueue ?? false,
       })
     ) {
@@ -134,7 +144,10 @@ export async function runNextEbilletOrganizer(
     return {
       done: true,
       status: "idle",
-      message: "Ingen eBillet-organizers venter på synkronisering.",
+      message:
+        opts.allowStart === false
+          ? "Ingen igangværende eBillet-kørsel at genoptage."
+          : "Ingen eBillet-organizers venter på synkronisering.",
       runId: null,
       organizerId: null,
       remaining: 0,
@@ -207,18 +220,19 @@ export async function runNextEbilletOrganizer(
 
 /**
  * Work through one finite organizer cycle until the request is close to its
- * wall-clock budget. A new cycle is never started inside the same batch after
- * the queue has drained.
+ * wall-clock budget. Resume-only callers may drain an existing cycle but may
+ * never create the next one.
  */
 export async function runEbilletQueueBatch(
   budgetMs = 55_000,
+  opts: EbilletQueueOptions = {},
 ): Promise<EbilletQueueResult & { processed: number }> {
   const deadline = Date.now() + Math.max(1_000, budgetMs);
   let processed = 0;
   let last: EbilletQueueResult | null = null;
 
   while (Date.now() < deadline) {
-    last = await runNextEbilletOrganizer();
+    last = await runNextEbilletOrganizer(opts);
     if (last.runId) processed += 1;
     if (last.done || last.status === "retrying" || last.status === "dead_letter") break;
   }

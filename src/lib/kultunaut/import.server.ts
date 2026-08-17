@@ -526,84 +526,48 @@ export async function processJobBatch(
       // Source authority: eBillet owns the showtimes of every cinema linked to
       // an active eBillet organizer — Kultunaut must not write there at all.
       // Kultunaut remains authoritative for all other cinemas.
-      const coveredCinemaIds = new Set<string>();
-      {
-        const { data: orgs, error: orgErr } = await supabaseAdmin
-          .from("ebillet_organizers")
-          .select("cinema_id")
-          .eq("is_active", true)
-          .not("cinema_id", "is", null);
-        if (orgErr) errors.push(`ebillet coverage lookup: ${orgErr.message}`);
-        for (const o of orgs ?? []) if (o.cinema_id) coveredCinemaIds.add(o.cinema_id);
+      let ebilletCinemaIds = new Set<string>();
+      try {
+        ebilletCinemaIds = await loadEbilletCinemaIds(supabaseAdmin);
+      } catch (err) {
+        // Without the coverage list we cannot prove a write is legal — stop
+        // this batch rather than risk writing into eBillet territory.
+        throw new Error(err instanceof Error ? err.message : String(err));
       }
 
-      for (const row of slice) {
+      const { writable } = partitionByAuthority(slice, ebilletCinemaIds);
+
+      const rows = writable.map((row) => {
         const times = row.times;
         const ticketUrls = row.ticket_urls;
-
-        if (coveredCinemaIds.has(row.cinema_id)) {
-          // eBillet-authoritative cinema: skip silently.
-          upserted++;
-          continue;
-        }
-
-        const { data: existing } = await supabaseAdmin
-          .from("showtimes")
-          .select("id, source")
-          .eq("movie_id", row.movie_id)
-          .eq("cinema_id", row.cinema_id)
-          .eq("date", row.date)
-          .eq("hall", row.hall)
-          .maybeSingle();
-
-
-
-        const startTimeIso = times[0]
-          ? new Date(`${row.date}T${times[0]}`).toISOString()
-          : null;
         const primaryTicketUrl = ticketUrls.find((u) => u) ?? null;
+        return {
+          movie_id: row.movie_id,
+          cinema_id: row.cinema_id,
+          date: row.date,
+          hall: row.hall,
+          times,
+          ticket_url: primaryTicketUrl,
+          ticket_urls: ticketUrls,
+          booking_url: primaryTicketUrl,
+          start_time: times[0] ? new Date(`${row.date}T${times[0]}`).toISOString() : null,
+          formats: row.formats ?? [],
+          languages: row.languages ?? [],
+          events: row.events ?? [],
+          source: KULTUNAUT_SOURCE,
+        };
+      });
 
-        if (existing) {
-          const { error } = await supabaseAdmin
-            .from("showtimes")
-            .update({
-              times,
-              ticket_url: primaryTicketUrl,
-              ticket_urls: ticketUrls,
-              booking_url: primaryTicketUrl,
-              start_time: startTimeIso,
-              formats: row.formats ?? [],
-              languages: row.languages ?? [],
-              events: row.events ?? [],
-            })
-            .eq("id", existing.id);
-          if (error) {
-            errors.push(`showtime update: ${error.message}`);
-            continue;
-          }
-        } else {
-          const { error } = await supabaseAdmin.from("showtimes").insert({
-            movie_id: row.movie_id,
-            cinema_id: row.cinema_id,
-            date: row.date,
-            hall: row.hall,
-            times,
-            ticket_url: primaryTicketUrl,
-            ticket_urls: ticketUrls,
-            booking_url: primaryTicketUrl,
-            start_time: startTimeIso,
-            formats: row.formats ?? [],
-            languages: row.languages ?? [],
-            events: row.events ?? [],
-          });
-          if (error) {
-            errors.push(`showtime insert: ${error.message}`);
-            continue;
-          }
-        }
-        upserted++;
+      // One scoped bulk upsert per batch instead of a SELECT + UPDATE/INSERT
+      // round trip per row. Identity is the unique index
+      // (movie_id, cinema_id, date, hall, source).
+      if (rows.length > 0) {
+        const { error } = await supabaseAdmin
+          .from("showtimes")
+          .upsert(rows as any, { onConflict: "movie_id,cinema_id,date,hall,source" });
+        if (error) errors.push(`showtime upsert: ${error.message}`);
       }
-
+      upserted += slice.length;
 
       const newCursor = cursor + slice.length;
       const finished = newCursor >= grouped.length;
@@ -630,7 +594,18 @@ export async function processJobBatch(
 
     if (job.phase === "cleanup") {
       const errors: string[] = [];
-      const summary = await cleanupStaleData();
+      const payload = (job.payload ?? {}) as { groupedShowtimes?: GroupedShowtime[] };
+      const desired: ShowtimeKeyed[] = (payload.groupedShowtimes ?? []).map((g) => ({
+        movie_id: g.movie_id,
+        cinema_id: g.cinema_id,
+        date: g.date,
+        hall: g.hall,
+      }));
+      // Only reconcile removals when the feed actually produced rows — an
+      // empty payload must never wipe existing Kultunaut showtimes.
+      const summary = await cleanupKultunautData(desired, {
+        reconcileRemovals: desired.length > 0,
+      });
       errors.push(...summary.errors);
 
       await supabaseAdmin
@@ -639,14 +614,15 @@ export async function processJobBatch(
           phase: "enrich",
           status: "running",
           message:
-            `Oprydning færdig — fjernede ${summary.showtimesDeleted} forældede visninger, ` +
-            `${summary.moviesDeleted} film og ${summary.cinemasDeleted} biografer uden kommende visninger. ` +
+            `Oprydning færdig — fjernede ${summary.showtimesDeleted} forældede Kultunaut-visninger ` +
+            `og ${summary.moviesDeleted} film uden visninger (biografer og eBillet-data røres ikke). ` +
             `Henter filmdata fra TMDb…`,
         })
         .eq("id", jobId);
       await pushErrors(errors);
       return { done: false, status: "running", phase: "enrich" };
     }
+
 
     if (job.phase === "enrich") {
       // Optional metadata step. It must never fail or block the import:

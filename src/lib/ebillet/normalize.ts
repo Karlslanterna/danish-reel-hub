@@ -36,7 +36,13 @@ export type EbilletMovieGroup = {
 export const movieRefOf = (movie: { id: number; baseId?: number | null }): string =>
   movie.baseId && movie.baseId > 0 ? `base-${movie.baseId}` : `movie-${movie.id}`;
 
-export const screeningRefOf = (showtimeId: number): string => `eb-${showtimeId}`;
+/**
+ * Showtime ids are scoped by organizer. Even if eBillet currently allocates
+ * them globally, encoding the organizer makes the identity collision-proof
+ * and keeps promotion strictly inside one cinema scope.
+ */
+export const screeningRefOf = (organizerId: number, showtimeId: number): string =>
+  `eb-${organizerId}-${showtimeId}`;
 
 const clean = (html: string | null | undefined): string =>
   (html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -115,7 +121,7 @@ export function normalizeEbilletScreenings(
   for (const st of relevant) {
     const movie = movieById.get(st.movieId);
     if (!movie) continue;
-    const ref = screeningRefOf(st.id);
+    const ref = screeningRefOf(organizerId, st.id);
     if (seen.has(ref)) continue;
     let startsAt: string;
     try {

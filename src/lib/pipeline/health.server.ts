@@ -1,0 +1,219 @@
+/**
+ * Source-specific health for the canonical import pipeline.
+ *
+ * This deliberately does not infer eBillet health from Kultunaut jobs (or vice
+ * versa). Each source gets its own run freshness, canonical screening count,
+ * dead-letter count and unresolved identity count.
+ */
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { ImportSource } from "./types";
+
+export type PipelineHealthStatus = "healthy" | "warning" | "critical" | "unknown";
+
+export type SourcePipelineHealth = {
+  source: ImportSource;
+  status: PipelineHealthStatus;
+  reasons: string[];
+  lastRunAt: string | null;
+  lastRunState: string | null;
+  lastSuccessAt: string | null;
+  hoursSinceLastSuccess: number | null;
+  canonicalScreenings: number;
+  futureScreenings: number;
+  queuedRuns: number;
+  runningRuns: number;
+  deadLetterRuns: number;
+  unresolvedMappings: number;
+};
+
+export type CanonicalPipelineHealth = {
+  status: PipelineHealthStatus;
+  reasons: string[];
+  sources: Record<ImportSource, SourcePipelineHealth>;
+  checkedAt: string;
+};
+
+type RunRow = {
+  state: string;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+};
+
+const WARN_HOURS = 26;
+const CRITICAL_HOURS = 48;
+
+function maxStatus(a: PipelineHealthStatus, b: PipelineHealthStatus): PipelineHealthStatus {
+  const rank: Record<PipelineHealthStatus, number> = {
+    healthy: 0,
+    unknown: 1,
+    warning: 2,
+    critical: 3,
+  };
+  return rank[a] >= rank[b] ? a : b;
+}
+
+async function countRows(
+  table: "screenings" | "import_runs" | "unresolved_source_entities",
+  configure: (query: ReturnType<typeof supabaseAdmin.from>) => unknown,
+): Promise<number> {
+  // Kept only as documentation helper; source health uses explicit queries
+  // below so Supabase's fluent generic types remain intact.
+  void table;
+  void configure;
+  return 0;
+}
+
+async function sourceHealth(source: ImportSource): Promise<SourcePipelineHealth> {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Copenhagen",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const [runsRes, canonicalRes, futureRes, queuedRes, runningRes, deadRes, unresolvedRes] =
+    await Promise.all([
+      supabaseAdmin
+        .from("import_runs")
+        .select("state,created_at,updated_at,finished_at")
+        .eq("source", source)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabaseAdmin
+        .from("screenings")
+        .select("id", { count: "exact", head: true })
+        .eq("source", source),
+      supabaseAdmin
+        .from("screenings")
+        .select("id", { count: "exact", head: true })
+        .eq("source", source)
+        .gte("local_date", today),
+      supabaseAdmin
+        .from("import_runs")
+        .select("id", { count: "exact", head: true })
+        .eq("source", source)
+        .eq("state", "queued"),
+      supabaseAdmin
+        .from("import_runs")
+        .select("id", { count: "exact", head: true })
+        .eq("source", source)
+        .eq("state", "running"),
+      supabaseAdmin
+        .from("import_runs")
+        .select("id", { count: "exact", head: true })
+        .eq("source", source)
+        .eq("state", "dead_letter"),
+      supabaseAdmin
+        .from("unresolved_source_entities")
+        .select("id", { count: "exact", head: true })
+        .eq("source", source)
+        .eq("resolved", false),
+    ]);
+
+  for (const [label, result] of [
+    ["runs", runsRes],
+    ["screenings", canonicalRes],
+    ["future screenings", futureRes],
+    ["queued runs", queuedRes],
+    ["running runs", runningRes],
+    ["dead letters", deadRes],
+    ["unresolved mappings", unresolvedRes],
+  ] as const) {
+    if (result.error) throw new Error(`${source} health ${label}: ${result.error.message}`);
+  }
+
+  const runs = (runsRes.data ?? []) as RunRow[];
+  const last = runs[0] ?? null;
+  const success = runs.find((r) => r.state === "completed") ?? null;
+  const successAt = success?.finished_at ?? success?.updated_at ?? null;
+  const hoursSinceLastSuccess = successAt
+    ? Math.max(0, (Date.now() - Date.parse(successAt)) / 3_600_000)
+    : null;
+  const canonicalScreenings = canonicalRes.count ?? 0;
+  const futureScreenings = futureRes.count ?? 0;
+  const deadLetterRuns = deadRes.count ?? 0;
+  const reasons: string[] = [];
+  let status: PipelineHealthStatus = "healthy";
+
+  if (!last) {
+    status = canonicalScreenings > 0 ? "warning" : "unknown";
+    reasons.push("No canonical import runs recorded yet");
+  }
+
+  if (deadLetterRuns > 0) {
+    status = "critical";
+    reasons.push(`${deadLetterRuns} import run(s) are in dead-letter state`);
+  }
+
+  if (hoursSinceLastSuccess === null) {
+    if (canonicalScreenings > 0) {
+      status = maxStatus(status, "warning");
+      reasons.push("Canonical screenings exist, but no completed import_run is recorded yet");
+    }
+  } else if (hoursSinceLastSuccess >= CRITICAL_HOURS) {
+    status = maxStatus(status, "critical");
+    reasons.push(`Last canonical success was ${hoursSinceLastSuccess.toFixed(1)}h ago`);
+  } else if (hoursSinceLastSuccess >= WARN_HOURS) {
+    status = maxStatus(status, "warning");
+    reasons.push(`Last canonical success was ${hoursSinceLastSuccess.toFixed(1)}h ago`);
+  }
+
+  // At source level, zero future screenings is a strong anomaly once the
+  // source has previously produced canonical data.
+  if (canonicalScreenings > 0 && futureScreenings === 0) {
+    status = maxStatus(status, "critical");
+    reasons.push("Source has canonical history but zero future screenings");
+  }
+
+  if ((unresolvedRes.count ?? 0) > 0) {
+    status = maxStatus(status, "warning");
+    reasons.push(`${unresolvedRes.count} unresolved identity mapping(s)`);
+  }
+
+  if (reasons.length === 0) reasons.push("All canonical source checks passed");
+
+  return {
+    source,
+    status,
+    reasons,
+    lastRunAt: last?.created_at ?? null,
+    lastRunState: last?.state ?? null,
+    lastSuccessAt: successAt,
+    hoursSinceLastSuccess,
+    canonicalScreenings,
+    futureScreenings,
+    queuedRuns: queuedRes.count ?? 0,
+    runningRuns: runningRes.count ?? 0,
+    deadLetterRuns,
+    unresolvedMappings: unresolvedRes.count ?? 0,
+  };
+}
+
+export async function getCanonicalPipelineHealth(): Promise<CanonicalPipelineHealth> {
+  const [ebillet, kultunaut] = await Promise.all([
+    sourceHealth("ebillet"),
+    sourceHealth("kultunaut"),
+  ]);
+
+  // eBillet is the current primary operational feed. A Kultunaut outage is
+  // surfaced separately and degrades an otherwise healthy platform to warning,
+  // but does not page the whole service as critical while eBillet remains good.
+  let status: PipelineHealthStatus = ebillet.status;
+  const reasons = [...ebillet.reasons.map((r) => `eBillet: ${r}`)];
+  if (kultunaut.status === "critical" && ebillet.status === "healthy") {
+    status = "warning";
+  } else if (kultunaut.status === "warning" && status === "healthy") {
+    status = "warning";
+  } else if (kultunaut.status === "unknown" && status === "healthy") {
+    status = "warning";
+  }
+  reasons.push(...kultunaut.reasons.map((r) => `Kultunaut: ${r}`));
+
+  return {
+    status,
+    reasons,
+    sources: { ebillet, kultunaut },
+    checkedAt: new Date().toISOString(),
+  };
+}

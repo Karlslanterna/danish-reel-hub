@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest";
+import { groupScreeningsForUi } from "./cinema-data";
+
+describe("groupScreeningsForUi", () => {
+  it("preserves one ticket URL per exact screening while keeping the existing UI shape", () => {
+    const grouped = groupScreeningsForUi([
+      {
+        movie_id: "m1",
+        cinema_id: "c1",
+        starts_at: "2026-08-20T18:30:00.000Z",
+        local_date: "2026-08-20",
+        local_time: "20:30:00",
+        hall: "Sal 1",
+        ticket_url: "https://tickets/late",
+        formats: ["2D"],
+        languages: ["Dansk tekst"],
+        events: [],
+      },
+      {
+        movie_id: "m1",
+        cinema_id: "c1",
+        starts_at: "2026-08-20T16:00:00.000Z",
+        local_date: "2026-08-20",
+        local_time: "18:00:00",
+        hall: "Sal 1",
+        ticket_url: "https://tickets/early",
+        formats: ["2D", "Atmos"],
+        languages: [],
+        events: ["Premiere"],
+      },
+    ]);
+
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]).toMatchObject({
+      movieId: "m1",
+      cinemaId: "c1",
+      date: "2026-08-20",
+      hall: "Sal 1",
+      times: ["18:00", "20:30"],
+      ticketUrls: ["https://tickets/early", "https://tickets/late"],
+      bookingUrl: "https://tickets/early",
+    });
+    expect(grouped[0].formats).toEqual(expect.arrayContaining(["2D", "Atmos"]));
+    expect(grouped[0].languages).toContain("Dansk tekst");
+    expect(grouped[0].events).toContain("Premiere");
+  });
+
+  it("keeps halls separate", () => {
+    const base = {
+      movie_id: "m1",
+      cinema_id: "c1",
+      starts_at: "2026-08-20T16:00:00.000Z",
+      local_date: "2026-08-20",
+      local_time: "18:00:00",
+      ticket_url: null,
+      formats: [],
+      languages: [],
+      events: [],
+    };
+    const grouped = groupScreeningsForUi([
+      { ...base, hall: "Sal 1" },
+      { ...base, hall: "Sal 2", starts_at: "2026-08-20T17:00:00.000Z", local_time: "19:00:00" },
+    ]);
+    expect(grouped).toHaveLength(2);
+  });
+});

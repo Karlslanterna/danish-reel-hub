@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { expectPageLoads, firstCityPath, firstPathFor, restoreSupabaseSession } from "./helpers";
+import {
+  expectPageLoads,
+  firstCityPath,
+  firstPathFor,
+  getSitemapUrls,
+  restoreSupabaseSession,
+} from "./helpers";
 
 const SEARCH_LABEL = "Søg på film, biograf eller by";
 
@@ -66,6 +72,57 @@ test.describe("Public pages", () => {
       page.getByRole("option").first(),
       "Search: suggestion list rendered but not visible",
     ).toBeVisible();
+  });
+
+  test("5b. a live eBillet button uses the current route and opens without the generic error", async ({
+    page,
+    request,
+  }) => {
+    const urls = await getSitemapUrls(request);
+    const cinemaPaths = urls
+      .map((url) => new URL(url).pathname)
+      .filter((path) => path.startsWith("/biograf/"))
+      .slice(0, 50);
+
+    let bookingUrl: string | null = null;
+    let sourcePath: string | null = null;
+
+    // Reading the server-rendered HTML is much faster than opening dozens of
+    // cinema pages in Chromium. Stop as soon as production exposes an eBillet
+    // booking link.
+    for (const path of cinemaPaths) {
+      const response = await request.get(path);
+      if (!response.ok()) continue;
+      const html = await response.text();
+      const match = html.match(/href=["'](https:\/\/[^"']*ebillet\.dk[^"']*)["']/i);
+      if (!match?.[1]) continue;
+      bookingUrl = match[1].replaceAll("&amp;", "&");
+      sourcePath = path;
+      break;
+    }
+
+    expect(
+      bookingUrl,
+      `Could not find an eBillet booking link on the first ${cinemaPaths.length} live cinema pages`,
+    ).not.toBeNull();
+    expect(
+      bookingUrl!,
+      `Live Lanterna page ${sourcePath} still exposes an obsolete eBillet URL: ${bookingUrl}`,
+    ).toMatch(/^https:\/\/[^/]*ebillet\.dk\/billetter\/\d+\/\d+\/?\?org=\d+$/);
+
+    const response = await page.goto(bookingUrl!, {
+      waitUntil: "domcontentloaded",
+      timeout: 30_000,
+    });
+    expect(response, `eBillet returned no response for ${bookingUrl}`).not.toBeNull();
+    expect(response!.status(), `eBillet returned HTTP ${response!.status()} for ${bookingUrl}`).toBeLessThan(400);
+
+    await page.waitForTimeout(2_000);
+    const body = ((await page.locator("body").innerText().catch(() => "")) ?? "").toLowerCase();
+    expect(
+      body,
+      `eBillet rendered its generic error page for the live Lanterna link ${bookingUrl}`,
+    ).not.toContain("der skete en fejl");
   });
 });
 

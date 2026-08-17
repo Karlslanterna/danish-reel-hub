@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupScreeningsForUi } from "./cinema-data";
+import { groupScreeningsForUi } from "./screening-read-model";
 
 describe("groupScreeningsForUi", () => {
   it("preserves one ticket URL per exact screening while keeping the existing UI shape", () => {

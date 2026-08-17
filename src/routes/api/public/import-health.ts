@@ -6,7 +6,9 @@ import { createFileRoute } from "@tanstack/react-router";
  * Public, aggregate-only operational health. The canonical pipeline is the
  * source of truth: eBillet and Kultunaut are evaluated independently so an
  * upstream Kultunaut outage cannot make a healthy eBillet platform look down.
- * Legacy Kultunaut scheduler health is included only as supplemental context.
+ *
+ * During the transition the response also preserves the legacy Kultunaut
+ * metrics/scheduler fields consumed by the existing Admin page.
  *
  * ?monitor=1 returns HTTP 503 only when canonical health is critical.
  */
@@ -18,12 +20,11 @@ export const Route = createFileRoute("/api/public/import-health")({
           const { getCanonicalPipelineHealth } = await import("@/lib/pipeline/health.server");
           const canonical = await getCanonicalPipelineHealth();
 
-          // Scheduler/legacy health is useful while Kultunaut finishes its
-          // migration, but it must never override canonical source health.
+          // Legacy fields remain compatibility-only. Failure to produce them
+          // must not hide the canonical per-source health report.
           const [legacyImport, scheduler] = await Promise.all([
             import("@/lib/kultunaut/health.server")
               .then(({ getImportHealth }) => getImportHealth())
-              .then((report) => ({ status: report.status, reasons: report.reasons }))
               .catch(() => null),
             import("@/lib/kultunaut/scheduler.server")
               .then(({ getSchedulerHealth }) => getSchedulerHealth())
@@ -35,14 +36,19 @@ export const Route = createFileRoute("/api/public/import-health")({
 
           return Response.json(
             {
+              // Canonical fields — these determine platform health.
               status: canonical.status,
               reasons: canonical.reasons,
               sources: canonical.sources,
               checkedAt: canonical.checkedAt,
-              kultunautLegacy: {
-                import: legacyImport,
-                scheduler,
-              },
+
+              // Transitional fields expected by the current Admin dashboard.
+              importStatus: legacyImport?.status ?? "unknown",
+              metrics: legacyImport?.metrics ?? null,
+              scheduler,
+              kultunautLegacy: legacyImport
+                ? { status: legacyImport.status, reasons: legacyImport.reasons }
+                : null,
             },
             {
               status: httpStatus,
@@ -62,6 +68,9 @@ export const Route = createFileRoute("/api/public/import-health")({
               reasons: ["Import health is temporarily unavailable"],
               sources: null,
               checkedAt: new Date().toISOString(),
+              importStatus: "unknown",
+              metrics: null,
+              scheduler: null,
             },
             {
               status: 500,

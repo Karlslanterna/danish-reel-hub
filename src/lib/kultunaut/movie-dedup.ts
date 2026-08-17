@@ -17,14 +17,30 @@ export const normalizeMovieTitle = (value: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+export const validMovieYear = (year: number | null | undefined): number | null =>
+  typeof year === "number" && Number.isFinite(year) && year >= 1888 && year <= 2200 ? year : null;
+
 /**
- * Film identity is title + year. A missing year never gets merged with a
- * dated record: that is safer than collapsing two distinct films.
+ * General comparison identity: normalized title + known year. Missing/zero
+ * years stay distinct from dated records.
  */
 export const movieIdentityKey = (movie: MovieIdentity): string => {
   const title = normalizeMovieTitle(movie.title);
-  const year = movie.year != null && Number.isFinite(movie.year) ? movie.year : "unknown";
-  return `${title}|${year}`;
+  return `${title}|${validMovieYear(movie.year) ?? "unknown"}`;
+};
+
+/**
+ * Import grouping is stricter than general comparison: two undated Kultunaut
+ * records are not automatically the same film merely because their titles
+ * match. The stable source id keeps them separate until better evidence exists.
+ */
+export const kultunautMovieGroupKey = (
+  movie: MovieIdentity,
+  externalId: string,
+): string => {
+  const title = normalizeMovieTitle(movie.title);
+  const year = validMovieYear(movie.year);
+  return year === null ? `${title}|source:${externalId}` : `${title}|${year}`;
 };
 
 export function sameMovieIdentity(a: MovieIdentity, b: MovieIdentity): boolean {

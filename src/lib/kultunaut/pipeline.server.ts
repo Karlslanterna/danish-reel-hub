@@ -1,31 +1,36 @@
 /**
- * Kultunaut import pipeline — the active path.
+ * Kultunaut canonical import pipeline.
  *
- *   fetch -> validate -> normalize -> resolve -> stage -> promote -> mark
+ *   snapshot -> validate -> resolve identities -> normalize -> stage -> promote
  *
- * Kultunaut is authoritative ONLY for cinemas that are not linked to an
- * eBillet organizer. Scopes owned by eBillet are skipped entirely, so a
- * Kultunaut run can never insert into or delete from eBillet territory
- * (the `promote_screenings` RPC enforces the same rule in the database).
+ * Kultunaut owns screenings only for cinemas without an eBillet link. Identity
+ * resolution is persistent and conservative: source refs are reused, movies
+ * are never merged by title alone, and one unresolved movie blocks promotion
+ * for that cinema instead of silently deleting the missing screening.
  *
- * The run is resumable: work is checkpointed into `import_runs.cursor` after
- * every batch, and the legacy `import_jobs` row is kept up to date purely so
- * the existing admin UI keeps working.
+ * `import_jobs` remains a temporary Admin compatibility read model. Durable
+ * execution state lives in `import_runs`.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { parseKultunautXml, type ParsedCinema, type ParsedMovie } from "./parser.server";
+import { parseKultunautXml } from "./parser.server";
 import { validateKultunautSnapshot } from "./snapshot";
 import { normalizeKultunautScreenings } from "./normalize";
+import { loadEbilletOwnedCinemaIds } from "./authority.server";
+import {
+  resolveKultunautCinemas,
+  resolveKultunautMovies,
+} from "./resolve.server";
 import {
   applyValidation,
   createSnapshot,
   getSnapshotRaw,
   loadStagedForCinema,
+  markSnapshotFailed,
   stageScreenings,
   stagedCinemaRefs,
 } from "@/lib/pipeline/snapshots.server";
 import { promoteCinema, purgePastScreenings } from "@/lib/pipeline/promote.server";
-import { loadRefs, recordUnresolved, upsertRefs } from "@/lib/pipeline/identity.server";
+import { loadRefs, recordUnresolved } from "@/lib/pipeline/identity.server";
 import { toPromotionRow } from "@/lib/pipeline/types";
 import {
   attachSnapshot,
@@ -46,26 +51,19 @@ export type BatchResult = {
   message?: string;
 };
 
-const slugify = (value: string): string =>
-  value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[æø]/g, (c) => (c === "æ" ? "ae" : "oe"))
-    .replace(/å/g, "aa")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+type PipelineCursor = {
+  phase?: "parse" | "promote";
+  index?: number;
+  scopes?: string[];
+  blockedMovieRefs?: string[];
+  declaredEmpty?: boolean;
+};
 
-const stripYearSuffix = (title: string): string =>
-  title.replace(/\s*[([]\s*(?:19|20)\d{2}\s*[)\]]\s*$/u, "").trim();
-
-const idFor = (ext: string) => `kn-${ext}`;
-
-// ------------------------------------------------------------------- create
+// ------------------------------------------------------------------- legacy Admin compatibility
 
 /**
- * Register a feed payload and queue a run. Returns the legacy job id so the
- * existing admin screens and API routes keep working unchanged.
+ * Register a full feed snapshot and durable run. The legacy job id is returned
+ * because current Admin routes still address imports by import_jobs.id.
  */
 export async function createImportJob(
   xml: string,
@@ -104,7 +102,7 @@ export async function createImportJob(
 async function jobContext(jobId: string) {
   const { data, error } = await supabaseAdmin
     .from("import_jobs")
-    .select("id, status, phase, payload")
+    .select("id,status,phase,payload")
     .eq("id", jobId)
     .maybeSingle();
   if (error) throw new Error(`import job read: ${error.message}`);
@@ -113,14 +111,22 @@ async function jobContext(jobId: string) {
   if (!payload.run_id || !payload.snapshot_id) {
     throw new Error("Job blev oprettet af den gamle importer og kan ikke genoptages her");
   }
-  return { jobId, runId: payload.run_id, snapshotId: payload.snapshot_id, status: data.status };
+  return {
+    jobId,
+    runId: payload.run_id,
+    snapshotId: payload.snapshot_id,
+  };
 }
 
 async function mirrorJob(jobId: string, patch: Record<string, unknown>): Promise<void> {
-  await supabaseAdmin.from("import_jobs").update(patch as never).eq("id", jobId);
+  const { error } = await supabaseAdmin
+    .from("import_jobs")
+    .update(patch as never)
+    .eq("id", jobId);
+  if (error) console.error(`[kultunaut] legacy job mirror failed ${jobId}: ${error.message}`);
 }
 
-// -------------------------------------------------------------------- parse
+// ------------------------------------------------------------------- parse/resolve/stage
 
 async function runParsePhase(ctx: {
   jobId: string;
@@ -130,244 +136,196 @@ async function runParsePhase(ctx: {
 }): Promise<BatchResult> {
   const xml = (await getSnapshotRaw(ctx.snapshotId)) ?? "";
   const parsed = parseKultunautXml(xml);
+  const normalized = normalizeKultunautScreenings(parsed.showtimes);
 
   const validation = validateKultunautSnapshot({
     xmlLength: xml.length,
     movies: parsed.movies.size,
     cinemas: parsed.cinemas.size,
     showtimes: parsed.showtimes.length,
-    grouped: parsed.showtimes.length,
+    grouped: normalized.length,
     declaredEmpty: ctx.declaredEmpty,
   });
-  await applyValidation(ctx.snapshotId, {
+  const promotable = await applyValidation(ctx.snapshotId, {
     verdict: validation.verdict,
     reasons: validation.reasons,
     stats: {
       xmlLength: xml.length,
       movies: parsed.movies.size,
       cinemas: parsed.cinemas.size,
-      showtimes: parsed.showtimes.length,
+      sourceShowtimeGroups: parsed.showtimes.length,
+      physicalScreenings: normalized.length,
     },
   });
-  if (validation.verdict === "incomplete") {
+
+  if (!promotable) {
+    const reason = validation.reasons.join("; ") || "Snapshot afvist";
     await mirrorJob(ctx.jobId, {
       status: "failed",
       phase: "parse",
-      message: `Snapshot afvist: ${validation.reasons.join("; ")}`,
+      message: `Snapshot afvist: ${reason}`,
     });
-    await failRun(ctx.runId, `snapshot incomplete: ${validation.reasons.join("; ")}`);
-    return { done: true, status: "failed", phase: "parse", message: validation.reasons.join("; ") };
+    const state = await failRun(ctx.runId, `snapshot incomplete: ${reason}`);
+    if (state === "dead_letter") await markSnapshotFailed(ctx.snapshotId, reason);
+    return { done: true, status: "failed", phase: "parse", message: reason };
   }
 
-  // ---- canonical movie per normalized title (keep the richest profile) ----
-  const score = (m: ParsedMovie): number => {
-    let s = 0;
-    const posters = [m.poster.a, m.poster.b, m.poster.c, m.poster.d, m.poster.url];
-    if (posters.some((v) => v && v.trim() !== "")) s += 10;
-    if (m.runtime > 0) s += 5;
-    if (m.synopsis.trim().length > 20) s += 3;
-    if (m.director.trim() !== "") s += 2;
-    if (m.rating.trim() !== "") s += 1;
-    if (m.genre.length > 0) s += 1;
-    if (m.original_title?.trim()) s += 1;
-    return s;
-  };
-  const byTitle = new Map<string, string[]>();
-  for (const m of parsed.movies.values()) {
-    const key = slugify(stripYearSuffix(m.title));
-    byTitle.set(key, [...(byTitle.get(key) ?? []), m.external_id]);
-  }
-  const canonicalExternal = new Map<string, string>();
-  for (const [, extIds] of byTitle) {
-    const ranked = extIds
-      .map((eid) => ({ eid, m: parsed.movies.get(eid)! }))
-      .sort((a, b) => score(b.m) - score(a.m));
-    for (const { eid } of ranked) canonicalExternal.set(eid, ranked[0]!.eid);
-  }
-
-  // ---- movies -------------------------------------------------------------
-  const movieRows = [...parsed.movies.values()]
-    .filter((m) => canonicalExternal.get(m.external_id) === m.external_id)
-    .map((m: ParsedMovie) => ({
-      id: idFor(m.external_id),
-      slug: slugify(m.title) || idFor(m.external_id),
-      external_id: m.external_id,
-      title: m.title,
-      original_title: m.original_title,
-      runtime: m.runtime,
-      genre: m.genre,
-      year: m.year,
-      director: m.director,
-      rating: m.rating,
-      synopsis: m.synopsis,
-      poster: m.poster,
-      source: SOURCE,
-    }));
-  for (let i = 0; i < movieRows.length; i += 500) {
-    const { error } = await supabaseAdmin
-      .from("movies")
-      .upsert(movieRows.slice(i, i + 500) as never, { onConflict: "id" });
-    if (error) throw new Error(`movies upsert: ${error.message}`);
-  }
-
-  // ---- cinemas ------------------------------------------------------------
-  const cinemaRows = [...parsed.cinemas.values()].map((c: ParsedCinema) => ({
-    id: idFor(c.external_id),
-    slug: slugify(c.name) || idFor(c.external_id),
-    external_id: c.external_id,
-    name: c.name,
-    city: c.city,
-    address: c.address,
-    description: c.description,
-    screens: c.screens,
-    latitude: c.latitude,
-    longitude: c.longitude,
-    source: SOURCE,
-  }));
-  // Never downgrade an eBillet-owned cinema: those rows are updated by
-  // eBillet only, so they are excluded from the Kultunaut upsert.
-  const ebilletOwned = await loadEbilletOwnedCinemaIds();
-  const writableCinemas = cinemaRows.filter((c) => !ebilletOwned.has(c.id));
-  for (let i = 0; i < writableCinemas.length; i += 500) {
-    const { error } = await supabaseAdmin
-      .from("cinemas")
-      .upsert(writableCinemas.slice(i, i + 500) as never, { onConflict: "id" });
-    if (error) throw new Error(`cinemas upsert: ${error.message}`);
-  }
-
-  // ---- identity refs ------------------------------------------------------
-  await upsertRefs([
-    ...cinemaRows.map((c) => ({
-      source: SOURCE,
-      entityType: "cinema" as const,
-      externalId: c.external_id,
-      canonicalId: c.id,
-      matchMethod: "external_id" as const,
-      confidence: 1,
-      locked: true,
-    })),
-    ...[...parsed.movies.values()].map((m) => ({
-      source: SOURCE,
-      entityType: "movie" as const,
-      externalId: m.external_id,
-      canonicalId: idFor(canonicalExternal.get(m.external_id) ?? m.external_id),
-      matchMethod: "external_id" as const,
-      confidence: 1,
-      locked: false,
-      notes: canonicalExternal.get(m.external_id) === m.external_id ? undefined : "merged duplicate title",
-    })),
+  // Resolve external identities before any screening can promote. Existing
+  // source refs are authoritative; eBillet-owned cinemas are never mutated.
+  const [cinemaResolution, movieResolution] = await Promise.all([
+    resolveKultunautCinemas(parsed.cinemas.values()),
+    resolveKultunautMovies(parsed.movies.values()),
   ]);
 
-  // ---- staging ------------------------------------------------------------
-  const normalized = normalizeKultunautScreenings(parsed.showtimes);
+  // Staging contains the complete normalized source snapshot, including rows
+  // whose movie identity may currently require review. Promotion checks those
+  // blockers per cinema so no partial desired set can delete live screenings.
   await stageScreenings(ctx.snapshotId, SOURCE, normalized);
 
-  const scopes = [...new Set(normalized.map((s) => s.sourceCinemaRef))].sort();
-  await checkpoint(ctx.runId, { phase: "promote", index: 0, scopes }, {
-    movies: movieRows.length,
-    cinemas: cinemaRows.length,
+  const scopes = [...new Set(normalized.map((screening) => screening.sourceCinemaRef))].sort();
+  const blockedMovieRefs = [...new Set(movieResolution.unresolvedExternalIds)].sort();
+  const stats = {
+    movies: parsed.movies.size,
+    movieCanonicalsWritten: movieResolution.canonicalRowsWritten,
+    cinemas: parsed.cinemas.size,
+    cinemaCanonicalsWritten: cinemaResolution.canonicalRowsWritten,
+    skippedEbilletCinemas: cinemaResolution.skippedEbilletOwned,
     screenings: normalized.length,
-  });
+    unresolvedMovies: blockedMovieRefs.length,
+  };
+
+  await checkpoint(
+    ctx.runId,
+    { phase: "promote", index: 0, scopes, blockedMovieRefs },
+    stats,
+  );
   await mirrorJob(ctx.jobId, {
     status: "running",
     phase: "promote",
-    total_movies: movieRows.length,
-    total_cinemas: cinemaRows.length,
+    total_movies: parsed.movies.size,
+    total_cinemas: parsed.cinemas.size,
     total_showtimes: normalized.length,
-    processed_movies: movieRows.length,
-    processed_cinemas: writableCinemas.length,
-    message: "Normaliseret — klar til promovering",
+    processed_movies: parsed.movies.size,
+    processed_cinemas: cinemaResolution.canonicalRowsWritten,
+    message:
+      blockedMovieRefs.length > 0
+        ? `Normaliseret; ${blockedMovieRefs.length} filmidentiteter kræver kontrol`
+        : "Normaliseret — klar til promovering",
   });
   return { done: false, status: "running", phase: "promote" };
 }
 
-/** Cinemas owned by eBillet — ownership is the LINK, never `is_active`. */
-async function loadEbilletOwnedCinemaIds(): Promise<Set<string>> {
-  const ids = new Set<string>();
-  const [linked, organizers] = await Promise.all([
-    supabaseAdmin.from("cinemas").select("id").not("ebillet_organizer_id", "is", null),
-    supabaseAdmin.from("ebillet_organizers").select("cinema_id").not("cinema_id", "is", null),
-  ]);
-  if (linked.error) throw new Error(`ebillet coverage: ${linked.error.message}`);
-  if (organizers.error) throw new Error(`ebillet coverage: ${organizers.error.message}`);
-  for (const r of linked.data ?? []) ids.add(r.id);
-  for (const r of organizers.data ?? []) if (r.cinema_id) ids.add(r.cinema_id);
-  return ids;
-}
-
-// ------------------------------------------------------------------ promote
+// ------------------------------------------------------------------- scoped promotion
 
 async function runPromotePhase(
   ctx: { jobId: string; runId: string; snapshotId: string },
-  cursor: { index: number; scopes: string[] },
+  cursor: { index: number; scopes: string[]; blockedMovieRefs: string[] },
 ): Promise<BatchResult> {
-  const { scopes } = cursor;
-  const batch = scopes.slice(cursor.index, cursor.index + CINEMAS_PER_BATCH);
-  if (batch.length === 0) return finishRun(ctx, scopes.length);
+  const batch = cursor.scopes.slice(cursor.index, cursor.index + CINEMAS_PER_BATCH);
+  if (batch.length === 0) return finishRun(ctx, cursor.scopes.length);
 
   const cinemaRefs = await loadRefs(SOURCE, "cinema", batch);
   const ebilletOwned = await loadEbilletOwnedCinemaIds();
-  const unresolved: string[] = [];
+  const blockedMovies = new Set(cursor.blockedMovieRefs);
+  const unresolvedCinemas: string[] = [];
+  const blockedCinemas: string[] = [];
   let upserted = 0;
   let deleted = 0;
-  let skipped = 0;
+  let skippedEbillet = 0;
 
   for (const scope of batch) {
-    const ref = cinemaRefs.get(scope);
-    if (!ref) {
-      unresolved.push(scope);
+    const cinemaRef = cinemaRefs.get(scope);
+    if (!cinemaRef) {
+      unresolvedCinemas.push(scope);
       continue;
     }
-    if (ebilletOwned.has(ref.canonicalId)) {
-      skipped += 1;
+    if (ebilletOwned.has(cinemaRef.canonicalId)) {
+      skippedEbillet += 1;
       continue;
     }
+
     const staged = await loadStagedForCinema(ctx.snapshotId, scope);
-    const movieRefs = await loadRefs(SOURCE, "movie", staged.map((s) => s.sourceMovieRef));
-    const rows = staged
-      .filter((s) => movieRefs.has(s.sourceMovieRef))
-      .map((s) => toPromotionRow(s, movieRefs.get(s.sourceMovieRef)!.canonicalId));
+    const sourceMovieRefs = [...new Set(staged.map((screening) => screening.sourceMovieRef))];
+    const movieRefs = await loadRefs(SOURCE, "movie", sourceMovieRefs);
+    const missingRefs = sourceMovieRefs.filter(
+      (externalId) => !movieRefs.has(externalId) || blockedMovies.has(externalId),
+    );
+
+    if (missingRefs.length > 0) {
+      blockedCinemas.push(scope);
+      await recordUnresolved(
+        missingRefs.map((externalId) => ({
+          source: SOURCE,
+          entityType: "movie" as const,
+          externalId,
+          label: `Kultunaut film ${externalId}`,
+          reason: "cinema promotion blocked until movie identity is resolved",
+          payload: { cinemaExternalId: scope },
+        })),
+      );
+      continue;
+    }
+
+    const rows = staged.map((screening) =>
+      toPromotionRow(screening, movieRefs.get(screening.sourceMovieRef)!.canonicalId),
+    );
+    // Crucially, the full staged desired set is promoted or nothing is. We do
+    // not filter unresolved rows and then let reconciliation delete the rest.
     const outcome = await promoteCinema({
       snapshotId: ctx.snapshotId,
       source: SOURCE,
-      cinemaId: ref.canonicalId,
+      cinemaId: cinemaRef.canonicalId,
       rows,
     });
     upserted += outcome.upserted;
     deleted += outcome.deleted;
   }
 
-  if (unresolved.length) {
+  if (unresolvedCinemas.length > 0) {
     await recordUnresolved(
-      unresolved.map((externalId) => ({
+      unresolvedCinemas.map((externalId) => ({
         source: SOURCE,
         entityType: "cinema" as const,
         externalId,
-        label: `kultunaut theater ${externalId}`,
-        reason: "no identity mapping for theater id",
+        label: `Kultunaut theater ${externalId}`,
+        reason: "no persistent identity mapping for theater id",
       })),
     );
   }
 
   const nextIndex = cursor.index + batch.length;
   const run = await getRun(ctx.runId);
-  const prev = (run?.stats ?? {}) as Record<string, number>;
+  const previous = (run?.stats ?? {}) as Record<string, number>;
   const stats = {
-    ...prev,
-    promoted: (prev.promoted ?? 0) + upserted,
-    removed: (prev.removed ?? 0) + deleted,
-    skippedEbillet: (prev.skippedEbillet ?? 0) + skipped,
-    unresolvedCinemas: (prev.unresolvedCinemas ?? 0) + unresolved.length,
+    ...previous,
+    promoted: (previous.promoted ?? 0) + upserted,
+    removed: (previous.removed ?? 0) + deleted,
+    skippedEbillet: (previous.skippedEbillet ?? 0) + skippedEbillet,
+    unresolvedCinemas: (previous.unresolvedCinemas ?? 0) + unresolvedCinemas.length,
+    blockedCinemas: (previous.blockedCinemas ?? 0) + blockedCinemas.length,
   };
-  await checkpoint(ctx.runId, { phase: "promote", index: nextIndex, scopes }, stats);
+
+  await checkpoint(
+    ctx.runId,
+    {
+      phase: "promote",
+      index: nextIndex,
+      scopes: cursor.scopes,
+      blockedMovieRefs: cursor.blockedMovieRefs,
+    },
+    stats,
+  );
   await mirrorJob(ctx.jobId, {
     status: "running",
     phase: "promote",
     processed_showtimes: stats.promoted,
-    message: `Promoveret ${nextIndex}/${scopes.length} biografer`,
+    message:
+      blockedCinemas.length > 0
+        ? `Promoveret ${nextIndex}/${cursor.scopes.length} biografer; ${blockedCinemas.length} i denne batch afventer film-mapping`
+        : `Promoveret ${nextIndex}/${cursor.scopes.length} biografer`,
   });
 
-  if (nextIndex >= scopes.length) return finishRun(ctx, scopes.length);
+  if (nextIndex >= cursor.scopes.length) return finishRun(ctx, cursor.scopes.length);
   return { done: false, status: "running", phase: "promote" };
 }
 
@@ -377,7 +335,8 @@ async function finishRun(
 ): Promise<BatchResult> {
   const purged = await purgePastScreenings(SOURCE);
   const run = await getRun(ctx.runId);
-  await completeRun(ctx.runId, { ...(run?.stats ?? {}), purged, cinemas: cinemaCount });
+  const stats = { ...(run?.stats ?? {}), purged, cinemas: cinemaCount };
+  await completeRun(ctx.runId, stats);
   await mirrorJob(ctx.jobId, {
     status: "completed",
     phase: "done",
@@ -386,25 +345,25 @@ async function finishRun(
   return { done: true, status: "completed", phase: "done" };
 }
 
-// -------------------------------------------------------------------- batch
+// ------------------------------------------------------------------- resumable driver
 
-/** Process one resumable batch of an import job. */
+/** Process one resumable batch. Repeated calls are idempotent. */
 export async function processJobBatch(jobId: string): Promise<BatchResult> {
   const ctx = await jobContext(jobId);
   const run = await getRun(ctx.runId);
   if (!run) throw new Error("Run not found");
   if (run.state === "completed") return { done: true, status: "completed", phase: "done" };
   if (run.state === "dead_letter" || run.state === "failed") {
-    return { done: true, status: "failed", phase: "failed", message: run.lastError ?? undefined };
+    return {
+      done: true,
+      status: "failed",
+      phase: "failed",
+      message: run.lastError ?? undefined,
+    };
   }
-  await attachSnapshot(ctx.runId, ctx.snapshotId);
 
-  const cursor = (run.cursor ?? {}) as {
-    phase?: string;
-    index?: number;
-    scopes?: string[];
-    declaredEmpty?: boolean;
-  };
+  await attachSnapshot(ctx.runId, ctx.snapshotId);
+  const cursor = (run.cursor ?? {}) as PipelineCursor;
 
   try {
     if ((cursor.phase ?? "parse") === "parse") {
@@ -415,10 +374,15 @@ export async function processJobBatch(jobId: string): Promise<BatchResult> {
         declaredEmpty: cursor.declaredEmpty === true,
       });
     }
+
     const scopes = cursor.scopes ?? (await stagedCinemaRefs(ctx.snapshotId));
     return await runPromotePhase(
       { jobId, runId: ctx.runId, snapshotId: ctx.snapshotId },
-      { index: cursor.index ?? 0, scopes },
+      {
+        index: cursor.index ?? 0,
+        scopes,
+        blockedMovieRefs: cursor.blockedMovieRefs ?? [],
+      },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -427,17 +391,20 @@ export async function processJobBatch(jobId: string): Promise<BatchResult> {
       status: state === "dead_letter" ? "failed" : "queued",
       message: message.slice(0, 500),
     });
-    if (state === "dead_letter") return { done: true, status: "failed", phase: "failed", message };
+    if (state === "dead_letter") {
+      await markSnapshotFailed(ctx.snapshotId, message);
+      return { done: true, status: "failed", phase: "failed", message };
+    }
     return { done: false, status: "queued", phase: cursor.phase ?? "parse", message };
   }
 }
 
-/** Status for the admin UI (legacy shape). */
+/** Status for the existing Admin UI (legacy shape). */
 export async function getJobStatus(jobId: string) {
   const { data, error } = await supabaseAdmin
     .from("import_jobs")
     .select(
-      "id, status, phase, message, errors, created_at, updated_at, total_movies, total_cinemas, total_showtimes, processed_movies, processed_cinemas, processed_showtimes",
+      "id,status,phase,message,errors,created_at,updated_at,total_movies,total_cinemas,total_showtimes,processed_movies,processed_cinemas,processed_showtimes",
     )
     .eq("id", jobId)
     .maybeSingle();

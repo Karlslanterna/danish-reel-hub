@@ -68,17 +68,28 @@ async function candidateMovies(ids: string[]): Promise<ContinuityCandidateMovie[
   return out;
 }
 
+export type KultunautContinuityResolution = {
+  /** Safe per-run destination. Existing locked refs are never mutated here. */
+  canonicalOverrides: Map<string, string>;
+  /** Old canonical ids displaced by a safe runtime override. */
+  displacedCanonicalIds: string[];
+};
+
 /**
- * Bind Kultunaut ids to an already-active canonical film only when exactly one
- * strong title/year/genre-compatible candidate exists. This can repair an old
- * weak mapping and can prevent a brand-new source id from creating a duplicate.
- * Locked refs are overridden only by this explicit deterministic rule.
+ * Find a safer canonical destination for a Kultunaut source movie when exactly
+ * one active strong title/year/genre-compatible film exists.
+ *
+ * Crucially, this function is READ-ONLY with respect to source_entity_refs.
+ * Locked identity mappings are a database safety invariant and are never
+ * silently unlocked or repointed by an importer. The caller may use an
+ * override for this snapshot; brand-new refs can later be persisted normally.
  */
-export async function repairMappedKultunautMovieContinuity(
+export async function resolveKultunautMovieContinuity(
   movies: Iterable<ParsedMovie>,
-): Promise<{ rebound: number; displacedCanonicalIds: string[] }> {
+): Promise<KultunautContinuityResolution> {
   const list = [...movies];
-  if (list.length === 0) return { rebound: 0, displacedCanonicalIds: [] };
+  const canonicalOverrides = new Map<string, string>();
+  if (list.length === 0) return { canonicalOverrides, displacedCanonicalIds: [] };
 
   const [refs, activeIds] = await Promise.all([
     loadRefs(
@@ -89,9 +100,8 @@ export async function repairMappedKultunautMovieContinuity(
     activeMovieIds(),
   ]);
   const candidates = await candidateMovies(activeIds);
-
-  let rebound = 0;
   const displaced = new Set<string>();
+
   for (const incoming of list) {
     const current = refs.get(incoming.external_id);
     const decision = chooseContinuityCandidate({
@@ -104,24 +114,9 @@ export async function repairMappedKultunautMovieContinuity(
     });
     if (!decision || decision.canonicalId === current?.canonicalId) continue;
 
-    const { error } = await supabaseAdmin.from("source_entity_refs").upsert(
-      {
-        source: "kultunaut",
-        entity_type: "movie",
-        external_id: incoming.external_id,
-        canonical_id: decision.canonicalId,
-        match_method: "deterministic",
-        confidence: 1,
-        locked: true,
-        notes: "unique active title/year/genre continuity anchor",
-      },
-      { onConflict: "source,entity_type,external_id" },
-    );
-    if (error) throw new Error(`continuity ref repair ${incoming.external_id}: ${error.message}`);
-
+    canonicalOverrides.set(incoming.external_id, decision.canonicalId);
     if (current?.canonicalId) displaced.add(current.canonicalId);
-    rebound += 1;
   }
 
-  return { rebound, displacedCanonicalIds: [...displaced] };
+  return { canonicalOverrides, displacedCanonicalIds: [...displaced] };
 }

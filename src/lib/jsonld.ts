@@ -13,7 +13,9 @@ export function homeSchemas() {
     ld({
       "@context": "https://schema.org",
       "@type": "WebSite",
+      "@id": `${site}#website`,
       name: "Lanterna",
+      alternateName: ["Lanterna.dk"],
       url: site,
       potentialAction: {
         "@type": "SearchAction",
@@ -27,14 +29,14 @@ export function homeSchemas() {
     ld({
       "@context": "https://schema.org",
       "@type": "Organization",
+      "@id": `${site}#organization`,
       name: "Lanterna",
+      alternateName: "Lanterna.dk",
       url: site,
-      logo: canonicalUrl("/logo.svg"),
+      logo: canonicalUrl("/icon-512.png"),
     }),
   ];
 }
-
-
 
 function breadcrumbSchema(items: { name: string; url: string }[]) {
   return ld({

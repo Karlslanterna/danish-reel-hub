@@ -1,12 +1,10 @@
 /**
- * Normalization of screening metadata coming from the Kultunaut feed.
+ * Normalization of screening metadata coming from the source feeds.
  *
- * The feed expresses screening type, language and event information in free
- * text (titles, hall names, attributes such as `subtitled="da"`). Different
- * cinemas spell the same concept differently ("Org. version", "Original
- * version", "Originalversion"), so every raw value is mapped to one canonical
- * user-facing label BEFORE it is stored. Filter option lists are then built
- * from the stored values, which guarantees that duplicates never surface.
+ * Feeds express screening type, language and event information in free text
+ * (titles, hall names, attributes such as `subtitled="da"`). Different cinemas
+ * spell the same concept differently, so raw values are mapped to one canonical
+ * user-facing label BEFORE they are stored or shown in filters.
  */
 
 export type ShowtimeTags = {
@@ -30,14 +28,17 @@ const FORMAT_RULES: Rule[] = [
 
 /** Language / subtitles — "Sprog". */
 const LANGUAGE_RULES: Rule[] = [
-  { re: /\bdansk\s*(tale|version|dub\w*)\b|\bdubbet\b|\bdubbed\b|\bda\.?\s*tale\b/, label: "Dansk tale" },
   {
-    re: /\bdansk(e)?\s*(tekst\w*|undertekst\w*)\b|\bda\.?\s*tekst\w*\b|\bdk\s*tekst\w*\b|\bsubtitled[-_ ]?da\b/,
+    re: /\bdansk\s*(tale|version|dub\w*)\b|\bdubbet\b|\bdubbed\b|\bda\.?\s*tale\b|\bdk\.?\s*tale\b/,
+    label: "Dansk tale",
+  },
+  {
+    re: /\bdansk(e)?\s*(tekst\w*|undertekst\w*)\b|\bda\.?\s*tekst\w*\b|\bdk\.?\s*tekst\w*\b|\bsubtitled[-_ ]?da\b/,
     label: "Danske undertekster",
   },
   { re: /\bengelsk(e)?\s*(tekst\w*|undertekst\w*)\b|\ben\.?\s*tekst\w*\b/, label: "Engelske undertekster" },
   {
-    re: /\borg\.?\s*version\b|\boriginal\s*version\b|\boriginalversion\b|\boriginal\s*tale\b|\bov\b/,
+    re: /\borg\.?\s*version\b|\borg\.?\s*tale\b|\boriginal\s*version\b|\boriginalversion\b|\boriginal\s*tale\b|\bov\b/,
     label: "Originalversion",
   },
   { re: /\bengelsk\s*tale\b|\bengelsk\s*version\b/, label: "Engelsk tale" },

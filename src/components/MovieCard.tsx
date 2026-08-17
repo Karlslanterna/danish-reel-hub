@@ -25,7 +25,11 @@ export function MovieCard({ movie, citySlug }: { movie: Movie; citySlug?: string
   );
 
   return citySlug ? (
-    <Link to="/$city/film/$slug" params={{ city: citySlug, slug: movie.slug }} className="group block">
+    <Link
+      to="/$city/film/$slug"
+      params={{ city: citySlug, slug: movie.slug }}
+      className="group block"
+    >
       {inner}
     </Link>
   ) : (

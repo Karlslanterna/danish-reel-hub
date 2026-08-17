@@ -1,8 +1,8 @@
 // Sitemap data layer.
 //
-// Every entry is derived from real, upcoming screenings: a URL only enters a
-// sitemap when it has at least one showtime inside the visible date window.
-// `lastmod` always comes from the newest showtime record backing that URL —
+// Every entry is derived from real, upcoming canonical screenings: a URL only
+// enters a sitemap when it has at least one screening inside the visible date
+// window. `lastmod` comes from the newest screening update backing that URL —
 // never from build or request time.
 
 import { citySlug } from "./city-slug";
@@ -27,25 +27,25 @@ const day = (v: unknown) => (v ? String(v).slice(0, 10) : undefined);
 const newer = (a: string | undefined, b: string | undefined) =>
   !a ? b : !b ? a : a > b ? a : b;
 
-type ShowtimeRow = {
+type ScreeningRow = {
   movie_id: string;
   cinema_id: string;
-  created_at: string | null;
+  updated_at: string | null;
 };
 
-async function loadUpcomingShowtimes(): Promise<ShowtimeRow[]> {
+async function loadUpcomingScreenings(): Promise<ScreeningRow[]> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const out: ShowtimeRow[] = [];
+  const out: ScreeningRow[] = [];
   const pageSize = 1000;
   for (let page = 0; ; page++) {
     const { data, error } = await supabaseAdmin
-      .from("showtimes")
-      .select("movie_id, cinema_id, created_at")
-      .gte("date", windowStart())
-      .lte("date", windowEnd())
+      .from("screenings")
+      .select("movie_id, cinema_id, updated_at")
+      .gte("local_date", windowStart())
+      .lte("local_date", windowEnd())
       .range(page * pageSize, page * pageSize + pageSize - 1);
     if (error) throw error;
-    const rows = (data ?? []) as ShowtimeRow[];
+    const rows = (data ?? []) as ScreeningRow[];
     out.push(...rows);
     if (rows.length < pageSize) break;
   }
@@ -55,10 +55,10 @@ async function loadUpcomingShowtimes(): Promise<ShowtimeRow[]> {
 export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-  const [moviesRes, cinemasRes, showtimes] = await Promise.all([
+  const [moviesRes, cinemasRes, screenings] = await Promise.all([
     supabaseAdmin.from("movies").select("id, slug"),
     supabaseAdmin.from("cinemas").select("id, slug, city"),
-    loadUpcomingShowtimes(),
+    loadUpcomingScreenings(),
   ]);
 
   const movieSlug = new Map<string, string>();
@@ -76,8 +76,8 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
   const cityMovieMod = new Map<string, string | undefined>();
   let siteMod: string | undefined;
 
-  for (const s of showtimes) {
-    const mod = day(s.created_at);
+  for (const s of screenings) {
+    const mod = day(s.updated_at);
     siteMod = newer(siteMod, mod);
 
     const mSlug = movieSlug.get(s.movie_id);

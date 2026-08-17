@@ -60,6 +60,9 @@ jobs:
         continue-on-error: true
         run: node scripts/check-screening-parity.mjs
 
+      - name: Audit live Empire and movie duplicates
+        run: node scripts/audit-live-data-quality.mjs
+
       - name: Diagnose eBillet gaps against upstream
         if: steps.parity.outcome == 'failure'
         run: node scripts/diagnose-ebillet-parity.mjs

@@ -31,7 +31,7 @@ export type OrganizerPipelineResult = {
   organizerId: number;
   cinemaId: string | null;
   skipped: boolean;
-  reason?: string;
+  reason?: string | null;
   snapshotId?: string;
   movies: number;
   screenings: number;

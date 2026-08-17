@@ -238,11 +238,22 @@ export async function cleanupKultunautData(
  * Returns the new job id immediately; processing happens in subsequent
  * calls to processJobBatch().
  */
-export async function createImportJob(xml: string): Promise<{ jobId: string }> {
+export async function createImportJob(
+  xml: string,
+  opts: { declaredEmpty?: boolean } = {},
+): Promise<{ jobId: string }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("import_jobs")
-    .insert({ source: "kultunaut", status: "queued", phase: "pending", xml })
+    .insert({
+      source: "kultunaut",
+      status: "queued",
+      phase: "pending",
+      xml,
+      // Only an explicit caller assertion may allow an empty feed to delete
+      // existing data; it is never inferred from the payload.
+      payload: { declaredEmpty: Boolean(opts.declaredEmpty) },
+    })
     .select("id")
     .single();
   if (error) throw new Error(`Failed to create import job: ${error.message}`);
@@ -426,7 +437,7 @@ export async function processJobBatch(
         cinemas: parsed.cinemas.size,
         showtimes: parsed.showtimes.length,
         grouped: groupedShowtimes.length,
-        declaredEmpty: Boolean((job.payload ?? {}).declaredEmpty),
+        declaredEmpty: Boolean(((job.payload ?? {}) as { declaredEmpty?: boolean }).declaredEmpty),
       });
       if (snapshot.verdict === "incomplete") {
         errors.push(`snapshot incomplete: ${snapshot.reasons.join("; ")}`);

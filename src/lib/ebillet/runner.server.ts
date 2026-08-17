@@ -38,10 +38,20 @@ export type EbilletQueueResult = {
   };
 };
 
+type QueueRpcResult = {
+  data: unknown;
+  error: { message: string } | null;
+};
+
 async function enqueueEligibleOrganizers(): Promise<number> {
   // This RPC encodes the important distinction between availability and sync
   // eligibility: linked cinemas stay eligible even if is_active=false.
-  const { data, error } = await (supabaseAdmin.rpc as any)("enqueue_ebillet_import_runs");
+  // The generated Supabase type does not know about the migration until types
+  // are regenerated, so the narrow cast is kept local and does not use `any`.
+  const enqueueRpc = supabaseAdmin.rpc as unknown as (
+    fn: "enqueue_ebillet_import_runs",
+  ) => PromiseLike<QueueRpcResult>;
+  const { data, error } = await enqueueRpc("enqueue_ebillet_import_runs");
   if (error) throw new Error(`eBillet queue: ${error.message}`);
   return Number(data ?? 0) || 0;
 }

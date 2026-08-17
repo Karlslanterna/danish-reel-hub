@@ -120,23 +120,40 @@ export function normalizeEbilletScreenings(
   const movieById = new Map<number, EbilletMovie>(payload.movies.map((m) => [m.id, m]));
   const typeName = new Map(payload.showtimeTypes.map((t) => [String(t.id), t.name]));
   const out: NormalizedScreening[] = [];
-  const seen = new Set<string>();
+  const seenRefs = new Set<string>();
+  const seenPhysical = new Set<string>();
 
-  const relevant = payload.showtimes.filter(
-    (st: EbilletShowtime) => st.organizerId === organizerId,
-  );
+  // eBillet can expose multiple booking ids for the same physical screening.
+  // Prefer a bookable row, then the lowest source id for deterministic identity.
+  // If that preferred id changes later, the promotion RPC reconciles the new
+  // source_ref against the stable physical identity atomically.
+  const relevant = payload.showtimes
+    .filter((st: EbilletShowtime) => st.organizerId === organizerId)
+    .sort((a, b) => {
+      const aDisabled = a.buyInfo?.enabled === false ? 1 : 0;
+      const bDisabled = b.buyInfo?.enabled === false ? 1 : 0;
+      return aDisabled - bDisabled || a.id - b.id;
+    });
+
   for (const st of relevant) {
     if (!isPlausibleEbilletDateTime(st.dateTime, now)) continue;
     const movie = movieById.get(st.movieId);
     if (!movie) continue;
     const ref = screeningRefOf(organizerId, st.id);
-    if (seen.has(ref)) continue;
+    if (seenRefs.has(ref)) continue;
+
     let startsAt: string;
     try {
       startsAt = ebilletStartsAt(st.dateTime);
     } catch {
       continue;
     }
+
+    const sourceMovieRef = movieRefOf(movie);
+    const hall = (st.locationName ?? "").trim() || "Sal";
+    const physicalKey = `${sourceMovieRef}\u001f${startsAt}\u001f${hall}`;
+    if (seenPhysical.has(physicalKey)) continue;
+
     const { date, time } = copenhagenParts(startsAt);
     const formats: string[] = [movie.is3D || movie.dimension === "3" ? "3D" : "2D"];
     if (movie.isAtmos) formats.push("Atmos");
@@ -144,15 +161,16 @@ export function normalizeEbilletScreenings(
     const min = st.minPrice != null ? Number(st.minPrice) : null;
     const max = st.maxPrice != null ? Number(st.maxPrice) : null;
 
-    seen.add(ref);
+    seenRefs.add(ref);
+    seenPhysical.add(physicalKey);
     out.push({
       sourceRef: ref,
       sourceCinemaRef: String(organizerId),
-      sourceMovieRef: movieRefOf(movie),
+      sourceMovieRef,
       startsAt,
       localDate: date,
       localTime: time,
-      hall: (st.locationName ?? "").trim() || "Sal",
+      hall,
       ticketUrl: ebilletBookingUrl(organizerId, st.movieId, st.id),
       priceMin: min !== null && Number.isFinite(min) ? min : null,
       priceMax: max !== null && Number.isFinite(max) ? max : null,

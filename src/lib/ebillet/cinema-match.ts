@@ -97,6 +97,30 @@ export function matchCinema(
 }
 
 /**
+ * Potential duplicates that are too close to auto-create around, but did not
+ * satisfy a deterministic match rule. The importer parks these for review
+ * instead of silently creating a second canonical cinema.
+ */
+export function plausibleCinemaConflicts(
+  organizer: MatchOrganizer,
+  cinemas: MatchCinema[],
+): MatchCinema[] {
+  const oCity = cityKey(organizer.city);
+  const oName = normKey(organizer.name);
+  const oSlug = slugifyName(organizer.name);
+
+  return cinemas.filter((c) => {
+    if (c.ebillet_organizer_id !== null && c.ebillet_organizer_id !== organizer.id) return false;
+    const cCity = cityKey(c.city);
+    const cName = normKey(c.name);
+    const sameCity = oCity !== "" && cCity !== "" && oCity === cCity;
+    const nameOverlap = cName === oName || cName.includes(oName) || oName.includes(cName);
+    const sameSlug = c.slug === oSlug;
+    return (sameCity && nameOverlap) || (sameSlug && !cityConflict(cCity, oCity));
+  });
+}
+
+/**
  * A slug that is guaranteed free among `cinemas` (the DB has a unique index on
  * cinemas.slug, so a collision otherwise aborts the whole organizer sync).
  */

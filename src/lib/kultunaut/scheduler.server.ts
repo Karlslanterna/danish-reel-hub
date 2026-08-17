@@ -131,7 +131,7 @@ async function fetchFeedXml(): Promise<string> {
 
 /** One batch with retries; returns the pipeline result. */
 async function processBatchWithRetry(jobId: string) {
-  const { processJobBatch } = await import("@/lib/kultunaut/import.server");
+  const { processJobBatch } = await import("@/lib/kultunaut/pipeline.server");
   let lastError = "";
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -387,7 +387,7 @@ export async function runScheduledImport(
   let jobId: string;
   try {
     const xml = await fetchFeedXml();
-    const { createImportJob } = await import("@/lib/kultunaut/import.server");
+    const { createImportJob } = await import("@/lib/kultunaut/pipeline.server");
     ({ jobId } = await createImportJob(xml));
     await db.from("import_schedule_runs").update({ job_id: jobId }).eq("id", runId);
     log("job_created", { runId, jobId });

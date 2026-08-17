@@ -15,6 +15,7 @@ import type {
 import { ebilletBookingUrl, parseRuntimeMinutes } from "./api.server";
 import { copenhagenParts } from "@/lib/pipeline/localtime";
 import type { NormalizedScreening } from "@/lib/pipeline/types";
+import { extractTags } from "@/lib/showtime-tags";
 import {
   ebilletDateTimeToUtcIso,
   isPlausibleEbilletDateTime,
@@ -118,6 +119,7 @@ export function normalizeEbilletScreenings(
   now = new Date(),
 ): NormalizedScreening[] {
   const movieById = new Map<number, EbilletMovie>(payload.movies.map((m) => [m.id, m]));
+  const baseById = new Map<number, EbilletMovieBase>(payload.movieBases.map((b) => [b.id, b]));
   const typeName = new Map(payload.showtimeTypes.map((t) => [String(t.id), t.name]));
   const out: NormalizedScreening[] = [];
   const seenRefs = new Set<string>();
@@ -155,9 +157,19 @@ export function normalizeEbilletScreenings(
     if (seenPhysical.has(physicalKey)) continue;
 
     const { date, time } = copenhagenParts(startsAt);
-    const formats: string[] = [movie.is3D || movie.dimension === "3" ? "3D" : "2D"];
-    if (movie.isAtmos) formats.push("Atmos");
+    const base = movie.baseId && movie.baseId > 0 ? baseById.get(movie.baseId) : undefined;
     const eventName = st.type != null ? typeName.get(String(st.type)) : undefined;
+    const tags = extractTags(
+      base?.name,
+      movie.name,
+      movie.subName,
+      movie.originalName,
+      eventName,
+      st.locationName,
+    );
+    const formats: string[] = [movie.is3D || movie.dimension === "3" ? "3D" : "2D"];
+    for (const format of tags.formats) if (!formats.includes(format)) formats.push(format);
+    if (movie.isAtmos) formats.push("Atmos");
     const min = st.minPrice != null ? Number(st.minPrice) : null;
     const max = st.maxPrice != null ? Number(st.maxPrice) : null;
 
@@ -176,8 +188,8 @@ export function normalizeEbilletScreenings(
       priceMax: max !== null && Number.isFinite(max) ? max : null,
       freeSeats: typeof st.freeSeats === "number" ? st.freeSeats : null,
       formats,
-      languages: [],
-      events: eventName ? [eventName] : [],
+      languages: tags.languages,
+      events: tags.events,
     });
   }
   return out.sort(

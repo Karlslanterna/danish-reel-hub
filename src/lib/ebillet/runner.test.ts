@@ -53,4 +53,16 @@ describe("shouldStartEbilletCycle", () => {
       }),
     ).toBe(true);
   });
+
+  it("never starts a new cycle from a resume-only scheduler tick", () => {
+    expect(
+      shouldStartEbilletCycle({
+        activeRuns: 0,
+        lastCompletedAt: "2026-08-17T12:00:00.000Z",
+        allowStart: false,
+        force: true,
+        nowMs: NOW,
+      }),
+    ).toBe(false);
+  });
 });

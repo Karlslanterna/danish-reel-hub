@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { ParsedCinema, ParsedMovie } from "./parser.server";
 import { buildKultunautMovieGroups } from "./movie-groups";
+import { repairMappedKultunautMovieContinuity } from "./movie-continuity.server";
 import { loadEbilletOwnedCinemaIds } from "./authority.server";
 import {
   clearUnresolved,
@@ -151,8 +152,6 @@ export async function resolveKultunautCinemas(
       locked: true,
     });
 
-    // eBillet owns venue metadata and screenings once linked. Kultunaut keeps
-    // its identity alias but performs no canonical venue write.
     if (ebilletOwned.has(canonicalId)) {
       skippedEbilletOwned += 1;
       continue;
@@ -212,8 +211,6 @@ function sourceMoviePatch(current: ExistingMovie, movie: ParsedMovie): Record<st
     };
   }
 
-  // A canonical film can be shared with another source. Kultunaut then only
-  // fills blanks; it never overwrites useful existing source metadata.
   const patch: Record<string, unknown> = {};
   if (!current.original_title && movie.original_title) patch.original_title = movie.original_title;
   if ((!current.runtime || current.runtime <= 0) && movie.runtime > 0) patch.runtime = movie.runtime;
@@ -237,14 +234,16 @@ export type MovieResolution = {
 };
 
 /**
- * Resolve source movie ids conservatively. A known source ref is immutable;
- * duplicate source rows may share a canonical film only when normalized title
- * and a known year agree. Conflicting persisted refs are parked for review.
+ * Resolve source movie ids conservatively. Before normal resolution, previously
+ * mapped Kultunaut ids get one opportunity to self-heal if repeated exact
+ * screening continuity proves they belong to a stronger canonical film.
  */
 export async function resolveKultunautMovies(
   movies: Iterable<ParsedMovie>,
 ): Promise<MovieResolution> {
   const list = [...movies];
+  await repairMappedKultunautMovieContinuity(list);
+
   const groups = buildKultunautMovieGroups(list);
   const externalIds = list.map((movie) => movie.external_id);
   const refs = await loadRefs(SOURCE, "movie", externalIds);

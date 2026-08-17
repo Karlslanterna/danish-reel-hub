@@ -116,8 +116,8 @@ export const ebilletDiscover = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { runEbilletJob } = await import("@/lib/ebillet/sync.server");
-    return runEbilletJob({ kind: "discover", trigger: "manual", maxId: data.maxId });
+    const { runEbilletDiscovery } = await import("@/lib/ebillet/discovery.server");
+    return runEbilletDiscovery({ trigger: "manual", maxId: data.maxId });
   });
 
 /** One leased organizer per call; the admin client loops until done. */

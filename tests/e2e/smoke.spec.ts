@@ -61,11 +61,13 @@ test.describe("Public pages", () => {
 });
 
 test.describe("Infrastructure endpoints", () => {
-  test("6. /sitemap.xml returns 200 XML", async ({ request }) => {
+  test("6. /sitemap.xml returns a sitemap index", async ({ request }) => {
     const res = await request.get("/sitemap.xml");
     expect(res.status(), "/sitemap.xml must return HTTP 200").toBe(200);
+    expect(res.headers()["content-type"] ?? "", "/sitemap.xml must be XML").toMatch(/xml/i);
     const body = await res.text();
-    expect(body, "/sitemap.xml must contain a <urlset> root").toContain("<urlset");
+    expect(body, "/sitemap.xml must contain a <sitemapindex> root").toContain("<sitemapindex");
+    expect(body, "/sitemap.xml must link at least one child sitemap").toContain("<sitemap>");
   });
 
   test("7. /robots.txt returns 200", async ({ request }) => {

@@ -8,7 +8,7 @@
  * and `showtimeTypes`. eBillet exposes no organizer directory endpoint, so
  * organizer discovery is done by probing the id space in small batches —
  * the API silently ignores unknown ids and only returns organizers that
- * exist (see discoverOrganizers in ./sync.server).
+ * exist (see discoverOrganizers in ./discovery.server).
  */
 
 export const EBILLET_API_BASE = "https://flow.ebillet.dk/api";

@@ -88,14 +88,26 @@ describe("validateSnapshot", () => {
   it("rejects a suspicious empty payload for a populated cinema", () => {
     const res = validateSnapshot(ORG, payload({ showtimes: [] }), { existingRowCount: 42 });
     expect(res.ok).toBe(false);
-    expect(res.reason).toMatch(/mistænkelig/);
+    expect(res.allowDeletes).toBe(false);
+    expect(res.reason).toMatch(/eksisterende data bevares/);
   });
 
-  it("accepts a coherently empty snapshot", () => {
+  it("also rejects a coherently empty payload when production rows exist", () => {
     const res = validateSnapshot(
       ORG,
       payload({ showtimes: [], movies: [], movieBases: [] }),
       { existingRowCount: 42 },
+    );
+    expect(res.ok).toBe(false);
+    expect(res.allowDeletes).toBe(false);
+    expect(res.reason).toMatch(/eksisterende data bevares/);
+  });
+
+  it("accepts an empty snapshot only when there is nothing existing to delete", () => {
+    const res = validateSnapshot(
+      ORG,
+      payload({ showtimes: [], movies: [], movieBases: [] }),
+      { existingRowCount: 0 },
     );
     expect(res.ok).toBe(true);
   });

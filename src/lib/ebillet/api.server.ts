@@ -86,8 +86,13 @@ export async function fetchOrganizerPayload(
   throw new Error(`eBillet request failed (${organizerIds.join(",")}): ${lastError}`);
 }
 
+/**
+ * eBillet's public booking route is /billetter/<movie>/<showtime>?org=<organizer>.
+ * Use the generic flow.ebillet.dk host rather than cinema-specific branded
+ * hosts so links remain portable when opened directly from Lanterna.
+ */
 export function ebilletBookingUrl(organizerId: number, movieId: number, showtimeId: number): string {
-  return `https://flow.ebillet.dk/booking/${movieId}/${showtimeId}?organizerIds=${organizerId}`;
+  return `https://flow.ebillet.dk/billetter/${movieId}/${showtimeId}?org=${organizerId}`;
 }
 
 export function parseRuntimeMinutes(length?: string | null): number {

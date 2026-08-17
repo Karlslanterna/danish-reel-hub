@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { groupScreeningIndexForUi, groupScreeningsForUi } from "./screening-read-model";
+import {
+  groupScreeningIndexForUi,
+  groupScreeningsForUi,
+  normalizeTicketUrl,
+} from "./screening-read-model";
 
 describe("groupScreeningsForUi", () => {
   it("preserves one ticket URL per exact screening while keeping the existing UI shape", () => {
@@ -43,6 +47,15 @@ describe("groupScreeningsForUi", () => {
     expect(grouped[0].formats).toEqual(expect.arrayContaining(["2D", "Atmos"]));
     expect(grouped[0].languages).toContain("Dansk tekst");
     expect(grouped[0].events).toContain("Premiere");
+  });
+
+  it("repairs old Lanterna eBillet URLs without touching other ticket providers", () => {
+    expect(
+      normalizeTicketUrl("https://flow.ebillet.dk/booking/38141/415567?organizerIds=141"),
+    ).toBe("https://flow.ebillet.dk/billetter/38141/415567?org=141");
+    expect(normalizeTicketUrl("https://example.com/tickets/123")).toBe(
+      "https://example.com/tickets/123",
+    );
   });
 
   it("keeps halls separate", () => {

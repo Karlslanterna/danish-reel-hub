@@ -6,11 +6,10 @@
  *    eBillet stores "Fredericia" / "DK-7000",
  *  - eBillet often drops the city from the venue name ("Kosmorama" in
  *    Haderslev vs Kultunaut's "Kosmorama Haderslev"),
- *  - several unrelated venues share a bare name ("Kosmorama", "Grafen"),
- *    which previously produced a slug collision and a failed sync.
+ *  - several unrelated venues share a bare name ("Kosmorama", "Grafen").
  *
- * This module is pure so it can be unit-reasoned about and reused by any
- * future importer.
+ * Matching is deliberately conservative: a deterministic rule must yield
+ * exactly one unclaimed cinema. Ambiguity is never resolved by array order.
  */
 
 import { baseCityOf } from "@/lib/city-slug";
@@ -55,15 +54,17 @@ export type MatchOrganizer = {
 const cityConflict = (a: string, b: string) => a !== "" && b !== "" && a !== b;
 
 /**
- * Pick the existing cinema an organizer belongs to, or null when it is a new
- * venue. Never returns a cinema already claimed by a *different* organizer.
+ * Pick the existing cinema an organizer belongs to, or null when there is no
+ * single safe match. Never returns a cinema already claimed by a different
+ * organizer and never chooses arbitrarily among multiple matching rows.
  */
 export function matchCinema(
   organizer: MatchOrganizer,
   cinemas: MatchCinema[],
 ): MatchCinema | null {
-  const claimed = cinemas.find((c) => c.ebillet_organizer_id === organizer.id);
-  if (claimed) return claimed;
+  const claimed = cinemas.filter((c) => c.ebillet_organizer_id === organizer.id);
+  if (claimed.length === 1) return claimed[0]!;
+  if (claimed.length > 1) return null;
 
   const oName = normKey(organizer.name);
   const oCity = cityKey(organizer.city);
@@ -71,7 +72,7 @@ export function matchCinema(
 
   const free = cinemas.filter((c) => c.ebillet_organizer_id === null);
 
-  const candidates: Array<(c: MatchCinema) => boolean> = [
+  const rules: Array<(c: MatchCinema) => boolean> = [
     // 1. identical name in the same town
     (c) => normKey(c.name) === oName && !cityConflict(cityKey(c.city), oCity),
     // 2. Kultunaut spells out the town: "Kosmorama Haderslev" == "Kosmorama" @ Haderslev
@@ -85,9 +86,12 @@ export function matchCinema(
     (c) => c.slug === slugifyName(organizer.name) && !cityConflict(cityKey(c.city), oCity),
   ];
 
-  for (const rule of candidates) {
-    const hit = free.find(rule);
-    if (hit) return hit;
+  for (const rule of rules) {
+    const hits = free.filter(rule);
+    if (hits.length === 1) return hits[0]!;
+    // If a rule that should be deterministic is ambiguous, weaker rules may
+    // not be used to break the tie. Leave the organizer unresolved instead.
+    if (hits.length > 1) return null;
   }
   return null;
 }
@@ -105,7 +109,9 @@ export function uniqueCinemaSlug(
   const base = slugifyName(organizer.name);
   if (!taken.has(base)) return base;
 
-  const city = organizer.city ? slugifyName(organizer.city.replace(/^\s*(?:DK[-\s]?)?\d{3,4}\b/iu, "")) : "";
+  const city = organizer.city
+    ? slugifyName(organizer.city.replace(/^\s*(?:DK[-\s]?)?\d{3,4}\b/iu, ""))
+    : "";
   const withCity = city ? `${base}-${city}` : "";
   if (withCity && !taken.has(withCity)) return withCity;
 

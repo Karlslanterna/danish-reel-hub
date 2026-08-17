@@ -1,137 +1,95 @@
-# TMDb Integration — Technical Design (for review)
+# Lanterna — arkitektur- og backend-audit
 
-Kultunaut stays authoritative for cinemas, showtimes and ticket links. TMDb becomes authoritative for film metadata (title art, synopsis, runtime, genres, cast/crew, ratings). The design keeps room for IMDb and Letterboxd as additional providers later.
+Baseret på gennemgang af den aktuelle kode (`src/lib/ebillet/*`, `src/lib/kultunaut/*`, `src/lib/tmdb/*`) og direkte forespørgsler mod produktionsdatabasen i dag. Tidligere audit-dokumenter er ikke lagt til grund.
 
-## 1. Data model
+## Målte tal fra den faktiske database
 
-Keep `movies` as the Kultunaut-owned identity row, and move enrichment into provider-agnostic tables.
+| Måling | Værdi |
+|---|---|
+| showtimes | 9.580 (ebillet 7.381 / kultunaut 2.199) |
+| movies | 855 (ebillet 782 / kultunaut 73) |
+| cinemas | 192 (ebillet 32 / kultunaut 160) |
+| movies med `year = 0` | 547 (64 %) |
+| eBillet-film uden synopsis eller plakat | 772 af 782 |
+| Kultunaut-showtimes på eBillet-ejede biografer | 199 (14+ biografer, bl.a. Grand Teatret, Empire Bio) |
+| eBillet-oprettede biografer uden lat/lon | 32 af 32 |
+| showtimes uden for 30-dages vinduet | 2.014 |
+| duplikerede titler / fortidige showtimes / skæve ticket_urls | 0 / 0 / 0 |
+| tabelstørrelse showtimes | 8,7 MB |
 
-**`movies` (existing, trimmed responsibility)**
-Keeps: `id`, `slug`, `external_id` (Kultunaut), `title` (feed title), `original_title`, `release_date`/`year` as reported by the feed. Existing metadata columns (`runtime`, `genre`, `synopsis`, `poster`, `director`, `rating`, `trailer_url`) stay in place as the fallback layer — no destructive change.
+## A. Kritiske fejl
 
-**`movie_metadata` (new)** — one row per movie per provider.
-- `movie_id` -> `movies.id`
-- `provider` (`tmdb` | `imdb` | `letterboxd`)
-- `provider_id` (TMDb movie id, IMDb tt-id, Letterboxd slug)
-- `title`, `original_title`, `synopsis`, `runtime`, `release_date`, `genres[]`, `poster_url`, `backdrop_url`, `trailer_url`, `directors[]`, `cast` (jsonb), `certification`, `vote_average`, `vote_count`, `original_language`, `homepage`
-- `raw` jsonb (the trimmed provider payload, for reprocessing without re-fetching)
-- `fetched_at`, `stale_after`, `etag`, `created_at`, `updated_at`
-- unique `(movie_id, provider)`; index on `(provider, provider_id)`
+1. **Source authority er kun håndhævet på skrivning, aldrig på eksisterende data.** Kultunaut-importen springer eBillet-dækkede biografer over, men fjerner ikke de 199 Kultunaut-rækker, der allerede ligger der. De vises offentligt side om side med eBillet-rækker. Authority-reglen er dermed ikke opfyldt i dag.
+2. **`cleanupStaleData()` er global, cross-source og destruktiv, og kører inde i Kultunaut-jobbet.** Den sletter alle fortidige showtimes uanset kilde og derefter enhver film/biograf uden showtimes. Hvis en eBillet-sync fejler eller en biograf er midlertidigt tom, sletter Kultunaut-jobbet eBillet-biografen — og `showtimes_cinema_id_fkey ON DELETE CASCADE` river dens showtimes med. Det er præcis den implicitte cross-source cleanup, der ikke må findes.
+3. **Ingen unik constraint på showtime-identitet.** Grupperingen `(movie_id, cinema_id, date, hall)` findes kun i applikationskode. To samtidige kørsler kan skabe dubletter uden at databasen protesterer. `external_id` er unik, men eBillet sætter den til `eb-<org>-<første showtime id>`, som ændrer sig når det første id forsvinder.
+4. **Grupperede array-rækker er den forkerte kanoniske granularitet.** Én række bærer `times[]`, `ticket_urls[]`, `ebillet_showtime_ids[]`, ét `min/max_price` og ét aggregeret `free_seats`. Identitet, reconciliation, priser og ledige sæder pr. forestilling går tabt, `start_time` duplikerer `date+times[0]`, og diff-logikken skal genopfinde identitet fra arrays.
+5. **Film-identitet skabes af titel.** `matchMovie` kræver titel + år, men 64 % af rækkerne har `year = 0`, så fallback fejler næsten altid og opretter en ny `eb-`-film i stedet. Det forklarer 782 eBillet-film mod 73 Kultunaut-film: samme fysiske film findes i praksis flere gange på tværs af kilder. Kultunaut-importens `merge`-fase gør det modsatte — den sletter film ud fra `ilike`-titelmatch alene og re-pointer showtimes, hvilket kan kollapse to forskellige film.
+6. **Biograf-identitet bruger stadig navnepræfiks-søgning** (`ilike '<første ord>%' limit 50`) plus bynavn. Robust nok i dag, men det er strengmatch der bestemmer canonical identity.
+7. **To uafhængige, uforenelige job-modeller.** `import_jobs` (faseautomat, gemmer hele XML-payloaden i rækken, ingen lease, ingen forsøgstæller, en fejl i én fase fejler hele jobbet) og `ebillet_sync_runs` (cursor-CAS pr. organizer). Single-flight i eBillet hviler kun på cursor-CAS: intet forhindrer to `running` runs i at blive oprettet, og resume-forespørgslen tager vilkårligt ældste `running` run uanset `kind`.
+8. **Partial commits overalt.** Hver organizer laver 5–10 uafhængige skrivninger (cinema, organizer, movies, insert/update/delete af showtimes) uden transaktion. En timeout midt i reconciliation efterlader biografen halvt slettet.
+9. **Tavse trigger-drops.** `enforce_showtime_source_authority` returnerer `NULL`/`OLD` ved konflikt. Skrivninger forsvinder uden fejl — usynligt datatab og meget svær fejlsøgning.
+10. **RLS kalder en SECURITY DEFINER-funktion pr. række** (`private.cinema_is_public(cinema_id)`) på hver showtime-læsning. Fungerer ved 9.600 rækker, bliver en flaskehals ved 100.000.
+11. **TMDb-berigelse ligger inde i importjobbet** (op til 40 runder i `enrich`-fasen) og kobler en ekstern, ratelimiteret API til import-completion.
+12. **Datakvalitet, brugersynligt:** ingen af de 32 eBillet-biografer har koordinater, så de er usynlige for "Afstand fra mig"-filteret. 772 eBillet-film mangler synopsis eller plakat.
 
-**`movie_provider_links` (new)** — the match record, kept separate from the payload so matching can be re-run and audited.
-- `movie_id`, `provider`, `provider_id`
-- `confidence` numeric 0–1, `match_method` (`exact_title_year`, `normalized_title`, `original_title`, `fuzzy`, `imdb_crosswalk`, `manual`)
-- `status`: `confirmed` | `candidate` | `ambiguous` | `rejected` | `unmatched`
-- `candidates` jsonb (top N scored alternatives, for the admin review UI)
-- `reviewed_by`, `reviewed_at`, timestamps
-- unique `(movie_id, provider)`; partial unique on `(provider, provider_id)` where `status='confirmed'` to prevent two Kultunaut films binding the same TMDb id silently
+## B. Rodårsager
 
-**`provider_fetch_log` (new, optional but recommended)** — per-call record of provider, endpoint, status, duration, error, for quota tracking and debugging.
+- Der findes ingen source-scoped stagingzone. Begge importere skriver direkte i canonical tabeller, så hver fejl er en produktionsfejl.
+- Kildeejerskab er kodet ind i primærnøglen (`kn-`/`eb-`-præfikser) i stedet for i en mapping-tabel. Et objekt kan ikke skifte eller dele kilde uden at skifte identitet.
+- Der findes ingen eksplicit identity-resolution-tabel. Matching genberegnes fra strenge ved hver kørsel i stedet for at blive besluttet én gang og gemt.
+- Databasen håndhæver ingen af de invarianter, koden antager (unik screening, én kilde pr. biograf, ingen cross-source sletning). Alt er applikationslogik.
+- Cleanup og ejerskab blev tilføjet efter datamodellen i stedet for at være en del af den.
 
-**Read path**: a `movies_view` (or a resolver in `src/lib/cinema-data.ts`) that coalesces per field: confirmed TMDb value -> Kultunaut value -> null. Field-level coalesce, not row-level, so a TMDb row missing a runtime still falls back.
+## C. Målarkitektur
 
-RLS: public read on `movie_metadata` (it feeds public pages), admin-only read on `movie_provider_links` and `provider_fetch_log`; all writes service-role only.
+**Kanonisk model og ejerskab**
 
-## 2. Matching strategy
-
-Normalization before comparison: lowercase, strip diacritics, strip trailing bracketed years, strip trailing edition/format noise (`3D`, `OV`, `m/ dansk tale`, `Babybio`), collapse punctuation/whitespace. Reuse the existing `slugify` + `showtime-tags` normalizers.
-
-Candidate lookup order per Kultunaut film:
-1. `search/movie` with normalized title + `year` from the feed (`primary_release_year`).
-2. If empty, same search without the year.
-3. If empty and an original title exists, search that.
-
-Scoring (0–1) over each candidate:
-- title similarity (normalized Levenshtein/trigram) — weight 0.5, evaluated against both `title` and `original_title`, best wins
-- release year delta: exact 1.0, ±1 year 0.7, ±2 0.3, else 0 — weight 0.3
-- runtime delta when the feed provides one: within 5 min 1.0, within 15 min 0.5 — weight 0.1
-- popularity/vote_count tiebreaker — weight 0.1
-
-Decision thresholds:
-- score >= 0.90 and the gap to the runner-up >= 0.15 -> `confirmed`, auto-enrich
-- 0.70–0.90, or a tight gap to the runner-up -> `ambiguous`, store top 5 candidates, no enrichment, surfaced in an admin review queue
-- < 0.70 or no results -> `unmatched`, retried on a later run (feeds get corrected over time)
-
-Manual override in the admin UI sets `status='manual'/'confirmed'` with `confidence=1`; a manual link is never overwritten by an automatic run. Rejections are remembered so the same wrong candidate is not re-proposed.
-
-IMDb/Letterboxd later: TMDb's `external_ids` gives the IMDb tt-id for free, so IMDb becomes a crosswalk rather than a fresh matching problem, and Letterboxd is derivable from the TMDb/IMDb id. Same tables, new `provider` value.
-
-## 3. Import and enrichment pipeline
-
-Enrichment is a separate phase in the existing background job, not a blocking part of the Kultunaut import — the site must stay correct if TMDb is down.
-
-Existing phases: `movies` -> `cinemas` -> `showtimes` -> `cleanup`.
-New phase inserted after `cleanup`: `enrich`.
-
-The `enrich` phase, batched exactly like the other phases (cursor-based, resumable, one batch per `/process` call):
-1. Select the work list: movies with no `movie_provider_links` row for `tmdb`, plus movies whose confirmed metadata is past `stale_after`, plus previously `unmatched` movies older than N days. Ordered by "has upcoming showtimes" first, so visible films get enriched first.
-2. Per movie: match (section 2) -> if confirmed, fetch `movie/{id}?append_to_response=credits,videos,images,release_dates,external_ids` (one call) -> upsert `movie_metadata` + `movie_provider_links`.
-3. Record counts on the job (`processed_enriched`, `matched`, `ambiguous`, `unmatched`) so the pipeline page shows them.
-4. Errors on a single film never fail the job; they are appended to `errors[]` and the film retried next run.
-
-Cleanup interaction: when a movie row is deleted for having no upcoming showtimes, its metadata cascades. Consider retaining `movie_provider_links` keyed by Kultunaut `external_id` (rather than the internal id) so a film returning to cinemas does not need re-matching or re-fetching.
-
-## 4. Refresh and caching
-
-- Confirmed metadata TTL is tiered: films with upcoming showtimes refresh every 7 days; films released within the last 60 days every 3 days (posters/trailers/certifications land late); everything else every 30 days.
-- `stale_after` is stored per row, so refresh selection is a single indexed query, not a full scan.
-- `raw` payload retained so display changes (new field, different image size) are re-derivable without any API call.
-- Poster/backdrop URLs are stored as TMDb CDN paths plus a size, resolved to full HTTPS URLs at render time — image size choices then change without a re-fetch. The existing `toHttpsUrl` guard stays.
-- Page-level caching is unchanged; the read layer serves from our DB only, never from TMDb at request time.
-
-## 5. API usage minimization
-
-- One `search` call plus one `append_to_response` detail call per newly matched film — never separate credits/videos/images calls.
-- Configuration endpoints (image base URL, genre list) fetched once per week and cached in a small `provider_config` cache row.
-- Per-run cap (e.g. 500 films) with resumption on the next run, keeping any single job well within TMDb rate limits.
-- Conditional refresh: skip the write and just bump `stale_after` when the payload is unchanged.
-- Client-side token bucket (~40 requests / 10s, configurable) plus `provider_fetch_log` for quota visibility.
-- The TMDb read token lives in project secrets and is only ever read inside server handlers.
-
-## 6. Error handling and retries
-
-- 429: honour `Retry-After`, exponential backoff, and end the batch early rather than burning the job's time budget; the job stays resumable.
-- 5xx / network: up to 3 retries with jittered backoff, then defer the film to the next run.
-- 401/403: treated like the existing Kultunaut `FeedAccessError` — the job records a clear Danish message ("TMDb afviste adgang (HTTP 401)") on the pipeline page, never echoing the token.
-- 404 on a previously confirmed id: mark the link `rejected` and requeue for re-matching.
-- Per-film failure counter; after 5 consecutive failures the film is parked and reported in the admin review queue instead of retried forever.
-- Health: extend the existing `import-health` endpoint with an enrichment section (match rate, ambiguous count, last successful enrichment) — degraded enrichment must not turn overall status critical, since the site still works.
-
-## 7. Field ownership
-
-| Field | Owner | Notes |
+| Objekt | Ejer af identitet | Ejer af felter |
 |---|---|---|
-| cinema identity, address, geo, website | Kultunaut | unchanged |
-| showtimes, dates, halls, formats/languages/events tags | Kultunaut | unchanged |
-| ticket URLs / booking links | Kultunaut | never from TMDb |
-| film identity in our DB (`id`, `slug`, `external_id`) | Kultunaut | slug stays stable for SEO |
-| feed title / original title | Kultunaut (matching input) | display title prefers TMDb |
-| synopsis, runtime, genres, release date, poster, backdrop, trailer, cast, director, ratings, original language, certification | TMDb | Kultunaut value is the fallback |
-| Danish-language synopsis | TMDb `language=da-DK` first, Kultunaut fallback | Kultunaut often has better Danish copy — worth a per-field preference flag |
-| aggregate ratings / user reviews | IMDb / Letterboxd later | additive only |
+| `cinemas` | Lanterna (stabilt `uuid`) | eBillet for eBillet-koblede: navn, sal-antal, aktiv. Kultunaut: adresse, geo, beskrivelse, website (eBillet leverer dem ikke) |
+| `movies` | Lanterna | TMDb først (plakat, synopsis, runtime, genrer, cast), derefter kildens værdi, aldrig blank overskrivning |
+| `screenings` (ny, erstatter `showtimes`) | Kilden, via `(source, source_ref)` | 100 % ejet af den kilde biografen er bundet til |
 
-## 8. Migration strategy
+**Nye strukturer**
 
-1. Migration A — additive only: create `movie_metadata`, `movie_provider_links`, `provider_fetch_log` with grants, RLS, and updated_at triggers. Nothing on the existing tables changes; the site is unaffected.
-2. Backfill run: enrichment phase executed manually from the admin pipeline page over the current ~127 films. Review the ambiguous queue.
-3. Read-layer switch: `cinema-data.ts` starts coalescing TMDb over Kultunaut, behind a flag so it can be reverted instantly.
-4. Observation window: compare film pages before/after; verify no film loses a poster or synopsis (the coalesce guarantees this, but verify).
-5. Migration B — later, optional: once TMDb coverage is proven, deprecate the metadata columns on `movies` rather than dropping them; drop only after a full release cycle.
+- `source_refs(source, entity_type, external_id, canonical_id, confidence, method, confirmed_at)` — én besluttet identitet pr. eksternt id. Strengmatch må kun foreslå, aldrig binde.
+- `import_snapshots(id, source, scope, fetched_at, payload_hash, status, validation)` — én række pr. fetch pr. scope (organizer eller hele Kultunaut-feedet).
+- `staged_screenings(snapshot_id, …)` — normaliseret, validerbar landingszone.
+- `screenings` — én række pr. forestilling: `cinema_id, movie_id, starts_at timestamptz, hall, source, source_ref, ticket_url, price_min, price_max, free_seats, formats[], languages[], events[]`, med `unique (source, source_ref)` og `unique (cinema_id, hall, starts_at, movie_id)`. Gruppering pr. dato/sal sker ved læsning, ikke i lagringen.
+- `cinemas.authoritative_source` som eksplicit kolonne + `cinemas.is_public` som denormaliseret boolean vedligeholdt af trigger, så RLS bliver et kolonneopslag i stedet for et funktionskald.
+- Promotion sker i én `SECURITY DEFINER`-RPC pr. scope: valider snapshot → diff mod `screenings` for netop den `(cinema_id, source)` → insert/update/delete i én transaktion. Ingen delvise commits; cleanup kan pr. konstruktion ikke ramme en anden kilde.
+- Cleanup opdeles: retention (slet forestillinger ældre end N dage, kildeagnostisk og ufarlig) adskilt fra orphan-oprydning (kun film uden nogen forestillinger, aldrig biografer).
+- TMDb-berigelse bliver et selvstændigt, købaseret job med egen TTL — ikke en importfase.
+- Én job-model for begge kilder: `jobs(kind, scope, state, lease_until, attempts, cursor, last_error)` med lease/heartbeat, forsøgstæller, dead-letter og et partielt unikt indeks der gør to aktive kørsler af samme kind umuligt.
 
-No destructive step happens before coverage is measured.
+**Anbefaling, eksplicit:** dette er en omskrivning af importlaget. `src/lib/ebillet/sync.server.ts` (972 linjer) og `src/lib/kultunaut/import.server.ts` (650 linjer) bør erstattes, ikke lappes. Genbrugelig og god kode: `parser.server.ts`, `reconcile.ts` (diff/validate-logikken), `cinema-match.ts`, `venue-filter.ts`, `api.server.ts`, `tmdb/*`.
 
-## 9. Risks and recommendations
+## D. Migrationssekvens
 
-- **Danish market coverage.** Local/arthouse Danish titles and one-off events (Babybio screenings, opera transmissions, festival films) are frequently absent from TMDb. Expect a real unmatched tail; the Kultunaut fallback and a manual-link UI are mandatory, not optional.
-- **Wrong-match damage.** A confident wrong match shows the wrong poster and synopsis on a public page. Mitigation: conservative thresholds, runner-up gap requirement, and the ambiguous queue defaulting to no enrichment.
-- **Title noise.** Kultunaut titles carry format and event suffixes; matching quality depends heavily on the normalizer. Recommend unit tests over a fixture set of real feed titles before rollout.
-- **TMDb attribution and terms.** TMDb requires attribution ("This product uses the TMDb API but is not endorsed or certified by TMDb") — plan a footer/about-page line.
-- **Duplicate collapse interaction.** The importer already merges same-title films; run TMDb matching *after* that merge so we do not enrich rows that are about to disappear.
-- **Rate limits during backfill.** Cap the first run and let it span several scheduled runs rather than doing 127+ films in one burst.
-- **Recommendation on sequencing:** ship schema + matching + admin review queue first with enrichment write-only (not displayed), verify match quality against real data, and only then flip the read layer.
+1. **Stop blødningen (lav risiko, ingen modelændring).** Fjern biograf-sletning fra cleanup; begræns cleanup til kildens eget scope; fjern de 199 Kultunaut-rækker på eBillet-biografer via en eksplicit, revisérbar migration; erstat de tavse triggere med `RAISE EXCEPTION`; tilføj `unique (movie_id, cinema_id, date, hall)`; backfyld koordinater på de 32 eBillet-biografer.
+2. **Identitetslag.** Opret `source_refs`, backfyld fra `external_id`, `ebillet_organizer_id`, `ebillet_movie_base_id`, `ebillet_movie_ids`. Kør en read-only rapport over sandsynlige cross-source filmdubletter; flet kun manuelt bekræftede.
+3. **Ny screenings-tabel skygge-udfyldes** fra `showtimes` og fra næste import, mens læsestien stadig bruger `showtimes`. Sammenlign counts pr. biograf og dato.
+4. **Snapshot + promotion-RPC** tages i brug for eBillet først (mest veldefineret payload), derefter Kultunaut.
+5. **Læsestien flyttes** til `screenings` bag en flag; `showtimes` beholdes read-only en release-cyklus og droppes derefter.
+6. **Job-modellen konsolideres** og de to gamle drivere fjernes.
+7. **Enrichment afkobles** til eget job.
 
-## Open questions for you
+## E. Tests og invarianter
 
-1. Danish synopsis preference: TMDb `da-DK` when present, or always prefer the Kultunaut Danish text?
-2. Should posters switch to TMDb art wherever available, or keep Kultunaut art when it exists (branding consistency with the physical campaign)?
-3. Do you want the admin review queue in this phase, or auto-only matching first?
+Databasehåndhævet: unik screening-identitet; ingen `screenings`-række hvis kilde ≠ biografens `authoritative_source`; ingen sletning af rækker uden for det promoverede scope; ingen biograf uden `source_refs`-post.
+
+Testet: stale delete inden for scope; ugyldigt/tomt snapshot bevarer eksisterende data; Kultunaut-only biograf urørt af eBillet-kørsel; idempotent gentaget promotion (nul writes anden gang); titelkollision opretter aldrig forkert identitet; afbrudt promotion efterlader ingen delvis tilstand; to samtidige kørsler af samme scope → én taber uden skade; retention sletter aldrig fremtidige forestillinger.
+
+## F. Kan trygt forblive uændret
+
+Frontend og design; `src/lib/cinema-data.ts` læsemønstre (bortset fra kildetabel); `parser.server.ts`; `venue-filter.ts`; `cinema-match.ts`; TMDb-klient og -matching; discovery af organizers; admin-UI'et; RLS-modellen som koncept (kun implementeringen af `cinema_is_public` bør denormaliseres).
+
+## Performance ved 1.000 film / 500 biografer / 100.000 forestillinger
+
+Datamængden i sig selv er triviel (< 100 MB). Det, der ikke skalerer, er: `cleanupStaleData()` som henter alle id'er til hukommelsen (200+ round trips); Kultunaut-fasens ét `SELECT` pr. gruppe (~30.000 kald); `movies_ranked` som fuld aggregering pr. request; RLS-funktionskald pr. række; og `loadAll` over alle showtimes pr. biograf. Målarkitekturen løser alle fem med scope-forespørgsler, mængdebaseret diff i SQL, en materialiseret rangeringstabel og et boolsk RLS-prædikat. Nødvendige indekser: `screenings(cinema_id, starts_at)`, `screenings(movie_id, starts_at)`, `screenings(starts_at)`, `unique(source, source_ref)`.
+
+## Spørgsmål inden implementering
+
+1. Skal jeg starte med trin 1 (stop blødningen) som en isoleret, hurtig leverance, før vi tager stilling til omskrivningen?
+2. Accepteres `screenings` pr. forestilling som ny kanonisk granularitet — det er den ændring, alt andet hænger på?
+3. Skal cross-source filmdubletter flettes automatisk over en confidence-tærskel, eller kun manuelt via en admin-kø?

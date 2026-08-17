@@ -4,7 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
  * POST /api/public/ebillet-sync
  *
  * Scheduled entry point for eBillet. Canonical sync jobs use the shared
- * `import_runs` lease model; discovery remains a separate registry scan.
+ * `import_runs` lease model; discovery is registry maintenance only and lives
+ * in a separate service that cannot mutate canonical cinema/movie/screening data.
  *
  * Transitional authentication accepts both the new generic/eBillet headers and
  * the old Kultunaut-named headers so the existing scheduler does not break.
@@ -33,11 +34,8 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
 
         try {
           if (mode === "discover") {
-            // Discovery only maintains the organizer registry. It does not
-            // promote screenings and can remain on the legacy discovery code.
-            const { runEbilletJob } = await import("@/lib/ebillet/sync.server");
-            const result = await runEbilletJob({
-              kind: "discover",
+            const { runEbilletDiscoveryJob } = await import("@/lib/ebillet/discovery.server");
+            const result = await runEbilletDiscoveryJob({
               trigger: "cron",
               budgetMs: 55_000,
             });

@@ -3,37 +3,54 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * GET /api/public/import-health
  *
- * Returns a JSON health report for the Kultunaut import pipeline.
- * Suitable for uptime monitors and dashboards. Public read-only:
- * exposes only aggregated counts, timestamps, and status — no PII,
- * no XML payloads, no error message bodies.
+ * Public, aggregate-only operational health. The canonical pipeline is the
+ * source of truth: eBillet and Kultunaut are evaluated independently so an
+ * upstream Kultunaut outage cannot make a healthy eBillet platform look down.
  *
- * Response status codes:
- *   200 — always, unless ?monitor=1 is set
- *   503 — critical, only with ?monitor=1 (fires paging alerts on uptime monitors)
+ * During the transition the response also preserves the legacy Kultunaut
+ * metrics/scheduler fields consumed by the existing Admin page.
+ *
+ * ?monitor=1 returns HTTP 503 only when canonical health is critical.
  */
 export const Route = createFileRoute("/api/public/import-health")({
   server: {
     handlers: {
       GET: async ({ request }) => {
         try {
-          const { getImportHealth } = await import("@/lib/kultunaut/health.server");
-          const { getSchedulerHealth } = await import("@/lib/kultunaut/scheduler.server");
-          const [report, scheduler] = await Promise.all([
-            getImportHealth(),
-            getSchedulerHealth(),
+          const { getCanonicalPipelineHealth } = await import("@/lib/pipeline/health.server");
+          const canonical = await getCanonicalPipelineHealth();
+
+          // Legacy fields remain compatibility-only. Failure to produce them
+          // must not hide the canonical per-source health report.
+          const [legacyImport, scheduler] = await Promise.all([
+            import("@/lib/kultunaut/health.server")
+              .then(({ getImportHealth }) => getImportHealth())
+              .catch(() => null),
+            import("@/lib/kultunaut/scheduler.server")
+              .then(({ getSchedulerHealth }) => getSchedulerHealth())
+              .catch(() => null),
           ]);
-          // The scheduler can only make the overall picture worse.
-          const rank = { healthy: 0, unknown: 1, warning: 2, critical: 3 } as const;
-          const overall =
-            rank[scheduler.status] > rank[report.status] ? scheduler.status : report.status;
-          // Only uptime monitors opt into a failing HTTP status (?monitor=1).
-          // Dashboard/browser callers always get 200 and read `status` from the body,
-          // so a critical report does not surface as a client-side fetch error.
+
           const monitorMode = new URL(request.url).searchParams.get("monitor") === "1";
-          const httpStatus = monitorMode && overall === "critical" ? 503 : 200;
+          const httpStatus = monitorMode && canonical.status === "critical" ? 503 : 200;
+
           return Response.json(
-            { ...report, status: overall, importStatus: report.status, scheduler },
+            {
+              // Canonical fields — these determine platform health.
+              status: canonical.status,
+              reasons: canonical.reasons,
+              sources: canonical.sources,
+              parity: canonical.parity,
+              checkedAt: canonical.checkedAt,
+
+              // Transitional fields expected by the current Admin dashboard.
+              importStatus: legacyImport?.status ?? "unknown",
+              metrics: legacyImport?.metrics ?? null,
+              scheduler,
+              kultunautLegacy: legacyImport
+                ? { status: legacyImport.status, reasons: legacyImport.reasons }
+                : null,
+            },
             {
               status: httpStatus,
               headers: {
@@ -42,13 +59,28 @@ export const Route = createFileRoute("/api/public/import-health")({
               },
             },
           );
-
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
-          console.error("[import-health] check failed:", message);
+          console.error("[import-health] canonical health check failed:", message);
+          // Do not expose database/table/error details on a public endpoint.
           return Response.json(
-            { status: "unknown", error: message },
-            { status: 500, headers: { "cache-control": "no-store" } },
+            {
+              status: "unknown",
+              reasons: ["Import health is temporarily unavailable"],
+              sources: null,
+              parity: null,
+              checkedAt: new Date().toISOString(),
+              importStatus: "unknown",
+              metrics: null,
+              scheduler: null,
+            },
+            {
+              status: 500,
+              headers: {
+                "cache-control": "no-store",
+                "x-robots-tag": "noindex",
+              },
+            },
           );
         }
       },

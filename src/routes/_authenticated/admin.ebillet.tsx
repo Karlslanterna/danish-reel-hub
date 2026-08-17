@@ -81,7 +81,6 @@ function EbilletPage() {
         }
       }
 
-
       setNote(
         result?.message ??
           (result?.done === false ? "Kørslen fortsætter." : "Færdig."),
@@ -101,9 +100,9 @@ function EbilletPage() {
     <AdminShell title="eBillet-sync">
       <div className="mx-auto max-w-5xl space-y-6">
         <p className="text-sm text-muted-foreground">
-          eBillet supplerer Kultunaut med biografer, film og spilletider direkte fra
-          billetsystemet. Kultunaut-data overskrives aldrig — eBillet udfylder kun huller
-          og tilføjer nye visninger.
+          eBillet er autoritativ kilde for alle biografer, der er koblet til eBillet.
+          Synkroniseringen går gennem den canonical screening-pipeline, så Kultunaut ikke
+          kan overskrive eller slette eBillet-forestillinger på disse biografer.
         </p>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -262,8 +261,8 @@ function Kpi({ label, value }: { label: string; value: string | number }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className="mt-1 font-display text-2xl font-bold">{value}</p>
+        <p className="text-2xl font-semibold">{value}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{label}</p>
       </CardContent>
     </Card>
   );

@@ -3,13 +3,9 @@
  *
  *   fetch -> snapshot -> validate -> resolve -> normalize -> stage -> promote
  *
- * Compared to the legacy `sync.server.ts` orchestration this module:
- *  - records every payload as an `import_snapshots` row before canonical writes,
- *  - validates the payload before creating/updating cinemas, movies or screenings,
- *  - resolves identity through `source_entity_refs` instead of re-matching
- *    names on every run,
- *  - writes one row per physical screening into `screenings`,
- *  - performs destructive work only inside the scoped `promote_screenings` RPC.
+ * Canonical screening writes are atomic and source-scoped. Cinema/movie
+ * identity is persisted separately, so subsequent imports reuse source-native
+ * ids instead of repeating fuzzy matching.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { fetchOrganizerPayload, type EbilletMoviesResponse } from "./api.server";
@@ -21,12 +17,23 @@ import {
 import { matchMovie, validateSnapshot } from "./reconcile";
 import {
   matchCinema,
+  plausibleCinemaConflicts,
   slugifyName,
   uniqueCinemaSlug,
   type MatchCinema,
 } from "./cinema-match";
 import { classifyOrganizer } from "./venue-filter";
-import { loadRefs, recordUnresolved, upsertRefs } from "@/lib/pipeline/identity.server";
+import {
+  buildEbilletMovieSupplementPatch,
+  sourceRefsForMovieGroup,
+} from "./movie-metadata";
+import {
+  clearUnresolved,
+  loadRefs,
+  recordUnresolved,
+  upsertRefs,
+  type RefInput,
+} from "@/lib/pipeline/identity.server";
 import {
   applyValidation,
   createSnapshot,
@@ -67,19 +74,20 @@ type MovieRow = {
   ebillet_movie_ids: number[] | null;
 };
 
-const isBlank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "");
 const dedupeById = <T extends { id: string | number }>(rows: T[]): T[] => {
   const map = new Map<string | number, T>();
-  for (const r of rows) if (!map.has(r.id)) map.set(r.id, r);
+  for (const row of rows) if (!map.has(row.id)) map.set(row.id, row);
   return [...map.values()];
 };
 
-// ------------------------------------------------------------------ resolve
+const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+// ------------------------------------------------------------------ cinema identity
 
 /**
- * Read-only lookup used before validation. It deliberately does no fuzzy/name
- * matching and performs no writes: only an already persisted mapping counts as
- * existing production state during snapshot validation.
+ * Read-only lookup used before validation. It deliberately performs no
+ * name-based matching or writes: only persisted identity links count as
+ * existing production state when deciding whether an empty snapshot is safe.
  */
 async function findKnownCinemaId(organizerId: number): Promise<string | null> {
   const refs = await loadRefs("ebillet", "cinema", [String(organizerId)]);
@@ -104,27 +112,44 @@ async function findKnownCinemaId(organizerId: number): Promise<string | null> {
   return organizer?.cinema_id ?? cinema?.id ?? null;
 }
 
-/** Bind an organizer to its canonical cinema: ref first, then a match, else create. */
+/** Bind an organizer to one canonical cinema, or park ambiguous identity. */
 async function resolveCinema(
   organizerId: number,
   payload: EbilletMoviesResponse,
 ): Promise<{ cinemaId: string; created: boolean }> {
   const organizer = payload.organizers.find((o) => o.id === organizerId)!;
   const city = organizer.address?.city ?? "";
+  const externalId = String(organizerId);
 
-  const refs = await loadRefs("ebillet", "cinema", [String(organizerId)]);
-  const known = refs.get(String(organizerId));
+  const refs = await loadRefs("ebillet", "cinema", [externalId]);
+  const known = refs.get(externalId);
   const patch = {
     ebillet_organizer_id: organizerId,
+    source: "ebillet",
     screens: Math.max(organizer.locations?.length ?? 1, 1),
   };
 
   if (known) {
-    const { error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("cinemas")
       .update(patch as never)
-      .eq("id", known.canonicalId);
+      .eq("id", known.canonicalId)
+      .select("id")
+      .maybeSingle();
     if (error) throw new Error(`cinema update ${known.canonicalId}: ${error.message}`);
+    if (!data) {
+      await recordUnresolved([
+        {
+          source: "ebillet",
+          entityType: "cinema",
+          externalId,
+          label: organizer.name,
+          reason: `locked mapping points to missing cinema ${known.canonicalId}`,
+        },
+      ]);
+      throw new Error(`eBillet organizer ${organizerId} peger på en manglende canonical biograf`);
+    }
+    await clearUnresolved("ebillet", "cinema", [externalId]);
     return { cinemaId: known.canonicalId, created: false };
   }
 
@@ -144,8 +169,8 @@ async function resolveCinema(
       .ilike("name", `${firstToken}%`)
       .limit(50),
   ]);
-  for (const r of [byOrg, bySlug, byName]) {
-    if (r.error) throw new Error(`cinemas: ${r.error.message}`);
+  for (const result of [byOrg, bySlug, byName]) {
+    if (result.error) throw new Error(`cinemas: ${result.error.message}`);
   }
   const candidates = dedupeById<CinemaRow>([
     ...((byOrg.data ?? []) as CinemaRow[]),
@@ -160,11 +185,11 @@ async function resolveCinema(
       .update(patch as never)
       .eq("id", existing.id);
     if (error) throw new Error(`cinema update ${existing.id}: ${error.message}`);
-    await upsertRefs([
+    const { conflicts } = await upsertRefs([
       {
         source: "ebillet",
         entityType: "cinema",
-        externalId: String(organizerId),
+        externalId,
         canonicalId: existing.id,
         matchMethod: "external_id",
         confidence: 1,
@@ -172,10 +197,34 @@ async function resolveCinema(
         notes: "organizer bound to existing venue",
       },
     ]);
+    if (conflicts.length) throw new Error(conflicts[0]);
+    await clearUnresolved("ebillet", "cinema", [externalId]);
     return { cinemaId: existing.id, created: false };
   }
 
-  // Genuinely new venue: identity is the organizer id, so creating is safe.
+  // A near-match is more likely a spelling/metadata variation than a genuinely
+  // new venue. Park it for review instead of creating a duplicate canonical row.
+  const plausible = plausibleCinemaConflicts(matchInput, candidates);
+  if (plausible.length > 0) {
+    await recordUnresolved([
+      {
+        source: "ebillet",
+        entityType: "cinema",
+        externalId,
+        label: organizer.name,
+        reason: "possible existing cinema could not be matched deterministically",
+        payload: {
+          city,
+          candidateIds: plausible.map((c) => c.id),
+          candidateNames: plausible.map((c) => c.name),
+        },
+      },
+    ]);
+    throw new Error(`eBillet organizer ${organizerId} kræver manuel biografmapping`);
+  }
+
+  // No plausible existing venue was found. The organizer id itself is stable
+  // external identity, so creating a new canonical cinema is safe.
   const cinemaId = `eb-${organizerId}`;
   let slug = uniqueCinemaSlug(matchInput, candidates, cinemaId);
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -187,7 +236,6 @@ async function resolveCinema(
         city: city || "Danmark",
         address: organizer.address?.roadAndNumber ?? "",
         description: "",
-        source: "ebillet",
         ...patch,
       } as never,
       { onConflict: "id" },
@@ -200,40 +248,67 @@ async function resolveCinema(
     const { data: fresh } = await supabaseAdmin.from("cinemas").select(CINEMA_COLUMNS);
     slug = uniqueCinemaSlug(matchInput, (fresh ?? []) as CinemaRow[], cinemaId);
   }
-  await upsertRefs([
+
+  const { conflicts } = await upsertRefs([
     {
       source: "ebillet",
       entityType: "cinema",
-      externalId: String(organizerId),
+      externalId,
       canonicalId: cinemaId,
       matchMethod: "created",
       confidence: 1,
       locked: true,
     },
   ]);
+  if (conflicts.length) throw new Error(conflicts[0]);
+  await clearUnresolved("ebillet", "cinema", [externalId]);
   return { cinemaId, created: true };
 }
 
-/** Map every movie group to a canonical movie id, creating rows when new. */
-async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, string>> {
-  const resolved = new Map<string, string>();
-  if (groups.length === 0) return resolved;
+// ------------------------------------------------------------------ movie identity
 
-  const refs = await loadRefs(
-    "ebillet",
-    "movie",
-    groups.map((g) => g.ref),
-  );
-  const pending = groups.filter((g) => {
-    const known = refs.get(g.ref);
-    if (known) resolved.set(g.ref, known.canonicalId);
-    return !known;
-  });
-  if (pending.length === 0) return resolved;
+async function uniqueMovieSlug(group: EbilletMovieGroup): Promise<string> {
+  const base = slugifyName(group.title) || `ebillet-${slugifyName(group.ref)}`;
+  const candidates = [
+    base,
+    group.year > 0 ? `${base}-${group.year}` : null,
+    `${base}-${slugifyName(group.ref)}`,
+  ].filter((value): value is string => Boolean(value));
 
-  const baseIds = pending.map((g) => g.baseId).filter((v): v is number => v != null);
-  const movieIds = pending.flatMap((g) => g.movieIds);
-  const titles = pending.map((g) => g.title);
+  const { data, error } = await supabaseAdmin.from("movies").select("slug").in("slug", candidates);
+  if (error) throw new Error(`movie slug lookup: ${error.message}`);
+  const taken = new Set((data ?? []).map((row) => row.slug));
+  const free = candidates.find((candidate) => !taken.has(candidate));
+  if (free) return free;
+
+  const stem = `${base}-${slugifyName(group.ref)}`;
+  for (let n = 2; n < 100; n++) {
+    const candidate = `${stem}-${n}`;
+    const { data: hit, error: hitError } = await supabaseAdmin
+      .from("movies")
+      .select("id")
+      .eq("slug", candidate)
+      .maybeSingle();
+    if (hitError) throw new Error(`movie slug lookup: ${hitError.message}`);
+    if (!hit) return candidate;
+  }
+  throw new Error(`Kunne ikke finde unik filmslug til ${group.title}`);
+}
+
+/** Load candidate movies for source-id and conservative title+year matching. */
+async function movieCandidates(groups: EbilletMovieGroup[]): Promise<MovieRow[]> {
+  if (groups.length === 0) return [];
+  const baseIds = groups.map((g) => g.baseId).filter((v): v is number => v != null);
+  const movieIds = groups.flatMap((g) => g.movieIds);
+  const titles = groups.map((g) => g.title).filter(Boolean);
+  const candidateYears = [
+    ...new Set(
+      groups
+        .filter((g) => g.year > 1900)
+        .flatMap((g) => [g.year - 1, g.year, g.year + 1]),
+    ),
+  ];
+
   const queries = [] as Array<
     PromiseLike<{ data: MovieRow[] | null; error: { message: string } | null }>
   >;
@@ -247,17 +322,97 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
       supabaseAdmin.from("movies").select(MOVIE_COLUMNS).overlaps("ebillet_movie_ids", movieIds) as never,
     );
   }
+  // Exact title catches existing rows with missing years; matchMovie still
+  // refuses title-only merging, so this cannot create an unsafe match.
   if (titles.length) {
     queries.push(supabaseAdmin.from("movies").select(MOVIE_COLUMNS).in("title", titles) as never);
   }
-  const results = await Promise.all(queries);
-  const candidates: MovieRow[] = [];
-  for (const r of results) {
-    if (r.error) throw new Error(`movies: ${r.error.message}`);
-    candidates.push(...((r.data ?? []) as MovieRow[]));
+  // Year candidates allow normalized punctuation/title matching while keeping
+  // the candidate set bounded and preventing title-only remake merges.
+  if (candidateYears.length) {
+    queries.push(
+      supabaseAdmin.from("movies").select(MOVIE_COLUMNS).in("year", candidateYears) as never,
+    );
   }
-  const pool = dedupeById(candidates);
-  const newRefs: Parameters<typeof upsertRefs>[0] = [];
+
+  const results = await Promise.all(queries);
+  const rows: MovieRow[] = [];
+  for (const result of results) {
+    if (result.error) throw new Error(`movies: ${result.error.message}`);
+    rows.push(...((result.data ?? []) as MovieRow[]));
+  }
+  return dedupeById(rows);
+}
+
+/** Supplement every resolved canonical movie and verify no persisted ref is orphaned. */
+async function supplementResolvedMovies(
+  groups: EbilletMovieGroup[],
+  resolved: Map<string, string>,
+): Promise<void> {
+  const ids = [...new Set(resolved.values())];
+  const rows: MovieRow[] = [];
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data, error } = await supabaseAdmin
+      .from("movies")
+      .select(MOVIE_COLUMNS)
+      .in("id", ids.slice(i, i + 300));
+    if (error) throw new Error(`resolved movie lookup: ${error.message}`);
+    rows.push(...((data ?? []) as MovieRow[]));
+  }
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  for (const group of groups) {
+    const canonicalId = resolved.get(group.ref);
+    if (!canonicalId) continue;
+    const row = byId.get(canonicalId);
+    if (!row) {
+      await recordUnresolved([
+        {
+          source: "ebillet",
+          entityType: "movie",
+          externalId: group.ref,
+          label: group.title,
+          reason: `source mapping points to missing canonical movie ${canonicalId}`,
+        },
+      ]);
+      throw new Error(`eBillet filmref ${group.ref} peger på en manglende canonical film`);
+    }
+
+    const patch = buildEbilletMovieSupplementPatch(row, group);
+    if (Object.keys(patch).length > 0) {
+      const { error } = await supabaseAdmin
+        .from("movies")
+        .update(patch as never)
+        .eq("id", canonicalId);
+      if (error) throw new Error(`movie update ${canonicalId}: ${error.message}`);
+      if (Array.isArray(patch.ebillet_movie_ids)) {
+        row.ebillet_movie_ids = patch.ebillet_movie_ids as number[];
+      }
+      if (typeof patch.ebillet_movie_base_id === "number") {
+        row.ebillet_movie_base_id = patch.ebillet_movie_base_id;
+      }
+    }
+  }
+}
+
+/** Map every eBillet movie group to one canonical movie id. */
+async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, string>> {
+  const resolved = new Map<string, string>();
+  if (groups.length === 0) return resolved;
+
+  const refs = await loadRefs(
+    "ebillet",
+    "movie",
+    groups.map((g) => g.ref),
+  );
+  const pending = groups.filter((group) => {
+    const known = refs.get(group.ref);
+    if (known) resolved.set(group.ref, known.canonicalId);
+    return !known;
+  });
+
+  const pool = await movieCandidates(pending);
+  const primaryRefs: RefInput[] = [];
 
   for (const group of pending) {
     const match = matchMovie(
@@ -267,41 +422,22 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
         title: group.title,
         year: group.year > 0 ? group.year : null,
       },
-      pool.map((m) => ({
-        id: m.id,
-        title: m.title,
-        year: m.year && m.year > 0 ? m.year : null,
-        ebillet_movie_base_id: m.ebillet_movie_base_id,
-        ebillet_movie_ids: m.ebillet_movie_ids,
+      pool.map((movie) => ({
+        id: movie.id,
+        title: movie.title,
+        year: movie.year && movie.year > 0 ? movie.year : null,
+        ebillet_movie_base_id: movie.ebillet_movie_base_id,
+        ebillet_movie_ids: movie.ebillet_movie_ids,
       })),
     );
 
     if (match) {
-      const row = pool.find((m) => m.id === match.id)!;
-      const mergedIds = [...new Set([...(row.ebillet_movie_ids ?? []), ...group.movieIds])];
-      const patch: Record<string, unknown> = { ebillet_movie_ids: mergedIds };
-      if (group.baseId && !row.ebillet_movie_base_id) patch.ebillet_movie_base_id = group.baseId;
-      if (!row.runtime && group.runtime > 0) patch.runtime = group.runtime;
-      if (isBlank(row.synopsis) && group.synopsis) patch.synopsis = group.synopsis;
-      if (isBlank(row.director) && group.director) patch.director = group.director;
-      if ((row.genre ?? []).length === 0 && group.genres.length) patch.genre = group.genres;
-      if (isBlank(row.trailer_url) && group.trailerUrl) patch.trailer_url = group.trailerUrl;
-      const hasPoster = Object.values(row.poster ?? {}).some(
-        (v) => typeof v === "string" && v.trim() !== "",
-      );
-      if (!hasPoster && group.posterUrl) patch.poster = { url: group.posterUrl };
-      const { error } = await supabaseAdmin
-        .from("movies")
-        .update(patch as never)
-        .eq("id", row.id);
-      if (error) throw new Error(`movie update ${row.id}: ${error.message}`);
-      row.ebillet_movie_ids = mergedIds;
-      resolved.set(group.ref, row.id);
-      newRefs.push({
+      resolved.set(group.ref, match.id);
+      primaryRefs.push({
         source: "ebillet",
         entityType: "movie",
         externalId: group.ref,
-        canonicalId: row.id,
+        canonicalId: match.id,
         matchMethod: group.baseId || group.movieIds.length ? "external_id" : "deterministic",
         confidence: 1,
         locked: true,
@@ -310,10 +446,11 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
     }
 
     const id = `eb-${group.ref}`;
+    const slug = await uniqueMovieSlug(group);
     const { error } = await supabaseAdmin.from("movies").upsert(
       {
         id,
-        slug: slugifyName(group.title) || id,
+        slug,
         title: group.title,
         original_title: group.originalTitle,
         runtime: group.runtime,
@@ -331,6 +468,7 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
       { onConflict: "id" },
     );
     if (error) throw new Error(`movie insert ${id}: ${error.message}`);
+    resolved.set(group.ref, id);
     pool.push({
       id,
       title: group.title,
@@ -339,13 +477,12 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
       synopsis: group.synopsis,
       director: group.director,
       genre: group.genres,
-      poster: {},
+      poster: group.posterUrl ? { url: group.posterUrl } : {},
       trailer_url: group.trailerUrl,
       ebillet_movie_base_id: group.baseId,
       ebillet_movie_ids: group.movieIds,
     });
-    resolved.set(group.ref, id);
-    newRefs.push({
+    primaryRefs.push({
       source: "ebillet",
       entityType: "movie",
       externalId: group.ref,
@@ -356,18 +493,61 @@ async function resolveMovies(groups: EbilletMovieGroup[]): Promise<Map<string, s
     });
   }
 
-  const { conflicts } = await upsertRefs(newRefs);
-  if (conflicts.length) {
+  // Persist the primary base/version ref first. Locked conflicts are never
+  // silently re-pointed and are surfaced in the unresolved queue.
+  const primaryWrite = await upsertRefs(primaryRefs);
+  if (primaryWrite.conflicts.length > 0) {
     await recordUnresolved(
-      conflicts.map((c) => ({
+      primaryWrite.conflicts.map((conflict) => ({
         source: "ebillet" as const,
         entityType: "movie" as const,
-        externalId: c.split(":")[0]?.split("/").pop() ?? "unknown",
-        label: c,
+        externalId: conflict.split(":")[0]?.split("/").pop() ?? "unknown",
+        label: conflict,
         reason: "locked ref conflict",
       })),
     );
+    throw new Error(`eBillet movie identity conflict: ${primaryWrite.conflicts[0]}`);
   }
+
+  // Persist concrete eBillet version ids as aliases to the same canonical
+  // movie. This makes identity resilient if a future payload changes base data.
+  const aliasRefs: RefInput[] = [];
+  for (const group of groups) {
+    const canonicalId = resolved.get(group.ref);
+    if (!canonicalId) continue;
+    for (const externalId of sourceRefsForMovieGroup(group)) {
+      aliasRefs.push({
+        source: "ebillet",
+        entityType: "movie",
+        externalId,
+        canonicalId,
+        matchMethod: externalId === group.ref ? "external_id" : "external_id",
+        confidence: 1,
+        locked: true,
+      });
+    }
+  }
+  const aliasWrite = await upsertRefs(aliasRefs);
+  if (aliasWrite.conflicts.length > 0) {
+    await recordUnresolved(
+      aliasWrite.conflicts.map((conflict) => ({
+        source: "ebillet" as const,
+        entityType: "movie" as const,
+        externalId: conflict.split(":")[0]?.split("/").pop() ?? "unknown",
+        label: conflict,
+        reason: "locked alias ref conflict",
+      })),
+    );
+    throw new Error(`eBillet movie alias conflict: ${aliasWrite.conflicts[0]}`);
+  }
+
+  // Existing refs must still receive newly available metadata/version ids.
+  await supplementResolvedMovies(groups, resolved);
+  await clearUnresolved(
+    "ebillet",
+    "movie",
+    groups.map((group) => group.ref),
+  );
   return resolved;
 }
 
@@ -419,8 +599,16 @@ export async function runOrganizerPipeline(organizerId: number): Promise<Organiz
   }
 
   // Validation needs existing-row context but must not create or mutate the
-  // cinema just to obtain it. Only persisted identity links are trusted here.
-  const knownCinemaId = await findKnownCinemaId(organizerId);
+  // cinema just to obtain it. If even that lookup fails, the snapshot is failed
+  // rather than left forever in the ambiguous `received` state.
+  let knownCinemaId: string | null;
+  try {
+    knownCinemaId = await findKnownCinemaId(organizerId);
+  } catch (err) {
+    await markSnapshotFailed(snapshot.id, errorMessage(err));
+    throw err;
+  }
+
   let existingRows = 0;
   if (knownCinemaId) {
     const { count, error } = await supabaseAdmin
@@ -428,7 +616,10 @@ export async function runOrganizerPipeline(organizerId: number): Promise<Organiz
       .select("id", { count: "exact", head: true })
       .eq("cinema_id", knownCinemaId)
       .eq("source", "ebillet");
-    if (error) throw new Error(`existing screenings ${knownCinemaId}: ${error.message}`);
+    if (error) {
+      await markSnapshotFailed(snapshot.id, error.message);
+      throw new Error(`existing screenings ${knownCinemaId}: ${error.message}`);
+    }
     existingRows = count ?? 0;
   }
 
@@ -458,8 +649,7 @@ export async function runOrganizerPipeline(organizerId: number): Promise<Organiz
   }
 
   // A new organizer with a valid but empty snapshot has nothing canonical to
-  // create yet. Keep the registry entry and snapshot, and let discovery/queueing
-  // pick it up when eBillet later exposes screenings.
+  // create yet. Keep the registry entry and snapshot, and poll it again later.
   if (!knownCinemaId && screeningCount === 0) {
     await supabaseAdmin
       .from("import_snapshots")
@@ -488,52 +678,80 @@ export async function runOrganizerPipeline(organizerId: number): Promise<Organiz
     };
   }
 
-  // Canonical writes start only after the snapshot has passed validation.
-  const { cinemaId } = await resolveCinema(organizerId, payload);
-  await supabaseAdmin
-    .from("ebillet_organizers")
-    .update({ cinema_id: cinemaId })
-    .eq("id", organizerId);
+  // All post-validation failures mark the snapshot and organizer as failed.
+  // Existing screenings remain untouched unless the final atomic promotion RPC
+  // succeeds for this exact source+cinema scope.
+  try {
+    const { cinemaId } = await resolveCinema(organizerId, payload);
+    const { error: organizerLinkError } = await supabaseAdmin
+      .from("ebillet_organizers")
+      .update({ cinema_id: cinemaId })
+      .eq("id", organizerId);
+    if (organizerLinkError) throw new Error(`organizer link: ${organizerLinkError.message}`);
 
-  const groups = buildMovieGroups(payload);
-  const movieIdByRef = await resolveMovies(groups);
-  const normalized = normalizeEbilletScreenings(organizerId, payload).filter((s) =>
-    movieIdByRef.has(s.sourceMovieRef),
-  );
-  await stageScreenings(snapshot.id, "ebillet", normalized);
+    const groups = buildMovieGroups(payload);
+    const movieIdByRef = await resolveMovies(groups);
+    const normalized = normalizeEbilletScreenings(organizerId, payload).filter((screening) =>
+      movieIdByRef.has(screening.sourceMovieRef),
+    );
 
-  const rows = normalized.map((s) => toPromotionRow(s, movieIdByRef.get(s.sourceMovieRef)!));
-  const outcome = await promoteCinema({
-    snapshotId: snapshot.id,
-    source: "ebillet",
-    cinemaId,
-    rows,
-  }).catch(async (err: unknown) => {
-    await markSnapshotFailed(snapshot.id, err instanceof Error ? err.message : String(err));
+    // Every valid source screening must resolve to a movie. Silent dropping
+    // would turn an identity problem into destructive stale-screening cleanup.
+    const expectedRefs = new Set(
+      normalizeEbilletScreenings(organizerId, payload).map((screening) => screening.sourceRef),
+    );
+    if (normalized.length !== expectedRefs.size) {
+      throw new Error(
+        `eBillet normalization resolved ${normalized.length}/${expectedRefs.size} valid screenings to canonical movies`,
+      );
+    }
+
+    await stageScreenings(snapshot.id, "ebillet", normalized);
+    const rows = normalized.map((screening) =>
+      toPromotionRow(screening, movieIdByRef.get(screening.sourceMovieRef)!),
+    );
+    const outcome = await promoteCinema({
+      snapshotId: snapshot.id,
+      source: "ebillet",
+      cinemaId,
+      rows,
+    });
+
+    const counts = { cinemas: 1, movies: groups.length, showtimes: rows.length };
+    const { error: statusError } = await supabaseAdmin
+      .from("ebillet_organizers")
+      .update({
+        last_synced_at: nowIso(),
+        last_sync_status: "success",
+        last_sync_error: null,
+        last_sync_counts: counts,
+        showtime_count: screeningCount,
+        is_active: screeningCount > 0,
+      })
+      .eq("id", organizerId);
+    if (statusError) throw new Error(`organizer status: ${statusError.message}`);
+
+    return {
+      organizerId,
+      cinemaId,
+      skipped: false,
+      snapshotId: snapshot.id,
+      movies: groups.length,
+      screenings: rows.length,
+      upserted: outcome.upserted,
+      deleted: outcome.deleted,
+    };
+  } catch (err) {
+    const message = errorMessage(err);
+    await markSnapshotFailed(snapshot.id, message);
+    await supabaseAdmin
+      .from("ebillet_organizers")
+      .update({
+        last_synced_at: nowIso(),
+        last_sync_status: "failed",
+        last_sync_error: message.slice(0, 500),
+      })
+      .eq("id", organizerId);
     throw err;
-  });
-
-  const counts = { cinemas: 1, movies: groups.length, showtimes: rows.length };
-  await supabaseAdmin
-    .from("ebillet_organizers")
-    .update({
-      last_synced_at: nowIso(),
-      last_sync_status: "success",
-      last_sync_error: null,
-      last_sync_counts: counts,
-      showtime_count: screeningCount,
-      is_active: screeningCount > 0,
-    })
-    .eq("id", organizerId);
-
-  return {
-    organizerId,
-    cinemaId,
-    skipped: false,
-    snapshotId: snapshot.id,
-    movies: groups.length,
-    screenings: rows.length,
-    upserted: outcome.upserted,
-    deleted: outcome.deleted,
-  };
+  }
 }

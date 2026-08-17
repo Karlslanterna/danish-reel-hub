@@ -52,7 +52,8 @@ export type SnapshotVerdict = "complete" | "valid-empty" | "incomplete";
 export type SnapshotValidation = {
   verdict: SnapshotVerdict;
   reasons: string[];
-  stats: Record<string, number>;
+  /** Diagnostic metadata is audit information, not part of the verdict logic. */
+  stats: Record<string, unknown>;
 };
 
 /** A source entity that could not be bound to a canonical row. */

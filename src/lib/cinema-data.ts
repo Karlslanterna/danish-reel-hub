@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toHttpsUrl } from "@/lib/poster-url";
 import { DEFAULT_MOVIE_SORT, MOVIE_SORT_ORDERS, type MovieSortStrategy } from "@/lib/movie-sort";
 import { windowStart, windowEnd } from "@/lib/date-window";
+import { isPublicMovieTitle, normalizePublicGenres } from "@/lib/public-movie";
 import {
   groupScreeningIndexForUi,
   groupScreeningsForUi,
@@ -150,6 +151,7 @@ const mapMovie = (r: MovieRow): Movie => {
     r.tmdb_vote_average === null || r.tmdb_vote_average === undefined
       ? null
       : Number(r.tmdb_vote_average);
+  const rawGenres = r.tmdb_genres && r.tmdb_genres.length > 0 ? r.tmdb_genres : r.genre;
 
   return {
     id: r.id,
@@ -157,7 +159,7 @@ const mapMovie = (r: MovieRow): Movie => {
     title: r.title,
     originalTitle: r.original_title,
     runtime: r.tmdb_runtime && r.tmdb_runtime > 0 ? r.tmdb_runtime : r.runtime,
-    genre: r.tmdb_genres && r.tmdb_genres.length > 0 ? r.tmdb_genres : r.genre,
+    genre: normalizePublicGenres(rawGenres),
     year: r.year,
     director: nonEmpty(r.tmdb_director) ?? r.director,
     rating: r.rating,
@@ -189,6 +191,20 @@ const mapCinema = (r: CinemaRow): Cinema => ({
   website: r.website ?? null,
 });
 
+/** IDs allowed to influence public cards, filters and generated SEO pages. */
+async function fetchPublicMovieIdSet(): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("movies_ranked")
+    .select("id,title,screening_count")
+    .gt("screening_count", 0);
+  if (error) throw error;
+  return new Set(
+    (data ?? [])
+      .filter((row) => isPublicMovieTitle(row.title))
+      .map((row) => row.id),
+  );
+}
+
 /**
  * Movies ordered by a named strategy. `movies_ranked` already counts canonical
  * physical screenings, so movie ordering is independent of legacy showtimes.
@@ -196,13 +212,15 @@ const mapCinema = (r: CinemaRow): Cinema => ({
 export async function fetchMovies(
   strategy: MovieSortStrategy = DEFAULT_MOVIE_SORT,
 ): Promise<Movie[]> {
-  let query = supabase.from("movies_ranked").select("*");
+  let query = supabase.from("movies_ranked").select("*").gt("screening_count", 0);
   for (const o of MOVIE_SORT_ORDERS[strategy]) {
     query = query.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((r) => mapMovie(r as MovieRow));
+  return (data ?? [])
+    .map((r) => mapMovie(r as MovieRow))
+    .filter((movie) => isPublicMovieTitle(movie.title));
 }
 
 export async function fetchCinemas(): Promise<Cinema[]> {
@@ -214,7 +232,9 @@ export async function fetchCinemas(): Promise<Cinema[]> {
 export async function fetchMovieBySlug(slug: string): Promise<Movie | null> {
   const { data, error } = await supabase.from("movies").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
-  return data ? mapMovie(data as MovieRow) : null;
+  if (!data) return null;
+  const movie = mapMovie(data as MovieRow);
+  return isPublicMovieTitle(movie.title) ? movie : null;
 }
 
 export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
@@ -258,8 +278,10 @@ export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
   const out: Movie[] = [];
   for (const row of rows) {
     if (!row.movies || seen.has(row.movie_id)) continue;
+    const movie = mapMovie(row.movies);
+    if (!isPublicMovieTitle(movie.title)) continue;
     seen.add(row.movie_id);
-    out.push(mapMovie(row.movies));
+    out.push(movie);
   }
   return out.sort((a, b) => a.title.localeCompare(b.title, "da"));
 }
@@ -296,20 +318,24 @@ export function formatRuntime(min: number) {
 
 export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; cinemaId: string }>> {
   const bounds = screeningBounds();
-  const rows = await collectPages<{ movie_id: string; cinema_id: string }>((from, to) =>
-    supabase
-      .from("screenings")
-      .select("movie_id, cinema_id")
-      .gte("starts_at", bounds.startsAfter)
-      .gte("local_date", bounds.firstDate)
-      .lte("local_date", bounds.lastDate)
-      .order("starts_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
+  const [rows, publicMovieIds] = await Promise.all([
+    collectPages<{ movie_id: string; cinema_id: string }>((from, to) =>
+      supabase
+        .from("screenings")
+        .select("movie_id, cinema_id")
+        .gte("starts_at", bounds.startsAfter)
+        .gte("local_date", bounds.firstDate)
+        .lte("local_date", bounds.lastDate)
+        .order("starts_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchPublicMovieIdSet(),
+  ]);
   const seen = new Set<string>();
   const out: Array<{ movieId: string; cinemaId: string }> = [];
   for (const row of rows) {
+    if (!publicMovieIds.has(row.movie_id)) continue;
     const key = `${row.movie_id}|${row.cinema_id}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -320,52 +346,61 @@ export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; 
 
 export async function fetchShowtimes(): Promise<Showtime[]> {
   const bounds = screeningBounds();
-  const rows = await collectPages<ScreeningReadRow>((from, to) =>
-    supabase
-      .from("screenings")
-      .select(SCREENING_COLUMNS)
-      .gte("starts_at", bounds.startsAfter)
-      .gte("local_date", bounds.firstDate)
-      .lte("local_date", bounds.lastDate)
-      .order("starts_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
-  return groupScreeningsForUi(rows);
+  const [rows, publicMovieIds] = await Promise.all([
+    collectPages<ScreeningReadRow>((from, to) =>
+      supabase
+        .from("screenings")
+        .select(SCREENING_COLUMNS)
+        .gte("starts_at", bounds.startsAfter)
+        .gte("local_date", bounds.firstDate)
+        .lte("local_date", bounds.lastDate)
+        .order("starts_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchPublicMovieIdSet(),
+  ]);
+  return groupScreeningsForUi(rows.filter((row) => publicMovieIds.has(row.movie_id)));
 }
 
 /** Lightweight index used by homepage radius/date/tag filtering. */
 export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
   const bounds = screeningBounds();
-  const rows = await collectPages<ScreeningIndexReadRow>((from, to) =>
-    supabase
-      .from("screenings")
-      .select("movie_id, cinema_id, local_date, formats, languages, events")
-      .gte("starts_at", bounds.startsAfter)
-      .gte("local_date", bounds.firstDate)
-      .lte("local_date", bounds.lastDate)
-      .order("starts_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
-  return groupScreeningIndexForUi(rows);
+  const [rows, publicMovieIds] = await Promise.all([
+    collectPages<ScreeningIndexReadRow>((from, to) =>
+      supabase
+        .from("screenings")
+        .select("movie_id, cinema_id, local_date, formats, languages, events")
+        .gte("starts_at", bounds.startsAfter)
+        .gte("local_date", bounds.firstDate)
+        .lte("local_date", bounds.lastDate)
+        .order("starts_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchPublicMovieIdSet(),
+  ]);
+  return groupScreeningIndexForUi(rows.filter((row) => publicMovieIds.has(row.movie_id)));
 }
 
 export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtime[]> {
   const bounds = screeningBounds();
-  const rows = await collectPages<ScreeningReadRow>((from, to) =>
-    supabase
-      .from("screenings")
-      .select(SCREENING_COLUMNS)
-      .eq("cinema_id", cinemaId)
-      .gte("starts_at", bounds.startsAfter)
-      .gte("local_date", bounds.firstDate)
-      .lte("local_date", bounds.lastDate)
-      .order("starts_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
-  return groupScreeningsForUi(rows);
+  const [rows, publicMovieIds] = await Promise.all([
+    collectPages<ScreeningReadRow>((from, to) =>
+      supabase
+        .from("screenings")
+        .select(SCREENING_COLUMNS)
+        .eq("cinema_id", cinemaId)
+        .gte("starts_at", bounds.startsAfter)
+        .gte("local_date", bounds.firstDate)
+        .lte("local_date", bounds.lastDate)
+        .order("starts_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchPublicMovieIdSet(),
+  ]);
+  return groupScreeningsForUi(rows.filter((row) => publicMovieIds.has(row.movie_id)));
 }
 
 export async function fetchMoviesAndShowtimesForCinemas(
@@ -386,13 +421,14 @@ export async function fetchMoviesAndShowtimesForCinemas(
       .range(from, to),
   );
 
+  const visibleRows = rows.filter((row) => row.movies && isPublicMovieTitle(row.movies.title));
   const seen = new Set<string>();
   const movies: Movie[] = [];
-  for (const row of rows) {
+  for (const row of visibleRows) {
     if (row.movies && !seen.has(row.movie_id)) {
       seen.add(row.movie_id);
       movies.push(mapMovie(row.movies));
     }
   }
-  return { movies, showtimes: groupScreeningsForUi(rows) };
+  return { movies, showtimes: groupScreeningsForUi(visibleRows) };
 }

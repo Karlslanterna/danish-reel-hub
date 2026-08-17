@@ -30,10 +30,7 @@ export const NON_CINEMA_NAME_PATTERNS: readonly RegExp[] = [
 ];
 
 /** Explicit allow-list: venues that match a pattern but ARE cinemas. */
-export const ALLOWED_ORGANIZER_NAMES: readonly string[] = [
-  "museumsbio",
-];
-
+export const ALLOWED_ORGANIZER_NAMES: readonly string[] = ["museumsbio"];
 
 function normalize(value: string): string {
   return value
@@ -47,19 +44,16 @@ function normalize(value: string): string {
     .trim();
 }
 
-export type VenueClassification = {
-  isCinema: boolean;
-  /** Human-readable reason when excluded (Danish, shown in admin). */
-  reason: string | null;
-};
+export type VenueClassification =
+  | { isCinema: true; reason: null }
+  | {
+      isCinema: false;
+      /** Human-readable exclusion reason (shown in admin). */
+      reason: string;
+    };
 
-/**
- * Decide whether an eBillet organizer should be imported as a cinema.
- */
-export function classifyOrganizer(input: {
-  id: number;
-  name: string;
-}): VenueClassification {
+/** Decide whether an eBillet organizer should be imported as a cinema. */
+export function classifyOrganizer(input: { id: number; name: string }): VenueClassification {
   if (EXCLUDED_ORGANIZER_IDS.has(input.id)) {
     return { isCinema: false, reason: "Ekskluderet organizer-id (ikke en biograf)" };
   }

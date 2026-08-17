@@ -53,17 +53,6 @@ function maxStatus(a: PipelineHealthStatus, b: PipelineHealthStatus): PipelineHe
   return rank[a] >= rank[b] ? a : b;
 }
 
-async function countRows(
-  table: "screenings" | "import_runs" | "unresolved_source_entities",
-  configure: (query: ReturnType<typeof supabaseAdmin.from>) => unknown,
-): Promise<number> {
-  // Kept only as documentation helper; source health uses explicit queries
-  // below so Supabase's fluent generic types remain intact.
-  void table;
-  void configure;
-  return 0;
-}
-
 async function sourceHealth(source: ImportSource): Promise<SourcePipelineHealth> {
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Copenhagen",

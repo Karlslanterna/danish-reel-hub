@@ -137,6 +137,23 @@ export function buildPublicMovieFamilies(candidates: MovieFamilyCandidate[]): Mo
   const parent = new Map(candidates.map((candidate) => [candidate.id, candidate.id] as const));
   const byId = new Map(candidates.map((candidate) => [candidate.id, candidate] as const));
 
+  // If the same title currently has clearly different known-year editions,
+  // an unknown-year row is ambiguous and must not bridge those editions.
+  const yearsByTitle = new Map<string, number[]>();
+  for (const candidate of candidates) {
+    const key = publicMovieTitleKey(candidate.title);
+    const year = validYear(candidate.year);
+    if (!key || year === null) continue;
+    const years = yearsByTitle.get(key) ?? [];
+    if (!years.includes(year)) years.push(year);
+    yearsByTitle.set(key, years);
+  }
+  const conflictedTitleKeys = new Set(
+    [...yearsByTitle.entries()]
+      .filter(([, years]) => Math.max(...years) - Math.min(...years) > 1)
+      .map(([key]) => key),
+  );
+
   const find = (id: string): string => {
     const p = parent.get(id) ?? id;
     if (p === id) return id;
@@ -153,9 +170,21 @@ export function buildPublicMovieFamilies(candidates: MovieFamilyCandidate[]): Mo
 
   for (let i = 0; i < candidates.length; i++) {
     for (let j = i + 1; j < candidates.length; j++) {
-      if (canSharePublicMovieFamily(candidates[i]!, candidates[j]!)) {
-        union(candidates[i]!.id, candidates[j]!.id);
+      const a = candidates[i]!;
+      const b = candidates[j]!;
+      if (!canSharePublicMovieFamily(a, b)) continue;
+
+      const sameTmdb = Boolean(a.tmdbId && b.tmdbId && a.tmdbId === b.tmdbId);
+      const key = publicMovieTitleKey(a.title);
+      if (!sameTmdb && conflictedTitleKeys.has(key)) {
+        const ay = validYear(a.year);
+        const by = validYear(b.year);
+        // Unknown-year records stay separate when two incompatible editions of
+        // the title are simultaneously active; otherwise they could bridge a
+        // remake to an older film through transitive grouping.
+        if (ay === null || by === null) continue;
       }
+      union(a.id, b.id);
     }
   }
 

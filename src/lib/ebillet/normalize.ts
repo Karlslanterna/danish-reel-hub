@@ -13,8 +13,12 @@ import type {
   EbilletShowtime,
 } from "./api.server";
 import { ebilletBookingUrl, parseRuntimeMinutes } from "./api.server";
-import { copenhagenParts, copenhagenToUtcIso } from "@/lib/pipeline/localtime";
+import { copenhagenParts } from "@/lib/pipeline/localtime";
 import type { NormalizedScreening } from "@/lib/pipeline/types";
+import {
+  ebilletDateTimeToUtcIso,
+  isPlausibleEbilletDateTime,
+} from "./showtime-validity";
 
 export type EbilletMovieGroup = {
   /** Source-native movie ref: `base-<id>` or `movie-<id>`. */
@@ -49,18 +53,20 @@ const clean = (html: string | null | undefined): string =>
 
 /** Instant for a showtime; eBillet emits Danish wall clock, sometimes offset-less. */
 export function ebilletStartsAt(dateTime: string): string {
-  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(dateTime.trim());
-  if (hasZone) return new Date(dateTime).toISOString();
-  return copenhagenToUtcIso(dateTime.slice(0, 10), dateTime.slice(11, 16));
+  return ebilletDateTimeToUtcIso(dateTime);
 }
 
 /** Collapse payload versions into one group per canonical film. */
-export function buildMovieGroups(payload: EbilletMoviesResponse): EbilletMovieGroup[] {
+export function buildMovieGroups(
+  payload: EbilletMoviesResponse,
+  now = new Date(),
+): EbilletMovieGroup[] {
   const movieById = new Map<number, EbilletMovie>(payload.movies.map((m) => [m.id, m]));
   const baseById = new Map<number, EbilletMovieBase>(payload.movieBases.map((b) => [b.id, b]));
 
   const seen = new Map<string, { baseId: number | null; movieIds: number[]; primary: number }>();
   for (const st of payload.showtimes) {
+    if (!isPlausibleEbilletDateTime(st.dateTime, now)) continue;
     const movie = movieById.get(st.movieId);
     if (!movie) continue;
     const ref = movieRefOf(movie);
@@ -109,6 +115,7 @@ export function buildMovieGroups(payload: EbilletMoviesResponse): EbilletMovieGr
 export function normalizeEbilletScreenings(
   organizerId: number,
   payload: EbilletMoviesResponse,
+  now = new Date(),
 ): NormalizedScreening[] {
   const movieById = new Map<number, EbilletMovie>(payload.movies.map((m) => [m.id, m]));
   const typeName = new Map(payload.showtimeTypes.map((t) => [String(t.id), t.name]));
@@ -119,6 +126,7 @@ export function normalizeEbilletScreenings(
     (st: EbilletShowtime) => st.organizerId === organizerId,
   );
   for (const st of relevant) {
+    if (!isPlausibleEbilletDateTime(st.dateTime, now)) continue;
     const movie = movieById.get(st.movieId);
     if (!movie) continue;
     const ref = screeningRefOf(organizerId, st.id);
@@ -154,5 +162,7 @@ export function normalizeEbilletScreenings(
       events: eventName ? [eventName] : [],
     });
   }
-  return out.sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.sourceRef.localeCompare(b.sourceRef));
+  return out.sort(
+    (a, b) => a.startsAt.localeCompare(b.startsAt) || a.sourceRef.localeCompare(b.sourceRef),
+  );
 }

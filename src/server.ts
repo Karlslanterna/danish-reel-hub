@@ -58,7 +58,6 @@ async function normalizeCatastrophicSsrResponse(
   });
 }
 
-
 // Paths whose responses should never be indexed by search engines.
 // HTML pages (auth, admin) set noindex via <meta>; these prefixes cover
 // non-HTML responses (API + MCP + well-known) where meta tags don't apply.
@@ -66,6 +65,36 @@ const NOINDEX_PATH_PREFIXES = ["/api/", "/mcp", "/.mcp/", "/.well-known/"];
 function shouldNoindex(pathname: string): boolean {
   if (pathname === "/mcp") return true;
   return NOINDEX_PATH_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
+/**
+ * Conservative headers that do not depend on an asset-domain inventory.
+ * CSP is intentionally not set here yet: a guessed policy could break TMDb
+ * images, Supabase, trailers or the app bundle. These headers are safe for the
+ * current app and still remove several browser attack surfaces.
+ */
+function withGlobalSecurityHeaders(response: Response, request: Request): Response {
+  const headers = new Headers(response.headers);
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("x-frame-options", "DENY");
+  headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  headers.set(
+    "permissions-policy",
+    "camera=(), microphone=(), payment=(), usb=(), browsing-topics=()",
+  );
+  headers.set("cross-origin-opener-policy", "same-origin");
+
+  // HSTS only makes sense when the request arrived over HTTPS. This avoids
+  // interfering with localhost development while protecting production.
+  if (new URL(request.url).protocol === "https:") {
+    headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 function withNoindexHeader(response: Response, pathname: string): Response {
@@ -87,13 +116,16 @@ export default {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       const normalized = await normalizeCatastrophicSsrResponse(response, request);
-      return withNoindexHeader(normalized, pathname);
+      return withGlobalSecurityHeaders(withNoindexHeader(normalized, pathname), request);
     } catch (error) {
       console.error("[server:fetch]", { route: pathname, method: request.method }, error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withGlobalSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+        request,
+      );
     }
   },
 };

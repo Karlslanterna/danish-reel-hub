@@ -20,25 +20,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
       - name: Use Node.js 22
         uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Typecheck
         run: npm run typecheck
-
       - name: Lint
         run: npm run lint
-
       - name: Unit tests
         run: npm test
-
       - name: Build
         run: npm run build
 
@@ -49,24 +43,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
       - name: Use Node.js 22
         uses: actions/setup-node@v6
         with:
           node-version: 22
-
       - name: Compare production screenings with legacy showtimes
         id: parity
         continue-on-error: true
         run: node scripts/check-screening-parity.mjs
-
       - name: Audit live Empire and movie duplicates
         run: node scripts/audit-live-data-quality.mjs
-
+      - name: Verify Odyssey continuity evidence
+        run: node scripts/audit-odyssey-overlap.mjs
       - name: Diagnose eBillet gaps against upstream
         if: steps.parity.outcome == 'failure'
         run: node scripts/diagnose-ebillet-parity.mjs
-
       - name: Fail on parity mismatch
         if: steps.parity.outcome == 'failure'
         run: exit 1
@@ -81,22 +72,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
       - name: Use Node.js 22
         uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-
       - name: Run smoke tests against production
         run: npm run test:smoke
-
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v6

@@ -198,11 +198,11 @@ async function fetchPublicMovieIdSet(): Promise<Set<string>> {
     .select("id,title,screening_count")
     .gt("screening_count", 0);
   if (error) throw error;
-  return new Set(
-    (data ?? [])
-      .filter((row) => isPublicMovieTitle(row.title))
-      .map((row) => row.id),
-  );
+  const ids = new Set<string>();
+  for (const row of data ?? []) {
+    if (row.id && isPublicMovieTitle(row.title)) ids.add(row.id);
+  }
+  return ids;
 }
 
 /**

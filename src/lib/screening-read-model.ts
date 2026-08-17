@@ -18,6 +18,11 @@ export type ScreeningReadRow = {
   events: string[] | null;
 };
 
+export type ScreeningIndexReadRow = Pick<
+  ScreeningReadRow,
+  "movie_id" | "cinema_id" | "local_date" | "formats" | "languages" | "events"
+>;
+
 export type UiShowtime = {
   movieId: string;
   cinemaId: string;
@@ -26,6 +31,15 @@ export type UiShowtime = {
   hall: string;
   bookingUrl: string | null;
   ticketUrls: string[];
+  formats: string[];
+  languages: string[];
+  events: string[];
+};
+
+export type UiShowtimeIndexRow = {
+  movieId: string;
+  cinemaId: string;
+  date: string;
   formats: string[];
   languages: string[];
   events: string[];
@@ -95,4 +109,33 @@ export function groupScreeningsForUi(rows: ScreeningReadRow[]): UiShowtime[] {
   }
 
   return sortShowtimes(result);
+}
+
+/**
+ * Homepage filters only need one row per movie/cinema/date. Canonical
+ * screenings are physical rows, so collapse halls/times while unioning tags.
+ */
+export function groupScreeningIndexForUi(rows: ScreeningIndexReadRow[]): UiShowtimeIndexRow[] {
+  const groups = new Map<string, UiShowtimeIndexRow>();
+  for (const row of rows) {
+    const key = `${row.movie_id}|${row.cinema_id}|${row.local_date}`;
+    const group = groups.get(key) ?? {
+      movieId: row.movie_id,
+      cinemaId: row.cinema_id,
+      date: row.local_date,
+      formats: [],
+      languages: [],
+      events: [],
+    };
+    addUnique(group.formats, row.formats);
+    addUnique(group.languages, row.languages);
+    addUnique(group.events, row.events);
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.movieId.localeCompare(b.movieId) ||
+      a.cinemaId.localeCompare(b.cinemaId),
+  );
 }

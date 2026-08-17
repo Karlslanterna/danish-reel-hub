@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupScreeningsForUi } from "./screening-read-model";
+import { groupScreeningIndexForUi, groupScreeningsForUi } from "./screening-read-model";
 
 describe("groupScreeningsForUi", () => {
   it("preserves one ticket URL per exact screening while keeping the existing UI shape", () => {
@@ -62,5 +62,39 @@ describe("groupScreeningsForUi", () => {
       { ...base, hall: "Sal 2", starts_at: "2026-08-20T17:00:00.000Z", local_time: "19:00:00" },
     ]);
     expect(grouped).toHaveLength(2);
+  });
+});
+
+describe("groupScreeningIndexForUi", () => {
+  it("collapses physical screenings to one movie/cinema/date row and unions tags", () => {
+    const grouped = groupScreeningIndexForUi([
+      {
+        movie_id: "m1",
+        cinema_id: "c1",
+        local_date: "2026-08-20",
+        formats: ["2D"],
+        languages: [],
+        events: ["Premiere"],
+      },
+      {
+        movie_id: "m1",
+        cinema_id: "c1",
+        local_date: "2026-08-20",
+        formats: ["Atmos"],
+        languages: ["Dansk tekst"],
+        events: [],
+      },
+    ]);
+
+    expect(grouped).toEqual([
+      {
+        movieId: "m1",
+        cinemaId: "c1",
+        date: "2026-08-20",
+        formats: ["2D", "Atmos"],
+        languages: ["Dansk tekst"],
+        events: ["Premiere"],
+      },
+    ]);
   });
 });

@@ -42,9 +42,15 @@ export function validateSnapshot(organizerId: number, payload: EbilletMoviesResp
   if (invalidCount / Math.max(showtimes.length, 1) > 0.25) return reject(`${invalidCount} af ${showtimes.length} showtimes har ugyldige/usandsynlige datoer`);
 
   const validCount = showtimes.length - invalidCount;
+  // eBillet does not provide an explicit, trustworthy "this cinema is now
+  // intentionally empty" marker. Therefore a zero-screening payload must
+  // never be allowed to replace existing production data. It may be a short
+  // upstream outage, a partial API response or a temporary organizer glitch.
+  // A genuinely empty cinema can be accepted when there is nothing to delete.
   if (validCount === 0 && opts.existingRowCount > 0) {
-    const coherentlyEmpty = payload.movies.length === 0 && payload.movieBases.length === 0;
-    if (!coherentlyEmpty) return reject(`tom showtime-liste men ${payload.movies.length} film i payload — afvist som mistænkelig`);
+    return reject(
+      `tom showtime-liste for en biograf med ${opts.existingRowCount} eksisterende visninger — eksisterende data bevares`,
+    );
   }
   return { ok: true, allowDeletes: true, reason: null };
 }

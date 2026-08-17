@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { ParsedCinema, ParsedMovie } from "./parser.server";
 import { buildKultunautMovieGroups } from "./movie-groups";
+import { resolveKultunautMovieContinuity } from "./movie-continuity.server";
 import { loadEbilletOwnedCinemaIds } from "./authority.server";
 import {
   clearUnresolved,
@@ -42,6 +43,8 @@ type ExistingMovie = {
   rating: string;
   synopsis: string;
   poster: Record<string, unknown> | null;
+  ebillet_movie_base_id: number | null;
+  ebillet_movie_ids: number[] | null;
 };
 
 const chunk = <T>(items: T[], size = 300): T[][] => {
@@ -70,7 +73,9 @@ async function existingMovies(ids: string[]): Promise<Map<string, ExistingMovie>
     if (idsChunk.length === 0) continue;
     const { data, error } = await supabaseAdmin
       .from("movies")
-      .select("id,slug,source,title,original_title,runtime,genre,year,director,rating,synopsis,poster")
+      .select(
+        "id,slug,source,title,original_title,runtime,genre,year,director,rating,synopsis,poster,ebillet_movie_base_id,ebillet_movie_ids",
+      )
       .in("id", idsChunk);
     if (error) throw new Error(`movie identity lookup: ${error.message}`);
     rows.push(...((data ?? []) as ExistingMovie[]));
@@ -113,11 +118,6 @@ export type CinemaResolution = {
   skippedEbilletOwned: number;
 };
 
-/**
- * Resolve Kultunaut theater ids before metadata writes. Existing source refs
- * always win, which prevents a future feed from silently creating a second
- * canonical row for an already-mapped theater.
- */
 export async function resolveKultunautCinemas(
   cinemas: Iterable<ParsedCinema>,
 ): Promise<CinemaResolution> {
@@ -151,8 +151,6 @@ export async function resolveKultunautCinemas(
       locked: true,
     });
 
-    // eBillet owns venue metadata and screenings once linked. Kultunaut keeps
-    // its identity alias but performs no canonical venue write.
     if (ebilletOwned.has(canonicalId)) {
       skippedEbilletOwned += 1;
       continue;
@@ -198,7 +196,10 @@ export async function resolveKultunautCinemas(
 }
 
 function sourceMoviePatch(current: ExistingMovie, movie: ParsedMovie): Record<string, unknown> {
-  if (current.source === SOURCE || current.id.startsWith("kn-")) {
+  const sharedWithEbillet =
+    (current.ebillet_movie_base_id ?? 0) > 0 || (current.ebillet_movie_ids ?? []).length > 0;
+
+  if ((current.source === SOURCE || current.id.startsWith("kn-")) && !sharedWithEbillet) {
     return {
       title: movie.title,
       original_title: movie.original_title,
@@ -212,8 +213,6 @@ function sourceMoviePatch(current: ExistingMovie, movie: ParsedMovie): Record<st
     };
   }
 
-  // A canonical film can be shared with another source. Kultunaut then only
-  // fills blanks; it never overwrites useful existing source metadata.
   const patch: Record<string, unknown> = {};
   if (!current.original_title && movie.original_title) patch.original_title = movie.original_title;
   if ((!current.runtime || current.runtime <= 0) && movie.runtime > 0) patch.runtime = movie.runtime;
@@ -236,15 +235,12 @@ export type MovieResolution = {
   unresolvedExternalIds: string[];
 };
 
-/**
- * Resolve source movie ids conservatively. A known source ref is immutable;
- * duplicate source rows may share a canonical film only when normalized title
- * and a known year agree. Conflicting persisted refs are parked for review.
- */
 export async function resolveKultunautMovies(
   movies: Iterable<ParsedMovie>,
 ): Promise<MovieResolution> {
   const list = [...movies];
+  const continuity = await resolveKultunautMovieContinuity(list);
+
   const groups = buildKultunautMovieGroups(list);
   const externalIds = list.map((movie) => movie.external_id);
   const refs = await loadRefs(SOURCE, "movie", externalIds);
@@ -258,7 +254,10 @@ export async function resolveKultunautMovies(
     const mappedIds = [
       ...new Set(
         group.externalIds
-          .map((externalId) => refs.get(externalId)?.canonicalId)
+          .map(
+            (externalId) =>
+              continuity.canonicalOverrides.get(externalId) ?? refs.get(externalId)?.canonicalId,
+          )
           .filter((id): id is string => Boolean(id)),
       ),
     ];
@@ -270,7 +269,7 @@ export async function resolveKultunautMovies(
           entityType: "movie" as const,
           externalId,
           label: group.primary.title,
-          reason: "same title/year group points to multiple locked canonical movies",
+          reason: "same title/year group points to multiple canonical movies",
           payload: { canonicalIds: mappedIds },
         })),
       );
@@ -320,15 +319,33 @@ export async function resolveKultunautMovies(
     }
 
     for (const externalId of item.externalIds) {
+      const existingRef = refs.get(externalId);
+      const override = continuity.canonicalOverrides.get(externalId);
+      // Existing locked refs are deliberately left untouched. The safe runtime
+      // override still sends this snapshot to the correct canonical movie.
+      if (existingRef && override && existingRef.canonicalId !== override) continue;
+
       refWrites.push({
         source: SOURCE,
         entityType: "movie",
         externalId,
         canonicalId: item.canonicalId,
-        matchMethod: refs.has(externalId) ? "external_id" : item.externalIds.length > 1 ? "deterministic" : "created",
+        matchMethod:
+          override && !existingRef
+            ? "deterministic"
+            : existingRef
+              ? "external_id"
+              : item.externalIds.length > 1
+                ? "deterministic"
+                : "created",
         confidence: 1,
         locked: true,
-        notes: item.externalIds.length > 1 ? "same normalized title and known year" : undefined,
+        notes:
+          override && !existingRef
+            ? "unique active title/year/genre continuity anchor"
+            : item.externalIds.length > 1
+              ? "same normalized title and known year"
+              : undefined,
       });
     }
   }

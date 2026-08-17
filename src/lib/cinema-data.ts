@@ -109,6 +109,13 @@ const SCREENING_COLUMNS =
   "movie_id, cinema_id, starts_at, local_date, local_time, hall, ticket_url, formats, languages, events";
 const SCREENING_PAGE_SIZE = 1000;
 
+/** A screening stops being user-visible once its advertised start time passes. */
+const screeningBounds = () => ({
+  firstDate: windowStart(),
+  lastDate: windowEnd(),
+  startsAfter: new Date().toISOString(),
+});
+
 /**
  * Supabase/PostgREST caps a response page, while canonical `screenings` has one
  * row per physical screening. Every public screening read therefore paginates
@@ -217,13 +224,15 @@ export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
 }
 
 export async function fetchShowtimesForMovie(movieId: string): Promise<Showtime[]> {
+  const bounds = screeningBounds();
   const rows = await collectPages<ScreeningReadRow>((from, to) =>
     supabase
       .from("screenings")
       .select(SCREENING_COLUMNS)
       .eq("movie_id", movieId)
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),
@@ -232,13 +241,15 @@ export async function fetchShowtimesForMovie(movieId: string): Promise<Showtime[
 }
 
 export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
+  const bounds = screeningBounds();
   const rows = await collectPages<{ movie_id: string; movies: MovieRow | null }>((from, to) =>
     supabase
       .from("screenings")
       .select("movie_id, movies(*)")
       .eq("cinema_id", cinemaId)
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),
@@ -254,13 +265,15 @@ export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
 }
 
 export async function fetchCinemasForMovie(movieId: string): Promise<Cinema[]> {
+  const bounds = screeningBounds();
   const rows = await collectPages<{ cinema_id: string; cinemas: CinemaRow | null }>((from, to) =>
     supabase
       .from("screenings")
       .select("cinema_id, cinemas(*)")
       .eq("movie_id", movieId)
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),
@@ -282,12 +295,14 @@ export function formatRuntime(min: number) {
 }
 
 export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; cinemaId: string }>> {
+  const bounds = screeningBounds();
   const rows = await collectPages<{ movie_id: string; cinema_id: string }>((from, to) =>
     supabase
       .from("screenings")
       .select("movie_id, cinema_id")
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),
@@ -304,12 +319,14 @@ export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; 
 }
 
 export async function fetchShowtimes(): Promise<Showtime[]> {
+  const bounds = screeningBounds();
   const rows = await collectPages<ScreeningReadRow>((from, to) =>
     supabase
       .from("screenings")
       .select(SCREENING_COLUMNS)
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),
@@ -319,12 +336,14 @@ export async function fetchShowtimes(): Promise<Showtime[]> {
 
 /** Lightweight index used by homepage radius/date/tag filtering. */
 export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
+  const bounds = screeningBounds();
   const rows = await collectPages<ScreeningIndexReadRow>((from, to) =>
     supabase
       .from("screenings")
       .select("movie_id, cinema_id, local_date, formats, languages, events")
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),
@@ -333,13 +352,15 @@ export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
 }
 
 export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtime[]> {
+  const bounds = screeningBounds();
   const rows = await collectPages<ScreeningReadRow>((from, to) =>
     supabase
       .from("screenings")
       .select(SCREENING_COLUMNS)
       .eq("cinema_id", cinemaId)
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),
@@ -351,13 +372,15 @@ export async function fetchMoviesAndShowtimesForCinemas(
   cinemaIds: string[],
 ): Promise<{ movies: Movie[]; showtimes: Showtime[] }> {
   if (cinemaIds.length === 0) return { movies: [], showtimes: [] };
+  const bounds = screeningBounds();
   const rows = await collectPages<ScreeningMovieRow>((from, to) =>
     supabase
       .from("screenings")
       .select(`${SCREENING_COLUMNS}, movies(*)`)
       .in("cinema_id", cinemaIds)
-      .gte("local_date", windowStart())
-      .lte("local_date", windowEnd())
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate)
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to),

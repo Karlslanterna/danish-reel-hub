@@ -53,6 +53,7 @@ describe("eBillet normalization", () => {
     expect(screenings[0]?.sourceRef).toBe("eb-108-1");
     expect(screenings[0]?.localDate).toBe("2026-08-20");
     expect(screenings[0]?.localTime).toBe("20:00");
+    expect(screenings[0]?.ticketUrl).toBe("https://flow.ebillet.dk/billetter/100/1?org=108");
   });
 
   it("does not create movie groups that are backed only by rejected screenings", () => {

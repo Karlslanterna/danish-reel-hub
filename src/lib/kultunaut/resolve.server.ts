@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { ParsedCinema, ParsedMovie } from "./parser.server";
 import { buildKultunautMovieGroups } from "./movie-groups";
-import { repairMappedKultunautMovieContinuity } from "./movie-continuity.server";
+import { resolveKultunautMovieContinuity } from "./movie-continuity.server";
 import { loadEbilletOwnedCinemaIds } from "./authority.server";
 import {
   clearUnresolved,
@@ -199,9 +199,6 @@ function sourceMoviePatch(current: ExistingMovie, movie: ParsedMovie): Record<st
   const sharedWithEbillet =
     (current.ebillet_movie_base_id ?? 0) > 0 || (current.ebillet_movie_ids ?? []).length > 0;
 
-  // Kultunaut may fully refresh a Kultunaut-only movie. Once eBillet also
-  // identifies the same canonical movie, Kultunaut becomes fill-blanks-only so
-  // a sparse feed row cannot erase known year/runtime/title metadata.
   if ((current.source === SOURCE || current.id.startsWith("kn-")) && !sharedWithEbillet) {
     return {
       title: movie.title,
@@ -242,7 +239,7 @@ export async function resolveKultunautMovies(
   movies: Iterable<ParsedMovie>,
 ): Promise<MovieResolution> {
   const list = [...movies];
-  await repairMappedKultunautMovieContinuity(list);
+  const continuity = await resolveKultunautMovieContinuity(list);
 
   const groups = buildKultunautMovieGroups(list);
   const externalIds = list.map((movie) => movie.external_id);
@@ -257,7 +254,10 @@ export async function resolveKultunautMovies(
     const mappedIds = [
       ...new Set(
         group.externalIds
-          .map((externalId) => refs.get(externalId)?.canonicalId)
+          .map(
+            (externalId) =>
+              continuity.canonicalOverrides.get(externalId) ?? refs.get(externalId)?.canonicalId,
+          )
           .filter((id): id is string => Boolean(id)),
       ),
     ];
@@ -269,7 +269,7 @@ export async function resolveKultunautMovies(
           entityType: "movie" as const,
           externalId,
           label: group.primary.title,
-          reason: "same title/year group points to multiple locked canonical movies",
+          reason: "same title/year group points to multiple canonical movies",
           payload: { canonicalIds: mappedIds },
         })),
       );
@@ -319,15 +319,33 @@ export async function resolveKultunautMovies(
     }
 
     for (const externalId of item.externalIds) {
+      const existingRef = refs.get(externalId);
+      const override = continuity.canonicalOverrides.get(externalId);
+      // Existing locked refs are deliberately left untouched. The safe runtime
+      // override still sends this snapshot to the correct canonical movie.
+      if (existingRef && override && existingRef.canonicalId !== override) continue;
+
       refWrites.push({
         source: SOURCE,
         entityType: "movie",
         externalId,
         canonicalId: item.canonicalId,
-        matchMethod: refs.has(externalId) ? "external_id" : item.externalIds.length > 1 ? "deterministic" : "created",
+        matchMethod:
+          override && !existingRef
+            ? "deterministic"
+            : existingRef
+              ? "external_id"
+              : item.externalIds.length > 1
+                ? "deterministic"
+                : "created",
         confidence: 1,
         locked: true,
-        notes: item.externalIds.length > 1 ? "same normalized title and known year" : undefined,
+        notes:
+          override && !existingRef
+            ? "unique active title/year/genre continuity anchor"
+            : item.externalIds.length > 1
+              ? "same normalized title and known year"
+              : undefined,
       });
     }
   }

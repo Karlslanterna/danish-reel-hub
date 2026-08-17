@@ -304,6 +304,11 @@ async function loadMovieCandidates(
  * Safe to call repeatedly — everything is matched on stable ids first,
  * then on normalised names/titles.
  */
+/**
+ * @deprecated Legacy orchestration, replaced by `runOrganizerPipeline` in
+ * ./pipeline.server.ts. Kept temporarily for reference during the migration;
+ * it is no longer called by the run driver.
+ */
 export async function syncOrganizer(organizerId: number): Promise<OrganizerSyncCounts> {
   const db = await admin();
   const payload = await fetchOrganizerPayload([organizerId]);
@@ -866,11 +871,13 @@ export async function runEbilletJob(opts: {
 
         const organizerId = ids[index];
         try {
-          const c = await syncOrganizer(organizerId);
+          // Active path: the new snapshot/staging/promotion pipeline.
+          const { runOrganizerPipeline } = await import("./pipeline.server");
+          const c = await runOrganizerPipeline(organizerId);
           run.organizers_synced += 1;
-          run.cinemas_upserted += c.cinemas;
+          run.cinemas_upserted += c.skipped ? 0 : 1;
           run.movies_upserted += c.movies;
-          run.showtimes_upserted += c.showtimes;
+          run.showtimes_upserted += c.screenings;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           run.organizers_failed += 1;

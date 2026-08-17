@@ -1,3 +1,8 @@
+/**
+ * @deprecated Legacy Kultunaut import state machine. The active path is
+ * ./pipeline.server.ts (snapshot -> staging -> scoped promotion). This file is
+ * kept for reference during the migration and is no longer wired up.
+ */
 import { parseKultunautXml } from "./parser.server";
 import {
   KULTUNAUT_SOURCE,

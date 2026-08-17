@@ -40,6 +40,7 @@ export const Route = createFileRoute("/api/public/import-health")({
               status: canonical.status,
               reasons: canonical.reasons,
               sources: canonical.sources,
+              parity: canonical.parity,
               checkedAt: canonical.checkedAt,
 
               // Transitional fields expected by the current Admin dashboard.
@@ -67,6 +68,7 @@ export const Route = createFileRoute("/api/public/import-health")({
               status: "unknown",
               reasons: ["Import health is temporarily unavailable"],
               sources: null,
+              parity: null,
               checkedAt: new Date().toISOString(),
               importStatus: "unknown",
               metrics: null,

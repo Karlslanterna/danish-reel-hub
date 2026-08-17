@@ -1,4 +1,12 @@
 import { parseKultunautXml } from "./parser.server";
+import {
+  KULTUNAUT_SOURCE,
+  partitionByAuthority,
+  staleKultunautShowtimeIds,
+  type ExistingShowtimeRow,
+  type ShowtimeKeyed,
+} from "./reconcile";
+
 
 export type ImportResult = {
   movies: { upserted: number };
@@ -92,56 +100,118 @@ async function allValues(
   return out;
 }
 
+/** Cinemas owned by an active eBillet organizer — off-limits to Kultunaut. */
+export async function loadEbilletCinemaIds(db: any): Promise<Set<string>> {
+  const { data, error } = await db
+    .from("ebillet_organizers")
+    .select("cinema_id")
+    .eq("is_active", true)
+    .not("cinema_id", "is", null);
+  if (error) throw new Error(`ebillet coverage lookup: ${error.message}`);
+  const ids = new Set<string>();
+  for (const row of (data ?? []) as Array<{ cinema_id: string | null }>) {
+    if (row.cinema_id) ids.add(row.cinema_id);
+  }
+  return ids;
+}
+
 /**
- * Remove data that is no longer current:
- *  - showtimes whose date is in the past
- *  - movies with no remaining upcoming showtimes
- *  - cinemas with no remaining upcoming showtimes
+ * Source-scoped cleanup for the Kultunaut importer.
+ *
+ * It may ONLY touch rows with `source = 'kultunaut'` on cinemas that are not
+ * owned by an active eBillet organizer. It never deletes cinemas (a venue must
+ * not disappear because a feed briefly returned nothing) and never deletes
+ * eBillet data — that is exclusively the eBillet sync's job.
  */
-export async function cleanupStaleData(): Promise<CleanupSummary> {
+export async function cleanupKultunautData(
+  desired: ShowtimeKeyed[] = [],
+  opts: { reconcileRemovals?: boolean } = {},
+): Promise<CleanupSummary> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const errors: string[] = [];
   const today = new Date().toISOString().slice(0, 10);
+  const ebilletCinemaIds = await loadEbilletCinemaIds(supabaseAdmin);
 
   let showtimesDeleted = 0;
-  const { data: deletedShowtimes, error: stErr } = await supabaseAdmin
+
+  // 1. Past Kultunaut showtimes.
+  const { data: past, error: pastErr } = await supabaseAdmin
     .from("showtimes")
     .delete()
+    .eq("source", KULTUNAUT_SOURCE)
     .lt("date", today)
     .select("id");
-  if (stErr) errors.push(`cleanup showtimes: ${stErr.message}`);
-  else showtimesDeleted = (deletedShowtimes ?? []).length;
+  if (pastErr) errors.push(`cleanup past kultunaut showtimes: ${pastErr.message}`);
+  else showtimesDeleted += (past ?? []).length;
 
-  const deleteOrphans = async (
-    table: "movies" | "cinemas",
-    fk: "movie_id" | "cinema_id",
-  ): Promise<number> => {
+  // 2. Upcoming Kultunaut showtimes that disappeared from the feed, scoped to
+  //    Kultunaut-authoritative cinemas.
+  if (opts.reconcileRemovals) {
     try {
-      const referenced = new Set(await allValues(supabaseAdmin, "showtimes", fk));
-      const ids = await allValues(supabaseAdmin, table, "id");
-      const orphans = ids.filter((id) => !referenced.has(id));
-      let deleted = 0;
-      const CHUNK = 200;
-      for (let i = 0; i < orphans.length; i += CHUNK) {
-        const slice = orphans.slice(i, i + CHUNK);
-        const { error } = await supabaseAdmin.from(table).delete().in("id", slice);
-        if (error) errors.push(`cleanup ${table}: ${error.message}`);
-        else deleted += slice.length;
+      const existing: ExistingShowtimeRow[] = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabaseAdmin
+          .from("showtimes")
+          .select("id, movie_id, cinema_id, date, hall, source")
+          .eq("source", KULTUNAUT_SOURCE)
+          .gte("date", today)
+          .range(from, from + PAGE - 1);
+        if (error) throw new Error(error.message);
+        const rows = (data ?? []) as ExistingShowtimeRow[];
+        existing.push(...rows);
+        if (rows.length < PAGE) break;
       }
-      return deleted;
+      const staleIds = staleKultunautShowtimeIds(existing, desired, ebilletCinemaIds);
+      const CHUNK = 200;
+      for (let i = 0; i < staleIds.length; i += CHUNK) {
+        const slice = staleIds.slice(i, i + CHUNK);
+        const { error } = await supabaseAdmin
+          .from("showtimes")
+          .delete()
+          .eq("source", KULTUNAUT_SOURCE)
+          .in("id", slice);
+        if (error) errors.push(`cleanup stale kultunaut showtimes: ${error.message}`);
+        else showtimesDeleted += slice.length;
+      }
     } catch (err) {
       errors.push(
-        `cleanup ${table}: ${err instanceof Error ? err.message : String(err)}`,
+        `cleanup stale kultunaut showtimes: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return 0;
     }
-  };
+  }
 
-  const moviesDeleted = await deleteOrphans("movies", "movie_id");
-  const cinemasDeleted = await deleteOrphans("cinemas", "cinema_id");
+  // 3. Kultunaut movies with no remaining showtimes at all. Cinemas are never
+  //    deleted here.
+  let moviesDeleted = 0;
+  try {
+    const referenced = new Set(await allValues(supabaseAdmin, "showtimes", "movie_id"));
+    const { data: knMovies, error: mErr } = await supabaseAdmin
+      .from("movies")
+      .select("id")
+      .eq("source", KULTUNAUT_SOURCE);
+    if (mErr) throw new Error(mErr.message);
+    const orphans = ((knMovies ?? []) as Array<{ id: string }>)
+      .map((m) => m.id)
+      .filter((id) => !referenced.has(id));
+    const CHUNK = 200;
+    for (let i = 0; i < orphans.length; i += CHUNK) {
+      const slice = orphans.slice(i, i + CHUNK);
+      const { error } = await supabaseAdmin
+        .from("movies")
+        .delete()
+        .eq("source", KULTUNAUT_SOURCE)
+        .in("id", slice);
+      if (error) errors.push(`cleanup movies: ${error.message}`);
+      else moviesDeleted += slice.length;
+    }
+  } catch (err) {
+    errors.push(`cleanup movies: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
-  return { showtimesDeleted, moviesDeleted, cinemasDeleted, errors };
+  return { showtimesDeleted, moviesDeleted, cinemasDeleted: 0, errors };
 }
+
 
 
 
@@ -456,84 +526,48 @@ export async function processJobBatch(
       // Source authority: eBillet owns the showtimes of every cinema linked to
       // an active eBillet organizer — Kultunaut must not write there at all.
       // Kultunaut remains authoritative for all other cinemas.
-      const coveredCinemaIds = new Set<string>();
-      {
-        const { data: orgs, error: orgErr } = await supabaseAdmin
-          .from("ebillet_organizers")
-          .select("cinema_id")
-          .eq("is_active", true)
-          .not("cinema_id", "is", null);
-        if (orgErr) errors.push(`ebillet coverage lookup: ${orgErr.message}`);
-        for (const o of orgs ?? []) if (o.cinema_id) coveredCinemaIds.add(o.cinema_id);
+      let ebilletCinemaIds = new Set<string>();
+      try {
+        ebilletCinemaIds = await loadEbilletCinemaIds(supabaseAdmin);
+      } catch (err) {
+        // Without the coverage list we cannot prove a write is legal — stop
+        // this batch rather than risk writing into eBillet territory.
+        throw new Error(err instanceof Error ? err.message : String(err));
       }
 
-      for (const row of slice) {
+      const { writable } = partitionByAuthority(slice, ebilletCinemaIds);
+
+      const rows = writable.map((row) => {
         const times = row.times;
         const ticketUrls = row.ticket_urls;
-
-        if (coveredCinemaIds.has(row.cinema_id)) {
-          // eBillet-authoritative cinema: skip silently.
-          upserted++;
-          continue;
-        }
-
-        const { data: existing } = await supabaseAdmin
-          .from("showtimes")
-          .select("id, source")
-          .eq("movie_id", row.movie_id)
-          .eq("cinema_id", row.cinema_id)
-          .eq("date", row.date)
-          .eq("hall", row.hall)
-          .maybeSingle();
-
-
-
-        const startTimeIso = times[0]
-          ? new Date(`${row.date}T${times[0]}`).toISOString()
-          : null;
         const primaryTicketUrl = ticketUrls.find((u) => u) ?? null;
+        return {
+          movie_id: row.movie_id,
+          cinema_id: row.cinema_id,
+          date: row.date,
+          hall: row.hall,
+          times,
+          ticket_url: primaryTicketUrl,
+          ticket_urls: ticketUrls,
+          booking_url: primaryTicketUrl,
+          start_time: times[0] ? new Date(`${row.date}T${times[0]}`).toISOString() : null,
+          formats: row.formats ?? [],
+          languages: row.languages ?? [],
+          events: row.events ?? [],
+          source: KULTUNAUT_SOURCE,
+        };
+      });
 
-        if (existing) {
-          const { error } = await supabaseAdmin
-            .from("showtimes")
-            .update({
-              times,
-              ticket_url: primaryTicketUrl,
-              ticket_urls: ticketUrls,
-              booking_url: primaryTicketUrl,
-              start_time: startTimeIso,
-              formats: row.formats ?? [],
-              languages: row.languages ?? [],
-              events: row.events ?? [],
-            })
-            .eq("id", existing.id);
-          if (error) {
-            errors.push(`showtime update: ${error.message}`);
-            continue;
-          }
-        } else {
-          const { error } = await supabaseAdmin.from("showtimes").insert({
-            movie_id: row.movie_id,
-            cinema_id: row.cinema_id,
-            date: row.date,
-            hall: row.hall,
-            times,
-            ticket_url: primaryTicketUrl,
-            ticket_urls: ticketUrls,
-            booking_url: primaryTicketUrl,
-            start_time: startTimeIso,
-            formats: row.formats ?? [],
-            languages: row.languages ?? [],
-            events: row.events ?? [],
-          });
-          if (error) {
-            errors.push(`showtime insert: ${error.message}`);
-            continue;
-          }
-        }
-        upserted++;
+      // One scoped bulk upsert per batch instead of a SELECT + UPDATE/INSERT
+      // round trip per row. Identity is the unique index
+      // (movie_id, cinema_id, date, hall, source).
+      if (rows.length > 0) {
+        const { error } = await supabaseAdmin
+          .from("showtimes")
+          .upsert(rows as any, { onConflict: "movie_id,cinema_id,date,hall,source" });
+        if (error) errors.push(`showtime upsert: ${error.message}`);
       }
-
+      upserted += slice.length;
 
       const newCursor = cursor + slice.length;
       const finished = newCursor >= grouped.length;
@@ -560,7 +594,18 @@ export async function processJobBatch(
 
     if (job.phase === "cleanup") {
       const errors: string[] = [];
-      const summary = await cleanupStaleData();
+      const payload = (job.payload ?? {}) as { groupedShowtimes?: GroupedShowtime[] };
+      const desired: ShowtimeKeyed[] = (payload.groupedShowtimes ?? []).map((g) => ({
+        movie_id: g.movie_id,
+        cinema_id: g.cinema_id,
+        date: g.date,
+        hall: g.hall,
+      }));
+      // Only reconcile removals when the feed actually produced rows — an
+      // empty payload must never wipe existing Kultunaut showtimes.
+      const summary = await cleanupKultunautData(desired, {
+        reconcileRemovals: desired.length > 0,
+      });
       errors.push(...summary.errors);
 
       await supabaseAdmin
@@ -569,14 +614,15 @@ export async function processJobBatch(
           phase: "enrich",
           status: "running",
           message:
-            `Oprydning færdig — fjernede ${summary.showtimesDeleted} forældede visninger, ` +
-            `${summary.moviesDeleted} film og ${summary.cinemasDeleted} biografer uden kommende visninger. ` +
+            `Oprydning færdig — fjernede ${summary.showtimesDeleted} forældede Kultunaut-visninger ` +
+            `og ${summary.moviesDeleted} film uden visninger (biografer og eBillet-data røres ikke). ` +
             `Henter filmdata fra TMDb…`,
         })
         .eq("id", jobId);
       await pushErrors(errors);
       return { done: false, status: "running", phase: "enrich" };
     }
+
 
     if (job.phase === "enrich") {
       // Optional metadata step. It must never fail or block the import:

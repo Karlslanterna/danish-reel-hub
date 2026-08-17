@@ -10,7 +10,10 @@ export type Crumb =
 
 export function Breadcrumb({ items }: { items: Crumb[] }) {
   return (
-    <nav aria-label="breadcrumb" className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+    <nav
+      aria-label="breadcrumb"
+      className="text-xs uppercase tracking-[0.2em] text-muted-foreground"
+    >
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {items.map((item, i) => {
           const isLast = i === items.length - 1;
@@ -26,17 +29,39 @@ export function Breadcrumb({ items }: { items: Crumb[] }) {
                     {item.label}
                   </span>
                 ) : item.to === "/" ? (
-                  <Link to="/" className="hover:text-foreground">{item.label}</Link>
+                  <Link to="/" className="hover:text-foreground">
+                    {item.label}
+                  </Link>
                 ) : item.to === "/film/$slug" ? (
-                  <Link to="/film/$slug" params={item.params} className="hover:text-foreground">{item.label}</Link>
+                  <Link
+                    to="/film/$slug"
+                    params={item.params}
+                    className="hover:text-foreground"
+                  >
+                    {item.label}
+                  </Link>
                 ) : item.to === "/biograf/$slug" ? (
-                  <Link to="/biograf/$slug" params={item.params} className="hover:text-foreground">{item.label}</Link>
+                  <Link
+                    to="/biograf/$slug"
+                    params={item.params}
+                    className="hover:text-foreground"
+                  >
+                    {item.label}
+                  </Link>
                 ) : (
-                  <Link to="/$city" params={item.params} className="hover:text-foreground">{item.label}</Link>
+                  <Link
+                    to="/$city"
+                    params={item.params}
+                    className="hover:text-foreground"
+                  >
+                    {item.label}
+                  </Link>
                 )}
               </li>
               {!isLast && (
-                <li aria-hidden="true" className="text-foreground/30">/</li>
+                <li aria-hidden="true" className="text-foreground/30">
+                  /
+                </li>
               )}
             </Fragment>
           );

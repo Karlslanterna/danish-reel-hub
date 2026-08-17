@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { matchCinema, type MatchCinema } from "./cinema-match";
+import {
+  matchCinema,
+  plausibleCinemaConflicts,
+  type MatchCinema,
+} from "./cinema-match";
 
 const cinema = (over: Partial<MatchCinema> = {}): MatchCinema => ({
   id: "c1",
@@ -49,5 +53,30 @@ describe("matchCinema", () => {
       [cinema({ city: "Fredericia" })],
     );
     expect(hit).toBeNull();
+  });
+});
+
+describe("plausibleCinemaConflicts", () => {
+  it("flags a near-name in the same city so the importer does not create a duplicate", () => {
+    const conflicts = plausibleCinemaConflicts(
+      { id: 177, name: "MovieHouse Hellerup", city: "Hellerup" },
+      [
+        cinema({
+          id: "mh",
+          name: "MovieHouse",
+          slug: "moviehouse",
+          city: "2900 Hellerup",
+        }),
+      ],
+    );
+    expect(conflicts.map((c) => c.id)).toEqual(["mh"]);
+  });
+
+  it("does not block a same-name venue in another city", () => {
+    const conflicts = plausibleCinemaConflicts(
+      { id: 177, name: "Kosmorama", city: "Haderslev" },
+      [cinema({ id: "other", city: "Fredericia" })],
+    );
+    expect(conflicts).toEqual([]);
   });
 });

@@ -127,4 +127,69 @@ describe("eBillet normalization", () => {
     expect(screenings).toHaveLength(1);
     expect(screenings[0]?.sourceRef).toBe("eb-108-50");
   });
+
+  it("derives Danish-language and event filters from eBillet presentation text", () => {
+    const tagged: EbilletMoviesResponse = {
+      organizers: payload.organizers,
+      movieBases: [{ id: 30, name: "Vaiana" }],
+      movies: [
+        {
+          id: 300,
+          baseId: 30,
+          name: "Vaiana - DK Tale",
+          originalName: "Moana",
+          dimension: "2",
+        },
+      ],
+      showtimeTypes: [{ id: 4, name: "Seniorbio" }],
+      showtimes: [
+        {
+          id: 60,
+          movieId: 300,
+          movieBaseId: 30,
+          locationId: 1,
+          locationName: "Sal 1",
+          organizerId: ORG,
+          type: 4,
+          dateTime: "2026-08-20T15:00:00",
+        },
+      ],
+    };
+
+    const [screening] = normalizeEbilletScreenings(ORG, tagged, NOW);
+    expect(screening?.formats).toEqual(["2D"]);
+    expect(screening?.languages).toEqual(["Dansk tale"]);
+    expect(screening?.events).toEqual(["Seniorbio"]);
+  });
+
+  it("normalizes eBillet subtitle and original-version labels", () => {
+    const tagged: EbilletMoviesResponse = {
+      organizers: payload.organizers,
+      movieBases: [{ id: 31, name: "Example" }],
+      movies: [
+        {
+          id: 301,
+          baseId: 31,
+          name: "Example - Org. tale - danske undertekster",
+          dimension: "3",
+        },
+      ],
+      showtimeTypes: [],
+      showtimes: [
+        {
+          id: 61,
+          movieId: 301,
+          movieBaseId: 31,
+          locationId: 1,
+          locationName: "Sal 2",
+          organizerId: ORG,
+          dateTime: "2026-08-20T17:00:00",
+        },
+      ],
+    };
+
+    const [screening] = normalizeEbilletScreenings(ORG, tagged, NOW);
+    expect(screening?.formats).toEqual(["3D"]);
+    expect(screening?.languages).toEqual(["Danske undertekster", "Originalversion"]);
+  });
 });

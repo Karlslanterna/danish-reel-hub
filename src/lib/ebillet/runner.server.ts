@@ -5,9 +5,10 @@
  * prevents two workers from processing the same organizer, and an expired
  * lease makes a crashed job reclaimable on the next scheduler tick.
  *
- * This deliberately replaces `ebillet_sync_runs` as the active sync driver.
- * Discovery still lives in the legacy module for now because it is registry
- * maintenance, not canonical screening promotion.
+ * A sync cycle is finite: organizers are enqueued only when there are no
+ * queued/running organizer jobs. Without that guard, a completed organizer
+ * would immediately be queued again on the next loop iteration and the queue
+ * could never drain to zero.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -43,11 +44,29 @@ type QueueRpcResult = {
   error: { message: string } | null;
 };
 
+/** Avoid immediately starting a fresh full scan after the previous one drains. */
+export const EBILLET_MIN_CYCLE_INTERVAL_MS = 15 * 60 * 1000;
+
+export function shouldStartEbilletCycle(input: {
+  activeRuns: number;
+  lastCompletedAt: string | null;
+  force?: boolean;
+  nowMs?: number;
+  minIntervalMs?: number;
+}): boolean {
+  if (input.activeRuns > 0) return false;
+  if (input.force) return true;
+  if (!input.lastCompletedAt) return true;
+  const completedMs = Date.parse(input.lastCompletedAt);
+  if (!Number.isFinite(completedMs)) return true;
+  const nowMs = input.nowMs ?? Date.now();
+  const minIntervalMs = input.minIntervalMs ?? EBILLET_MIN_CYCLE_INTERVAL_MS;
+  return nowMs - completedMs >= minIntervalMs;
+}
+
 async function enqueueEligibleOrganizers(): Promise<number> {
   // This RPC encodes the important distinction between availability and sync
   // eligibility: linked cinemas stay eligible even if is_active=false.
-  // The generated Supabase type does not know about the migration until types
-  // are regenerated, so the narrow cast is kept local and does not use `any`.
   const enqueueRpc = supabaseAdmin.rpc as unknown as (
     fn: "enqueue_ebillet_import_runs",
   ) => PromiseLike<QueueRpcResult>;
@@ -67,6 +86,20 @@ async function remainingRuns(): Promise<number> {
   return count ?? 0;
 }
 
+async function lastCompletedRunAt(): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("import_runs")
+    .select("finished_at,updated_at")
+    .eq("source", "ebillet")
+    .eq("scope_type", "organizer")
+    .eq("state", "completed")
+    .order("finished_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`eBillet latest completion: ${error.message}`);
+  return data?.finished_at ?? data?.updated_at ?? null;
+}
+
 const stateToStatus = (state: RunState): EbilletQueueResult["status"] =>
   state === "dead_letter" ? "dead_letter" : "retrying";
 
@@ -75,9 +108,26 @@ const stateToStatus = (state: RunState): EbilletQueueResult["status"] =>
  * A failed organizer is released for a later scheduler invocation instead of
  * being hammered repeatedly inside the same request.
  */
-export async function runNextEbilletOrganizer(): Promise<EbilletQueueResult> {
+export async function runNextEbilletOrganizer(
+  opts: { forceQueue?: boolean } = {},
+): Promise<EbilletQueueResult> {
   await reapExpiredRuns("ebillet");
-  const queued = await enqueueEligibleOrganizers();
+
+  const activeBefore = await remainingRuns();
+  let queued = 0;
+  if (activeBefore === 0) {
+    const lastCompletedAt = await lastCompletedRunAt();
+    if (
+      shouldStartEbilletCycle({
+        activeRuns: activeBefore,
+        lastCompletedAt,
+        force: opts.forceQueue ?? false,
+      })
+    ) {
+      queued = await enqueueEligibleOrganizers();
+    }
+  }
+
   const run = await claimRun("ebillet");
 
   if (!run) {
@@ -156,8 +206,9 @@ export async function runNextEbilletOrganizer(): Promise<EbilletQueueResult> {
 }
 
 /**
- * Work through organizers until the request is close to its wall-clock budget.
- * Stops immediately after a failure so retries happen on a later invocation.
+ * Work through one finite organizer cycle until the request is close to its
+ * wall-clock budget. A new cycle is never started inside the same batch after
+ * the queue has drained.
  */
 export async function runEbilletQueueBatch(
   budgetMs = 55_000,

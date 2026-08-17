@@ -55,6 +55,8 @@ jobs:
         run: node scripts/audit-live-data-quality.mjs
       - name: Verify Odyssey continuity evidence
         run: node scripts/audit-odyssey-overlap.mjs
+      - name: Inspect Odyssey metadata fingerprints
+        run: node scripts/audit-odyssey-metadata.mjs
       - name: Diagnose eBillet gaps against upstream
         if: steps.parity.outcome == 'failure'
         run: node scripts/diagnose-ebillet-parity.mjs

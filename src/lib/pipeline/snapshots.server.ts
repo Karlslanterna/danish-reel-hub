@@ -76,7 +76,7 @@ export async function applyValidation(
     .from("import_snapshots")
     .update({
       status: promotable ? "validated" : "rejected",
-      validation: validation as unknown as Record<string, unknown>,
+      validation: JSON.parse(JSON.stringify(validation)),
     })
     .eq("id", snapshotId);
   if (error) throw new Error(`snapshot: validation update failed — ${error.message}`);

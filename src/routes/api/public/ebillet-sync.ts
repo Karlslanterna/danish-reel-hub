@@ -3,9 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * POST /api/public/ebillet-sync
  *
- * Scheduled entry point for the eBillet integration (driven by pg_cron the
- * same way as the Kultunaut import). Authenticated with the internal
- * scheduler token, or the operator secret for manual triggers.
+ * Scheduled entry point for eBillet. Canonical sync jobs use the shared
+ * `import_runs` lease model; discovery remains a separate registry scan.
+ *
+ * Transitional authentication accepts both the new generic/eBillet headers and
+ * the old Kultunaut-named headers so the existing scheduler does not break.
  *
  *   header x-ebillet-mode: discover | sync   (default: sync)
  */
@@ -14,42 +16,50 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
     handlers: {
       POST: async ({ request }) => {
         const { verifySchedulerToken } = await import("@/lib/kultunaut/scheduler.server");
-        const token = request.headers.get("x-kultunaut-cron-token");
-        const envSecret = process.env.KULTUNAUT_IMPORT_SECRET;
+        const token =
+          request.headers.get("x-import-scheduler-token") ??
+          request.headers.get("x-kultunaut-cron-token");
+        const ebilletSecret = process.env.EBILLET_SYNC_SECRET;
+        const legacySecret = process.env.KULTUNAUT_IMPORT_SECRET;
+        const suppliedSecret =
+          request.headers.get("x-ebillet-secret") ?? request.headers.get("x-kultunaut-secret");
         const viaEnv =
-          !!envSecret && request.headers.get("x-kultunaut-secret") === envSecret;
+          (!!ebilletSecret && suppliedSecret === ebilletSecret) ||
+          (!!legacySecret && suppliedSecret === legacySecret);
         const ok = viaEnv || (await verifySchedulerToken(token));
         if (!ok) return new Response("Unauthorized", { status: 401 });
 
         const mode = request.headers.get("x-ebillet-mode") === "discover" ? "discover" : "sync";
 
         try {
-          const { runEbilletJob, reapStaleEbilletRuns } = await import(
-            "@/lib/ebillet/sync.server"
-          );
-          await reapStaleEbilletRuns(60);
-
-          // Each runEbilletJob("sync") call handles exactly one organizer and
-          // commits the cursor, so the cron invocation simply repeats batches
-          // until it runs out of wall-clock budget. Nothing is lost when the
-          // runtime terminates us mid-way — the next cron tick resumes.
-          const deadline = Date.now() + 60_000;
-          let result = await runEbilletJob({ kind: mode, trigger: "cron", budgetMs: 60_000 });
-          if (mode === "sync") {
-            while (!result.done && Date.now() < deadline) {
-              result = await runEbilletJob({ kind: "sync", trigger: "cron" });
-            }
+          if (mode === "discover") {
+            // Discovery only maintains the organizer registry. It does not
+            // promote screenings and can remain on the legacy discovery code.
+            const { runEbilletJob } = await import("@/lib/ebillet/sync.server");
+            const result = await runEbilletJob({
+              kind: "discover",
+              trigger: "cron",
+              budgetMs: 55_000,
+            });
+            return Response.json(result, {
+              status: result.status === "failed" ? 500 : 200,
+              headers: { "cache-control": "no-store" },
+            });
           }
+
+          const { runEbilletQueueBatch } = await import("@/lib/ebillet/runner.server");
+          const result = await runEbilletQueueBatch(55_000);
           return Response.json(result, {
-            status: result.status === "failed" ? 500 : 200,
+            status: result.status === "dead_letter" ? 500 : 200,
             headers: { "cache-control": "no-store" },
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
-          console.error("[ebillet] run crashed:", message);
-          return Response.json({ status: "failed", reason: message }, { status: 500 });
+          console.error("[ebillet] scheduler run crashed:", message);
+          // The authenticated scheduler only needs a stable failure signal;
+          // detailed stack/data stays in server logs rather than the response.
+          return Response.json({ status: "failed", reason: "eBillet sync failed" }, { status: 500 });
         }
-
       },
     },
   },

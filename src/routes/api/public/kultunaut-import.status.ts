@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/public/kultunaut-import/status")({
     handlers: {
       GET: async ({ request }) => {
         const secret = process.env.KULTUNAUT_IMPORT_SECRET;
-        if (!secret) return new Response("Import secret not configured", { status: 500 });
+        if (!secret) return new Response("Import unavailable", { status: 503 });
         const provided = request.headers.get("x-kultunaut-secret");
         if (!provided || provided !== secret) {
           return new Response("Unauthorized", { status: 401 });
@@ -23,10 +23,14 @@ export const Route = createFileRoute("/api/public/kultunaut-import/status")({
           const { getJobStatus } = await import("@/lib/kultunaut/pipeline.server");
           const job = await getJobStatus(jobId);
           if (!job) return new Response("Not found", { status: 404 });
-          return Response.json(job);
+          return Response.json(job, { headers: { "cache-control": "no-store" } });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
-          return new Response(`Status failed: ${message}`, { status: 500 });
+          console.error("[kultunaut-import] status failed:", message);
+          return Response.json(
+            { status: "failed", reason: "Kultunaut import status unavailable" },
+            { status: 500, headers: { "cache-control": "no-store" } },
+          );
         }
       },
     },

@@ -26,10 +26,19 @@ export type SourcePipelineHealth = {
   unresolvedMappings: number;
 };
 
+export type ScreeningParityHealth = {
+  available: boolean;
+  mismatchGroups: number;
+  totalAbsoluteDelta: number;
+  bySource: Record<ImportSource, { mismatchGroups: number; totalAbsoluteDelta: number }>;
+  truncated: boolean;
+};
+
 export type CanonicalPipelineHealth = {
   status: PipelineHealthStatus;
   reasons: string[];
   sources: Record<ImportSource, SourcePipelineHealth>;
+  parity: ScreeningParityHealth;
   checkedAt: string;
 };
 
@@ -42,8 +51,18 @@ export type HealthRunRow = {
   finished_at: string | null;
 };
 
+type ParityRow = {
+  source: string;
+  cinema_id: string;
+  screening_date: string;
+  canonical_count: number | string;
+  legacy_count: number | string;
+  delta: number | string;
+};
+
 const WARN_HOURS = 26;
 const CRITICAL_HOURS = 48;
+const PARITY_LIMIT = 1000;
 
 function maxStatus(a: PipelineHealthStatus, b: PipelineHealthStatus): PipelineHealthStatus {
   const rank: Record<PipelineHealthStatus, number> = {
@@ -68,6 +87,68 @@ export function unresolvedDeadLetterScopes(runs: HealthRunRow[]): number {
     if (!latest.has(key)) latest.set(key, run);
   }
   return [...latest.values()].filter((r) => r.state === "dead_letter").length;
+}
+
+/**
+ * The parity view is transition-only and is intentionally not part of the
+ * generated Supabase types. Keep this narrow structural cast local so the rest
+ * of the database client remains fully typed.
+ */
+async function screeningParityHealth(): Promise<ScreeningParityHealth> {
+  type ParityResult = { data: ParityRow[] | null; error: { message: string } | null };
+  type ParityDb = {
+    from: (table: "screening_model_parity") => {
+      select: (columns: string) => {
+        neq: (column: "delta", value: number) => {
+          limit: (limit: number) => PromiseLike<ParityResult>;
+        };
+      };
+    };
+  };
+
+  const db = supabaseAdmin as unknown as ParityDb;
+  const { data, error } = await db
+    .from("screening_model_parity")
+    .select("source,cinema_id,screening_date,canonical_count,legacy_count,delta")
+    .neq("delta", 0)
+    .limit(PARITY_LIMIT);
+
+  const empty = (): ScreeningParityHealth => ({
+    available: false,
+    mismatchGroups: 0,
+    totalAbsoluteDelta: 0,
+    bySource: {
+      ebillet: { mismatchGroups: 0, totalAbsoluteDelta: 0 },
+      kultunaut: { mismatchGroups: 0, totalAbsoluteDelta: 0 },
+    },
+    truncated: false,
+  });
+
+  // A deployment may briefly run code before the transition view migration is
+  // applied. Health should remain available and explicitly say parity is not.
+  if (error) return empty();
+
+  const rows = data ?? [];
+  const result: ScreeningParityHealth = {
+    available: true,
+    mismatchGroups: rows.length,
+    totalAbsoluteDelta: 0,
+    bySource: {
+      ebillet: { mismatchGroups: 0, totalAbsoluteDelta: 0 },
+      kultunaut: { mismatchGroups: 0, totalAbsoluteDelta: 0 },
+    },
+    truncated: rows.length >= PARITY_LIMIT,
+  };
+
+  for (const row of rows) {
+    const delta = Math.abs(Number(row.delta) || 0);
+    result.totalAbsoluteDelta += delta;
+    if (row.source === "ebillet" || row.source === "kultunaut") {
+      result.bySource[row.source].mismatchGroups += 1;
+      result.bySource[row.source].totalAbsoluteDelta += delta;
+    }
+  }
+  return result;
 }
 
 async function sourceHealth(source: ImportSource): Promise<SourcePipelineHealth> {
@@ -193,9 +274,10 @@ async function sourceHealth(source: ImportSource): Promise<SourcePipelineHealth>
 }
 
 export async function getCanonicalPipelineHealth(): Promise<CanonicalPipelineHealth> {
-  const [ebillet, kultunaut] = await Promise.all([
+  const [ebillet, kultunaut, parity] = await Promise.all([
     sourceHealth("ebillet"),
     sourceHealth("kultunaut"),
+    screeningParityHealth(),
   ]);
 
   // eBillet is the current primary operational feed. A Kultunaut outage is
@@ -212,10 +294,20 @@ export async function getCanonicalPipelineHealth(): Promise<CanonicalPipelineHea
   }
   reasons.push(...kultunaut.reasons.map((r) => `Kultunaut: ${r}`));
 
+  // Parity mismatches are a migration warning, not a source outage. They block
+  // retiring showtimes as a compatibility read model until investigated.
+  if (parity.available && parity.mismatchGroups > 0) {
+    status = maxStatus(status, "warning");
+    reasons.push(
+      `Screening parity: ${parity.mismatchGroups} group(s) differ by ${parity.totalAbsoluteDelta} physical screening(s)`,
+    );
+  }
+
   return {
     status,
     reasons,
     sources: { ebillet, kultunaut },
+    parity,
     checkedAt: new Date().toISOString(),
   };
 }

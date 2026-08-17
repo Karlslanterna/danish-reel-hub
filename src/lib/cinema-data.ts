@@ -4,7 +4,6 @@ import { sortShowtimes } from "@/lib/showtime-sort";
 import { DEFAULT_MOVIE_SORT, MOVIE_SORT_ORDERS, type MovieSortStrategy } from "@/lib/movie-sort";
 import { windowStart, windowEnd } from "@/lib/date-window";
 
-
 export type Poster = {
   a?: string;
   b?: string;
@@ -28,16 +27,15 @@ export type Movie = {
   rating: string;
   synopsis: string;
   poster: Poster;
-  /** TMDb extras — always optional so the UI works on Kultunaut data alone. */
+  /** TMDb extras — always optional so the UI works on source data alone. */
   backdropUrl?: string | null;
   trailerUrl?: string | null;
   cast?: CastMember[];
   voteAverage?: number | null;
-  /** Upcoming screenings across all cinemas — computed in the database. */
+  /** Upcoming physical screenings across all cinemas. */
   screeningCount?: number;
   nextScreeningDate?: string | null;
 };
-
 
 export type Cinema = {
   id: string;
@@ -52,6 +50,11 @@ export type Cinema = {
   website: string | null;
 };
 
+/**
+ * Compatibility shape consumed by the existing UI. The database source of
+ * truth is `screenings` (one row per physical screening); rows are grouped into
+ * this legacy date/hall/times shape only at the read boundary.
+ */
 export type Showtime = {
   movieId: string;
   cinemaId: string;
@@ -88,7 +91,6 @@ type MovieRow = {
   tmdb_vote_average?: number | string | null;
   screening_count?: number | string | null;
   next_screening_date?: string | null;
-
 };
 
 type CinemaRow = {
@@ -104,19 +106,21 @@ type CinemaRow = {
   website: string | null;
 };
 
-type ShowtimeRow = {
+type ScreeningRow = {
   movie_id: string;
   cinema_id: string;
-  date: string;
-  times: string[];
+  starts_at: string;
+  local_date: string;
+  local_time: string;
   hall: string;
-  booking_url: string | null;
   ticket_url: string | null;
-  ticket_urls: string[] | null;
   formats: string[] | null;
   languages: string[] | null;
   events: string[] | null;
 };
+
+const SCREENING_COLUMNS =
+  "movie_id, cinema_id, starts_at, local_date, local_time, hall, ticket_url, formats, languages, events";
 
 const nonEmpty = (v: string | null | undefined): string | undefined => {
   const s = (v ?? "").trim();
@@ -124,12 +128,11 @@ const nonEmpty = (v: string | null | undefined): string | undefined => {
 };
 
 /**
- * TMDb is preferred for film metadata, Kultunaut is the fallback. The
- * coalesce is per field, so a partial TMDb record never blanks a field that
- * Kultunaut does have.
+ * TMDb is preferred for film metadata; source metadata is the fallback. The
+ * coalesce is per field, so a partial TMDb record never blanks a source field.
  */
 const mapMovie = (r: MovieRow): Movie => {
-  const kultunautPoster = r.poster as Poster;
+  const sourcePoster = r.poster as Poster;
   const voteAverage =
     r.tmdb_vote_average === null || r.tmdb_vote_average === undefined
       ? null
@@ -146,21 +149,19 @@ const mapMovie = (r: MovieRow): Movie => {
     director: nonEmpty(r.tmdb_director) ?? r.director,
     rating: r.rating,
     synopsis: nonEmpty(r.tmdb_overview) ?? r.synopsis,
-    // Upgrade legacy http:// poster links so the browser never loads mixed content.
     poster: {
-      ...kultunautPoster,
-      url: toHttpsUrl(nonEmpty(r.tmdb_poster_url) ?? kultunautPoster?.url),
+      ...sourcePoster,
+      url: toHttpsUrl(nonEmpty(r.tmdb_poster_url) ?? sourcePoster?.url),
     },
     backdropUrl: toHttpsUrl(r.tmdb_backdrop_url) ?? null,
     trailerUrl: toHttpsUrl(r.tmdb_trailer_url) ?? null,
     cast: Array.isArray(r.tmdb_cast) ? (r.tmdb_cast as CastMember[]) : [],
-    voteAverage: Number.isFinite(voteAverage as number) && (voteAverage as number) > 0 ? voteAverage : null,
+    voteAverage:
+      Number.isFinite(voteAverage as number) && (voteAverage as number) > 0 ? voteAverage : null,
     screeningCount: Number(r.screening_count ?? 0) || 0,
     nextScreeningDate: r.next_screening_date ?? null,
-
   };
 };
-
 
 const mapCinema = (r: CinemaRow): Cinema => ({
   id: r.id,
@@ -175,23 +176,69 @@ const mapCinema = (r: CinemaRow): Cinema => ({
   website: r.website ?? null,
 });
 
-const mapShowtime = (r: ShowtimeRow): Showtime => ({
-  movieId: r.movie_id,
-  cinemaId: r.cinema_id,
-  date: r.date,
-  times: r.times,
-  hall: r.hall,
-  bookingUrl: r.booking_url ?? r.ticket_url ?? null,
-  ticketUrls: r.ticket_urls ?? [],
-  formats: r.formats ?? [],
-  languages: r.languages ?? [],
-  events: r.events ?? [],
-});
+const addUnique = (target: string[], values: string[] | null | undefined) => {
+  for (const value of values ?? []) if (value && !target.includes(value)) target.push(value);
+};
+
+type ShowtimeGroup = Showtime & {
+  slots: Array<{ time: string; startsAt: string; ticketUrl: string | null }>;
+};
+
+/** Convert canonical screening rows into the unchanged UI showtime contract. */
+export function groupScreeningsForUi(rows: ScreeningRow[]): Showtime[] {
+  const groups = new Map<string, ShowtimeGroup>();
+  for (const row of rows) {
+    const key = `${row.movie_id}|${row.cinema_id}|${row.local_date}|${row.hall}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        movieId: row.movie_id,
+        cinemaId: row.cinema_id,
+        date: row.local_date,
+        times: [],
+        hall: row.hall,
+        bookingUrl: null,
+        ticketUrls: [],
+        formats: [],
+        languages: [],
+        events: [],
+        slots: [],
+      };
+      groups.set(key, group);
+    }
+    group.slots.push({
+      time: row.local_time.slice(0, 5),
+      startsAt: row.starts_at,
+      ticketUrl: row.ticket_url,
+    });
+    addUnique(group.formats, row.formats);
+    addUnique(group.languages, row.languages);
+    addUnique(group.events, row.events);
+  }
+
+  const result: Showtime[] = [];
+  for (const group of groups.values()) {
+    group.slots.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    const ticketUrls = group.slots.map((slot) => slot.ticketUrl ?? "");
+    result.push({
+      movieId: group.movieId,
+      cinemaId: group.cinemaId,
+      date: group.date,
+      times: group.slots.map((slot) => slot.time),
+      hall: group.hall,
+      bookingUrl: group.slots.find((slot) => slot.ticketUrl)?.ticketUrl ?? null,
+      ticketUrls,
+      formats: group.formats,
+      languages: group.languages,
+      events: group.events,
+    });
+  }
+  return sortShowtimes(result);
+}
 
 /**
- * Movies ordered by a named strategy. Ordering happens in the database via the
- * `movies_ranked` view, which recomputes upcoming-screening counts on read —
- * so it always reflects the latest import with no extra frontend work.
+ * Movies ordered by a named strategy. Ordering happens in `movies_ranked`,
+ * which is backed by canonical `screenings`.
  */
 export async function fetchMovies(
   strategy: MovieSortStrategy = DEFAULT_MOVIE_SORT,
@@ -204,7 +251,6 @@ export async function fetchMovies(
   if (error) throw error;
   return (data ?? []).map((r) => mapMovie(r as MovieRow));
 }
-
 
 export async function fetchCinemas(): Promise<Cinema[]> {
   const { data, error } = await supabase.from("cinemas").select("*").order("name");
@@ -226,22 +272,22 @@ export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
 
 export async function fetchShowtimesForMovie(movieId: string): Promise<Showtime[]> {
   const { data, error } = await supabase
-    .from("showtimes")
-    .select("*")
+    .from("screenings")
+    .select(SCREENING_COLUMNS)
     .eq("movie_id", movieId)
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
-  return sortShowtimes((data ?? []).map(mapShowtime));
+  return groupScreeningsForUi((data ?? []) as ScreeningRow[]);
 }
 
 export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
   const { data, error } = await supabase
-    .from("showtimes")
+    .from("screenings")
     .select("movie_id, movies(*)")
     .eq("cinema_id", cinemaId)
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
   const seen = new Set<string>();
   const out: Movie[] = [];
@@ -255,11 +301,11 @@ export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
 
 export async function fetchCinemasForMovie(movieId: string): Promise<Cinema[]> {
   const { data, error } = await supabase
-    .from("showtimes")
+    .from("screenings")
     .select("cinema_id, cinemas(*)")
     .eq("movie_id", movieId)
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
   const seen = new Set<string>();
   const out: Cinema[] = [];
@@ -279,22 +325,30 @@ export function formatRuntime(min: number) {
 
 export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; cinemaId: string }>> {
   const { data, error } = await supabase
-    .from("showtimes")
+    .from("screenings")
     .select("movie_id, cinema_id")
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
-  return (data ?? []).map((r) => ({ movieId: (r as ShowtimeRow).movie_id, cinemaId: (r as ShowtimeRow).cinema_id }));
+  const seen = new Set<string>();
+  const out: Array<{ movieId: string; cinemaId: string }> = [];
+  for (const row of data ?? []) {
+    const key = `${row.movie_id}|${row.cinema_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ movieId: row.movie_id, cinemaId: row.cinema_id });
+  }
+  return out;
 }
 
 export async function fetchShowtimes(): Promise<Showtime[]> {
   const { data, error } = await supabase
-    .from("showtimes")
-    .select("*")
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .from("screenings")
+    .select(SCREENING_COLUMNS)
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
-  return sortShowtimes((data ?? []).map(mapShowtime));
+  return groupScreeningsForUi((data ?? []) as ScreeningRow[]);
 }
 
 export type ShowtimeIndexRow = {
@@ -306,39 +360,43 @@ export type ShowtimeIndexRow = {
   events: string[];
 };
 
-/**
- * Lightweight index of showtimes used by the homepage for radius + date filtering.
- * Fetches only 3 columns and only rows on/after today — one round trip instead of two full-table scans.
- */
+/** Lightweight index used by the homepage for radius + date filtering. */
 export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
   const { data, error } = await supabase
-    .from("showtimes")
-    .select("movie_id, cinema_id, date, formats, languages, events")
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .from("screenings")
+    .select("movie_id, cinema_id, local_date, formats, languages, events")
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
-  return (data ?? []).map((r) => {
-    const row = r as Pick<ShowtimeRow, "movie_id" | "cinema_id" | "date" | "formats" | "languages" | "events">;
-    return {
+
+  const groups = new Map<string, ShowtimeIndexRow>();
+  for (const row of data ?? []) {
+    const key = `${row.movie_id}|${row.cinema_id}|${row.local_date}`;
+    const existing = groups.get(key) ?? {
       movieId: row.movie_id,
       cinemaId: row.cinema_id,
-      date: row.date,
-      formats: row.formats ?? [],
-      languages: row.languages ?? [],
-      events: row.events ?? [],
+      date: row.local_date,
+      formats: [],
+      languages: [],
+      events: [],
     };
-  });
+    addUnique(existing.formats, row.formats);
+    addUnique(existing.languages, row.languages);
+    addUnique(existing.events, row.events);
+    groups.set(key, existing);
+  }
+  return [...groups.values()];
 }
 
 export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtime[]> {
   const { data, error } = await supabase
-    .from("showtimes")
-    .select("*")
+    .from("screenings")
+    .select(SCREENING_COLUMNS)
     .eq("cinema_id", cinemaId)
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
-  return sortShowtimes((data ?? []).map(mapShowtime));
+  return groupScreeningsForUi((data ?? []) as ScreeningRow[]);
 }
 
 export async function fetchMoviesAndShowtimesForCinemas(
@@ -346,22 +404,21 @@ export async function fetchMoviesAndShowtimesForCinemas(
 ): Promise<{ movies: Movie[]; showtimes: Showtime[] }> {
   if (cinemaIds.length === 0) return { movies: [], showtimes: [] };
   const { data, error } = await supabase
-    .from("showtimes")
-    .select("movie_id, cinema_id, date, times, hall, booking_url, ticket_url, ticket_urls, formats, languages, events, movies(*)")
+    .from("screenings")
+    .select(`${SCREENING_COLUMNS}, movies(*)`)
     .in("cinema_id", cinemaIds)
-    .gte("date", windowStart())
-    .lte("date", windowEnd());
+    .gte("local_date", windowStart())
+    .lte("local_date", windowEnd());
   if (error) throw error;
-  const rows = (data ?? []) as Array<ShowtimeRow & { movies: MovieRow | null }>;
+
+  const rows = (data ?? []) as Array<ScreeningRow & { movies: MovieRow | null }>;
   const seen = new Set<string>();
   const movies: Movie[] = [];
-  const showtimes: Showtime[] = [];
   for (const row of rows) {
     if (row.movies && !seen.has(row.movie_id)) {
       seen.add(row.movie_id);
       movies.push(mapMovie(row.movies));
     }
-    showtimes.push(mapShowtime(row));
   }
-  return { movies, showtimes: sortShowtimes(showtimes) };
+  return { movies, showtimes: groupScreeningsForUi(rows) };
 }

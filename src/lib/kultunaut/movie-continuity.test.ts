@@ -5,6 +5,8 @@ const anchor = {
   id: "canonical-odyssey",
   title: "The Odyssey (2026)",
   originalTitle: "The Odyssey",
+  genres: ["Action", "Drama"],
+  runtime: 170,
   year: 2026,
   tmdbId: null,
   ebilletBaseId: 458,
@@ -12,52 +14,52 @@ const anchor = {
 };
 
 describe("Kultunaut movie continuity", () => {
-  it("rebinds a changed source id when repeated exact screenings point to one strong anchor", () => {
+  it("maps an unknown-year source id to one unique active strong title+genre anchor", () => {
     expect(
       chooseContinuityCandidate({
         incomingTitle: "The Odyssey",
         incomingYear: 0,
+        incomingGenres: ["Action", "Drama"],
+        incomingRuntime: 0,
         currentCanonicalId: "duplicate",
-        totalSlots: 6,
-        slotCandidates: [
-          ["duplicate", anchor.id],
-          ["duplicate", anchor.id],
-          ["duplicate", anchor.id],
-          ["duplicate"],
-          ["duplicate"],
-          ["duplicate"],
-        ],
-        candidates: [anchor, { id: "duplicate", title: "The Odyssey", year: 0 }],
+        candidates: [anchor, { id: "duplicate", title: "The Odyssey", genres: ["Action", "Drama"], year: 0 }],
       }),
-    ).toMatchObject({ canonicalId: anchor.id, evidence: 3 });
+    ).toEqual({ canonicalId: anchor.id });
   });
 
-  it("never rebinds from one coincidental overlap", () => {
+  it("never merges an unknown-year row from title alone", () => {
     expect(
       chooseContinuityCandidate({
         incomingTitle: "The Odyssey",
         incomingYear: 0,
+        incomingGenres: [],
         currentCanonicalId: "duplicate",
-        totalSlots: 6,
-        slotCandidates: [["duplicate", anchor.id]],
         candidates: [anchor],
       }),
     ).toBeNull();
   });
 
-  it("does not merge two unknown-title-only Kultunaut rows without a strong anchor", () => {
+  it("does not use another weak Kultunaut duplicate as an anchor", () => {
     expect(
       chooseContinuityCandidate({
         incomingTitle: "The Odyssey",
         incomingYear: 0,
+        incomingGenres: ["Action", "Drama"],
         currentCanonicalId: "duplicate-a",
-        totalSlots: 6,
-        slotCandidates: [
-          ["duplicate-a", "duplicate-b"],
-          ["duplicate-a", "duplicate-b"],
-          ["duplicate-a", "duplicate-b"],
+        candidates: [
+          { id: "duplicate-b", title: "The Odyssey", genres: ["Action", "Drama"], year: 0 },
         ],
-        candidates: [{ id: "duplicate-b", title: "The Odyssey", year: 0 }],
+      }),
+    ).toBeNull();
+  });
+
+  it("refuses an ambiguous pair of strong active candidates", () => {
+    expect(
+      chooseContinuityCandidate({
+        incomingTitle: "The Odyssey",
+        incomingYear: 0,
+        incomingGenres: ["Action", "Drama"],
+        candidates: [anchor, { ...anchor, id: "another-odyssey", year: 2027 }],
       }),
     ).toBeNull();
   });
@@ -67,9 +69,19 @@ describe("Kultunaut movie continuity", () => {
       chooseContinuityCandidate({
         incomingTitle: "The Odyssey",
         incomingYear: 2027,
-        currentCanonicalId: "duplicate",
-        totalSlots: 3,
-        slotCandidates: [[anchor.id], [anchor.id], [anchor.id]],
+        incomingGenres: ["Action", "Drama"],
+        candidates: [anchor],
+      }),
+    ).toBeNull();
+  });
+
+  it("refuses incompatible runtime when both sources know it", () => {
+    expect(
+      chooseContinuityCandidate({
+        incomingTitle: "The Odyssey",
+        incomingYear: 2026,
+        incomingGenres: ["Action", "Drama"],
+        incomingRuntime: 90,
         candidates: [anchor],
       }),
     ).toBeNull();

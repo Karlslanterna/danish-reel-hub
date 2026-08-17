@@ -6,6 +6,7 @@ import {
   type ExistingShowtimeRow,
   type ShowtimeKeyed,
 } from "./reconcile";
+import { validateKultunautSnapshot, type SnapshotValidation } from "./snapshot";
 
 
 export type ImportResult = {
@@ -100,15 +101,32 @@ async function allValues(
   return out;
 }
 
-/** Cinemas owned by an active eBillet organizer — off-limits to Kultunaut. */
+/**
+ * Cinemas OWNED by eBillet — off-limits to Kultunaut writes and cleanup.
+ *
+ * Ownership is the link itself, in both directions:
+ *   - `cinemas.ebillet_organizer_id IS NOT NULL`
+ *   - `ebillet_organizers.cinema_id` (any status)
+ * The organizer's `is_active` flag is deliberately NOT used: it only reflects
+ * whether the organizer currently has screenings (visibility), while authority
+ * follows the coupling. Using `is_active` would let Kultunaut take over an
+ * eBillet cinema during a quiet period.
+ */
 export async function loadEbilletCinemaIds(db: any): Promise<Set<string>> {
+  const ids = new Set<string>();
+
+  const { data: linkedCinemas, error: cinErr } = await db
+    .from("cinemas")
+    .select("id")
+    .not("ebillet_organizer_id", "is", null);
+  if (cinErr) throw new Error(`ebillet coverage lookup (cinemas): ${cinErr.message}`);
+  for (const row of (linkedCinemas ?? []) as Array<{ id: string }>) ids.add(row.id);
+
   const { data, error } = await db
     .from("ebillet_organizers")
     .select("cinema_id")
-    .eq("is_active", true)
     .not("cinema_id", "is", null);
   if (error) throw new Error(`ebillet coverage lookup: ${error.message}`);
-  const ids = new Set<string>();
   for (const row of (data ?? []) as Array<{ cinema_id: string | null }>) {
     if (row.cinema_id) ids.add(row.cinema_id);
   }
@@ -119,7 +137,7 @@ export async function loadEbilletCinemaIds(db: any): Promise<Set<string>> {
  * Source-scoped cleanup for the Kultunaut importer.
  *
  * It may ONLY touch rows with `source = 'kultunaut'` on cinemas that are not
- * owned by an active eBillet organizer. It never deletes cinemas (a venue must
+ * linked to an eBillet organizer (ownership = the link, not `is_active`). It never deletes cinemas (a venue must
  * not disappear because a feed briefly returned nothing) and never deletes
  * eBillet data — that is exclusively the eBillet sync's job.
  */
@@ -220,11 +238,22 @@ export async function cleanupKultunautData(
  * Returns the new job id immediately; processing happens in subsequent
  * calls to processJobBatch().
  */
-export async function createImportJob(xml: string): Promise<{ jobId: string }> {
+export async function createImportJob(
+  xml: string,
+  opts: { declaredEmpty?: boolean } = {},
+): Promise<{ jobId: string }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("import_jobs")
-    .insert({ source: "kultunaut", status: "queued", phase: "pending", xml })
+    .insert({
+      source: "kultunaut",
+      status: "queued",
+      phase: "pending",
+      xml,
+      // Only an explicit caller assertion may allow an empty feed to delete
+      // existing data; it is never inferred from the payload.
+      payload: { declaredEmpty: Boolean(opts.declaredEmpty) },
+    })
     .select("id")
     .single();
   if (error) throw new Error(`Failed to create import job: ${error.message}`);
@@ -402,6 +431,18 @@ export async function processJobBatch(
         };
       });
 
+      const snapshot = validateKultunautSnapshot({
+        xmlLength: (job.xml ?? "").length,
+        movies: parsed.movies.size,
+        cinemas: parsed.cinemas.size,
+        showtimes: parsed.showtimes.length,
+        grouped: groupedShowtimes.length,
+        declaredEmpty: Boolean(((job.payload ?? {}) as { declaredEmpty?: boolean }).declaredEmpty),
+      });
+      if (snapshot.verdict === "incomplete") {
+        errors.push(`snapshot incomplete: ${snapshot.reasons.join("; ")}`);
+      }
+
       const payload: JobPayload = { groupedShowtimes };
       const cinemaRows = Array.from(parsed.cinemas.values()).map((c) => ({
         id: idFor("kn", c.external_id),
@@ -425,7 +466,7 @@ export async function processJobBatch(
           total_cinemas: cinemaRows.length,
           total_showtimes: groupedShowtimes.length,
           processed_movies: movieRows.length,
-          payload: { ...payload, cinemaRows, movieTitles: movieRows.map((m) => ({ id: m.id, title: m.title })) },
+          payload: { ...payload, snapshot, cinemaRows, movieTitles: movieRows.map((m) => ({ id: m.id, title: m.title })) },
           message: "Upserted movies",
         })
         .eq("id", jobId);
@@ -524,7 +565,8 @@ export async function processJobBatch(
       let upserted = job.processed_showtimes ?? 0;
 
       // Source authority: eBillet owns the showtimes of every cinema linked to
-      // an active eBillet organizer — Kultunaut must not write there at all.
+      // an eBillet organizer (regardless of the organizer's is_active status) —
+      // Kultunaut must not write there at all.
       // Kultunaut remains authoritative for all other cinemas.
       let ebilletCinemaIds = new Set<string>();
       try {
@@ -601,10 +643,21 @@ export async function processJobBatch(
         date: g.date,
         hall: g.hall,
       }));
-      // Only reconcile removals when the feed actually produced rows — an
-      // empty payload must never wipe existing Kultunaut showtimes.
+      // Stale reconciliation requires a validated, complete snapshot. The
+      // verdict is computed in the parse phase and stored on the job; a
+      // suspicious or partial payload keeps the import purely additive.
+      const validation = ((job.payload ?? {}) as { snapshot?: SnapshotValidation }).snapshot ?? {
+        verdict: "incomplete" as const,
+        reconcileRemovals: false,
+        reasons: ["snapshot validation missing on job payload"],
+      };
+      if (!validation.reconcileRemovals) {
+        errors.push(
+          `stale reconciliation skipped (snapshot ${validation.verdict}): ${validation.reasons.join("; ")}`,
+        );
+      }
       const summary = await cleanupKultunautData(desired, {
-        reconcileRemovals: desired.length > 0,
+        reconcileRemovals: validation.reconcileRemovals,
       });
       errors.push(...summary.errors);
 

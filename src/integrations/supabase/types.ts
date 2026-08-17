@@ -289,6 +289,68 @@ export type Database = {
         }
         Relationships: []
       }
+      import_runs: {
+        Row: {
+          attempts: number
+          created_at: string
+          cursor: Json | null
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          last_heartbeat: string | null
+          lease_until: string | null
+          scope_key: string
+          scope_type: string
+          snapshot_id: string | null
+          source: string
+          state: string
+          stats: Json
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          cursor?: Json | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          last_heartbeat?: string | null
+          lease_until?: string | null
+          scope_key: string
+          scope_type: string
+          snapshot_id?: string | null
+          source: string
+          state?: string
+          stats?: Json
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          cursor?: Json | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          last_heartbeat?: string | null
+          lease_until?: string | null
+          scope_key?: string
+          scope_type?: string
+          snapshot_id?: string | null
+          source?: string
+          state?: string
+          stats?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_runs_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "import_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_schedule_runs: {
         Row: {
           attempts: number
@@ -328,6 +390,48 @@ export type Database = {
           status?: string
           trigger?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      import_snapshots: {
+        Row: {
+          created_at: string
+          fetched_at: string
+          id: string
+          payload_hash: string
+          raw_payload: string | null
+          scope_external_id: string | null
+          scope_type: string
+          source: string
+          status: string
+          updated_at: string
+          validation: Json
+        }
+        Insert: {
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          payload_hash: string
+          raw_payload?: string | null
+          scope_external_id?: string | null
+          scope_type: string
+          source: string
+          status?: string
+          updated_at?: string
+          validation?: Json
+        }
+        Update: {
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          payload_hash?: string
+          raw_payload?: string | null
+          scope_external_id?: string | null
+          scope_type?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          validation?: Json
         }
         Relationships: []
       }
@@ -454,6 +558,101 @@ export type Database = {
         }
         Relationships: []
       }
+      screenings: {
+        Row: {
+          cinema_id: string
+          created_at: string
+          events: string[]
+          formats: string[]
+          free_seats: number | null
+          hall: string
+          id: string
+          languages: string[]
+          local_date: string
+          local_time: string
+          movie_id: string
+          price_max: number | null
+          price_min: number | null
+          snapshot_id: string | null
+          source: string
+          source_ref: string
+          starts_at: string
+          ticket_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          cinema_id: string
+          created_at?: string
+          events?: string[]
+          formats?: string[]
+          free_seats?: number | null
+          hall?: string
+          id?: string
+          languages?: string[]
+          local_date: string
+          local_time: string
+          movie_id: string
+          price_max?: number | null
+          price_min?: number | null
+          snapshot_id?: string | null
+          source: string
+          source_ref: string
+          starts_at: string
+          ticket_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cinema_id?: string
+          created_at?: string
+          events?: string[]
+          formats?: string[]
+          free_seats?: number | null
+          hall?: string
+          id?: string
+          languages?: string[]
+          local_date?: string
+          local_time?: string
+          movie_id?: string
+          price_max?: number | null
+          price_min?: number | null
+          snapshot_id?: string | null
+          source?: string
+          source_ref?: string
+          starts_at?: string
+          ticket_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "screenings_cinema_id_fkey"
+            columns: ["cinema_id"]
+            isOneToOne: false
+            referencedRelation: "cinemas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screenings_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screenings_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies_ranked"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screenings_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "import_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       showtimes: {
         Row: {
           booking_url: string | null
@@ -545,6 +744,158 @@ export type Database = {
           },
         ]
       }
+      source_entity_refs: {
+        Row: {
+          canonical_id: string
+          confidence: number | null
+          created_at: string
+          entity_type: string
+          external_id: string
+          id: string
+          locked: boolean
+          match_method: string
+          notes: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          canonical_id: string
+          confidence?: number | null
+          created_at?: string
+          entity_type: string
+          external_id: string
+          id?: string
+          locked?: boolean
+          match_method: string
+          notes?: string | null
+          source: string
+          updated_at?: string
+        }
+        Update: {
+          canonical_id?: string
+          confidence?: number | null
+          created_at?: string
+          entity_type?: string
+          external_id?: string
+          id?: string
+          locked?: boolean
+          match_method?: string
+          notes?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      staged_screenings: {
+        Row: {
+          created_at: string
+          events: string[]
+          formats: string[]
+          free_seats: number | null
+          hall: string
+          id: string
+          languages: string[]
+          local_date: string
+          local_time: string
+          price_max: number | null
+          price_min: number | null
+          snapshot_id: string
+          source: string
+          source_cinema_ref: string
+          source_movie_ref: string
+          source_ref: string
+          starts_at: string
+          ticket_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          events?: string[]
+          formats?: string[]
+          free_seats?: number | null
+          hall?: string
+          id?: string
+          languages?: string[]
+          local_date: string
+          local_time: string
+          price_max?: number | null
+          price_min?: number | null
+          snapshot_id: string
+          source: string
+          source_cinema_ref: string
+          source_movie_ref: string
+          source_ref: string
+          starts_at: string
+          ticket_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          events?: string[]
+          formats?: string[]
+          free_seats?: number | null
+          hall?: string
+          id?: string
+          languages?: string[]
+          local_date?: string
+          local_time?: string
+          price_max?: number | null
+          price_min?: number | null
+          snapshot_id?: string
+          source?: string
+          source_cinema_ref?: string
+          source_movie_ref?: string
+          source_ref?: string
+          starts_at?: string
+          ticket_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staged_screenings_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "import_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unresolved_source_entities: {
+        Row: {
+          candidates: Json
+          context: Json
+          created_at: string
+          entity_type: string
+          external_id: string
+          id: string
+          label: string
+          resolved: boolean
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          candidates?: Json
+          context?: Json
+          created_at?: string
+          entity_type: string
+          external_id: string
+          id?: string
+          label: string
+          resolved?: boolean
+          source: string
+          updated_at?: string
+        }
+        Update: {
+          candidates?: Json
+          context?: Json
+          created_at?: string
+          entity_type?: string
+          external_id?: string
+          id?: string
+          label?: string
+          resolved?: boolean
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -605,6 +956,49 @@ export type Database = {
       }
     }
     Functions: {
+      cinema_authoritative_source: {
+        Args: { p_cinema_id: string }
+        Returns: string
+      }
+      claim_import_run: {
+        Args: { p_lease_seconds?: number; p_source: string }
+        Returns: {
+          attempts: number
+          created_at: string
+          cursor: Json | null
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          last_heartbeat: string | null
+          lease_until: string | null
+          scope_key: string
+          scope_type: string
+          snapshot_id: string | null
+          source: string
+          state: string
+          stats: Json
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "import_runs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      promote_screenings: {
+        Args: {
+          p_cinema_id: string
+          p_rows: Json
+          p_snapshot_id: string
+          p_source: string
+        }
+        Returns: Json
+      }
+      rebuild_showtimes_for_cinema: {
+        Args: { p_cinema_id: string; p_source: string }
+        Returns: number
+      }
       slugify: { Args: { value: string }; Returns: string }
     }
     Enums: {

@@ -1,12 +1,23 @@
 import { expect, test } from "@playwright/test";
-import { expectPageLoads, firstPathFor, restoreSupabaseSession } from "./helpers";
+import { expectPageLoads, firstCityPath, firstPathFor, restoreSupabaseSession } from "./helpers";
+
+const SEARCH_LABEL = "Søg på film, biograf eller by";
+
+async function openSearch(page: import("@playwright/test").Page) {
+  const trigger = page.getByRole("button", { name: SEARCH_LABEL }).first();
+  await expect(trigger, "Search trigger is missing").toBeVisible();
+  await trigger.click();
+  const input = page.getByPlaceholder(SEARCH_LABEL).first();
+  await expect(input, "Search input did not open").toBeVisible();
+  return input;
+}
 
 test.describe("Public pages", () => {
   test("1. homepage loads", async ({ page }) => {
     await expectPageLoads(page, "/", "Homepage");
     await expect(
-      page.getByPlaceholder("Søg på film, biograf eller by"),
-      "Homepage: search input missing",
+      page.getByRole("button", { name: SEARCH_LABEL }).first(),
+      "Homepage: search trigger missing",
     ).toBeVisible();
   });
 
@@ -21,13 +32,13 @@ test.describe("Public pages", () => {
   });
 
   test("4. city page loads", async ({ page, request }) => {
-    const path = await firstPathFor(request, "/by/");
+    const path = await firstCityPath(request);
     await expectPageLoads(page, path, "City page");
   });
 
   test("5. search returns results for a known movie", async ({ page, request }) => {
-    // The query term is derived from the catalog itself, so the test never
-    // depends on one specific title existing in production.
+    // The query term is derived from the live movie sitemap, so this test does
+    // not depend on one hard-coded title surviving in production.
     const moviePath = await firstPathFor(request, "/film/");
     await page.goto(moviePath, { waitUntil: "domcontentloaded" });
     const title = ((await page.locator("h1").first().textContent()) ?? "").trim();
@@ -35,10 +46,8 @@ test.describe("Public pages", () => {
     expect(term.length, `Search: could not derive a query term from "${title}"`).toBeGreaterThan(1);
 
     await page.goto("/", { waitUntil: "networkidle" });
-    const input = page.getByPlaceholder("Søg på film, biograf eller by");
-    await input.click();
+    const input = await openSearch(page);
 
-    // Retry typing: the suggestion list only reacts once React has hydrated.
     await expect
       .poll(
         async () => {
@@ -79,10 +88,9 @@ test.describe("Infrastructure endpoints", () => {
 
   test("8. /api/public/import-health returns valid JSON with 200 or 503", async ({ request }) => {
     const res = await request.get("/api/public/import-health");
-    expect(
-      [200, 503],
-      `import-health returned unexpected status ${res.status()}`,
-    ).toContain(res.status());
+    expect([200, 503], `import-health returned unexpected status ${res.status()}`).toContain(
+      res.status(),
+    );
 
     let body: unknown;
     const raw = await res.text();

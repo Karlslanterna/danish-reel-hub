@@ -3,39 +3,67 @@ import { expect, type APIRequestContext, type BrowserContext, type Page } from "
 /**
  * Shared helpers for the smoke suite.
  *
- * Design goals:
- *  - deterministic: URLs under test are discovered from /sitemap.xml at run
- *    time instead of hard-coding slugs that may disappear from the catalog.
- *  - fast: sitemap is fetched once per worker and cached.
- *  - clear failures: every helper throws a message that names the URL and the
- *    expectation that failed.
+ * The sitemap root is an index, so smoke fixtures must follow its child
+ * sitemaps before looking for movie/cinema/city URLs. Keeping this discovery
+ * dynamic means the tests validate whatever is actually live in production
+ * without pinning brittle slugs.
  */
 
 let sitemapCache: string[] | null = null;
 
+const locsFrom = (xml: string): string[] =>
+  [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+
 export async function getSitemapUrls(request: APIRequestContext): Promise<string[]> {
   if (sitemapCache) return sitemapCache;
-  const res = await request.get("/sitemap.xml");
-  if (!res.ok()) {
-    throw new Error(`Cannot build smoke fixtures: /sitemap.xml returned ${res.status()}`);
+
+  const root = await request.get("/sitemap.xml");
+  if (!root.ok()) {
+    throw new Error(`Cannot build smoke fixtures: /sitemap.xml returned ${root.status()}`);
   }
-  const xml = await res.text();
-  sitemapCache = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  const rootXml = await root.text();
+  const rootLocs = locsFrom(rootXml);
+
+  if (!rootXml.includes("<sitemapindex")) {
+    sitemapCache = rootLocs;
+    return sitemapCache;
+  }
+
+  const urls: string[] = [];
+  for (const child of rootLocs) {
+    const response = await request.get(child);
+    if (!response.ok()) {
+      throw new Error(`Cannot build smoke fixtures: ${child} returned ${response.status()}`);
+    }
+    urls.push(...locsFrom(await response.text()));
+  }
+  sitemapCache = [...new Set(urls)];
   return sitemapCache;
 }
 
-/** First sitemap path matching a section prefix, e.g. "/film/". */
+/** First sitemap path matching a catalog section prefix. */
 export async function firstPathFor(
   request: APIRequestContext,
-  prefix: "/film/" | "/biograf/" | "/by/",
+  prefix: "/film/" | "/biograf/",
 ): Promise<string> {
   const urls = await getSitemapUrls(request);
   const match = urls.map((u) => new URL(u).pathname).find((p) => p.startsWith(prefix));
   if (!match) {
-    throw new Error(
-      `No ${prefix} entry found in /sitemap.xml — the catalog is empty, so this smoke test cannot run.`,
-    );
+    throw new Error(`No ${prefix} entry found in child sitemaps — production catalog is empty.`);
   }
+  return match;
+}
+
+/** City pages are canonical at /<city>, not /by/<city>. */
+export async function firstCityPath(request: APIRequestContext): Promise<string> {
+  const urls = await getSitemapUrls(request);
+  const match = urls
+    .map((u) => new URL(u).pathname)
+    .find((path) => {
+      const parts = path.split("/").filter(Boolean);
+      return parts.length === 1 && parts[0] !== "film" && parts[0] !== "biograf";
+    });
+  if (!match) throw new Error("No canonical city URL found in child sitemaps.");
   return match;
 }
 

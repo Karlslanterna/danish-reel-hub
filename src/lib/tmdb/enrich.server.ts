@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getMovieDetails,
   imageUrl,
@@ -37,10 +38,12 @@ type MovieRow = {
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
-async function selectWork(db: any, limit: number): Promise<{ rows: MovieRow[]; remaining: number }> {
+async function selectWork(
+  db: SupabaseClient,
+  limit: number,
+): Promise<{ rows: MovieRow[]; remaining: number }> {
   const cols = "id, title, original_title, year, tmdb_status";
 
-  // 1) never attempted
   const { data: pending, error: pErr } = await db
     .from("movies")
     .select(cols)
@@ -51,7 +54,6 @@ async function selectWork(db: any, limit: number): Promise<{ rows: MovieRow[]; r
 
   const rows: MovieRow[] = [...((pending ?? []) as MovieRow[])];
 
-  // 2) stale refreshes
   if (rows.length < limit) {
     const { data: stale, error: sErr } = await db
       .from("movies")
@@ -111,12 +113,9 @@ function buildUpdate(details: TmdbMovieDetails) {
 }
 
 /**
- * Enrich up to `limit` films with TMDb metadata.
- *
- * Never throws for per-film problems: a film that cannot be matched with high
- * confidence is marked `skipped` with a reason and left on Kultunaut data.
- * If TMDb is unconfigured or unavailable the batch returns early and the
- * import continues unchanged.
+ * Enrich up to `limit` films with TMDb metadata. TMDb is explicitly outside
+ * the critical import transaction: per-film or service failures never roll
+ * back a successfully promoted source snapshot.
  */
 export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
   const empty: EnrichSummary = {
@@ -146,21 +145,14 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
   for (const movie of work.rows) {
     try {
       const year = movie.year && movie.year > 1880 ? movie.year : null;
-
-      // Non-film listings (Børnebiffen, playbacks, lectures…) never exist on
-      // TMDb — skip them without spending API calls.
       let outcome: MatchOutcome = isNonFilmEvent(movie.title)
         ? { matched: false, reason: "ikke en film (arrangement)" }
         : { matched: false, reason: "ingen TMDb-resultater" };
 
       if (!isNonFilmEvent(movie.title)) {
-        // Extra search passes: feed title, embedded original title, DB
-        // original_title, and known Danish aliases. Scoring stays unchanged.
         for (const query of searchQueries(movie.title, movie.original_title)) {
           let candidates = (await searchMovies(query, year ?? undefined)) as MatchCandidate[];
-          if (candidates.length === 0 && year) {
-            candidates = (await searchMovies(query)) as MatchCandidate[];
-          }
+          if (candidates.length === 0 && year) candidates = (await searchMovies(query)) as MatchCandidate[];
           const attempt = pickMatch(query, year, candidates);
           outcome = attempt;
           if (attempt.matched) break;
@@ -197,22 +189,16 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
       }
 
       const { error } = await supabaseAdmin.from("movies").update(buildUpdate(details)).eq("id", movie.id);
-      if (error) {
-        summary.errors.push(`TMDb gem "${movie.title}": ${error.message}`);
-      } else {
-        summary.matched++;
-      }
+      if (error) summary.errors.push(`TMDb gem "${movie.title}": ${error.message}`);
+      else summary.matched++;
       summary.processed++;
     } catch (err) {
       if (err instanceof TmdbUnavailableError) {
-        // Whole-service problem: stop this batch, leave the rest for next run.
         summary.errors.push(`TMDb utilgængelig: ${err.message}`);
         summary.disabled = true;
         break;
       }
-      summary.errors.push(
-        `TMDb "${movie.title}": ${err instanceof Error ? err.message : String(err)}`,
-      );
+      summary.errors.push(`TMDb "${movie.title}": ${err instanceof Error ? err.message : String(err)}`);
       summary.processed++;
     }
   }

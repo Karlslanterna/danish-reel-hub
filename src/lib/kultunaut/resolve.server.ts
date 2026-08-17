@@ -43,6 +43,8 @@ type ExistingMovie = {
   rating: string;
   synopsis: string;
   poster: Record<string, unknown> | null;
+  ebillet_movie_base_id: number | null;
+  ebillet_movie_ids: number[] | null;
 };
 
 const chunk = <T>(items: T[], size = 300): T[][] => {
@@ -71,7 +73,9 @@ async function existingMovies(ids: string[]): Promise<Map<string, ExistingMovie>
     if (idsChunk.length === 0) continue;
     const { data, error } = await supabaseAdmin
       .from("movies")
-      .select("id,slug,source,title,original_title,runtime,genre,year,director,rating,synopsis,poster")
+      .select(
+        "id,slug,source,title,original_title,runtime,genre,year,director,rating,synopsis,poster,ebillet_movie_base_id,ebillet_movie_ids",
+      )
       .in("id", idsChunk);
     if (error) throw new Error(`movie identity lookup: ${error.message}`);
     rows.push(...((data ?? []) as ExistingMovie[]));
@@ -114,11 +118,6 @@ export type CinemaResolution = {
   skippedEbilletOwned: number;
 };
 
-/**
- * Resolve Kultunaut theater ids before metadata writes. Existing source refs
- * always win, which prevents a future feed from silently creating a second
- * canonical row for an already-mapped theater.
- */
 export async function resolveKultunautCinemas(
   cinemas: Iterable<ParsedCinema>,
 ): Promise<CinemaResolution> {
@@ -197,7 +196,13 @@ export async function resolveKultunautCinemas(
 }
 
 function sourceMoviePatch(current: ExistingMovie, movie: ParsedMovie): Record<string, unknown> {
-  if (current.source === SOURCE || current.id.startsWith("kn-")) {
+  const sharedWithEbillet =
+    (current.ebillet_movie_base_id ?? 0) > 0 || (current.ebillet_movie_ids ?? []).length > 0;
+
+  // Kultunaut may fully refresh a Kultunaut-only movie. Once eBillet also
+  // identifies the same canonical movie, Kultunaut becomes fill-blanks-only so
+  // a sparse feed row cannot erase known year/runtime/title metadata.
+  if ((current.source === SOURCE || current.id.startsWith("kn-")) && !sharedWithEbillet) {
     return {
       title: movie.title,
       original_title: movie.original_title,
@@ -233,11 +238,6 @@ export type MovieResolution = {
   unresolvedExternalIds: string[];
 };
 
-/**
- * Resolve source movie ids conservatively. Before normal resolution, previously
- * mapped Kultunaut ids get one opportunity to self-heal if repeated exact
- * screening continuity proves they belong to a stronger canonical film.
- */
 export async function resolveKultunautMovies(
   movies: Iterable<ParsedMovie>,
 ): Promise<MovieResolution> {

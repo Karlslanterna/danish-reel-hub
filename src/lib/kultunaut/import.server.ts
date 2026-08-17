@@ -92,56 +92,118 @@ async function allValues(
   return out;
 }
 
+/** Cinemas owned by an active eBillet organizer — off-limits to Kultunaut. */
+export async function loadEbilletCinemaIds(db: any): Promise<Set<string>> {
+  const { data, error } = await db
+    .from("ebillet_organizers")
+    .select("cinema_id")
+    .eq("is_active", true)
+    .not("cinema_id", "is", null);
+  if (error) throw new Error(`ebillet coverage lookup: ${error.message}`);
+  const ids = new Set<string>();
+  for (const row of (data ?? []) as Array<{ cinema_id: string | null }>) {
+    if (row.cinema_id) ids.add(row.cinema_id);
+  }
+  return ids;
+}
+
 /**
- * Remove data that is no longer current:
- *  - showtimes whose date is in the past
- *  - movies with no remaining upcoming showtimes
- *  - cinemas with no remaining upcoming showtimes
+ * Source-scoped cleanup for the Kultunaut importer.
+ *
+ * It may ONLY touch rows with `source = 'kultunaut'` on cinemas that are not
+ * owned by an active eBillet organizer. It never deletes cinemas (a venue must
+ * not disappear because a feed briefly returned nothing) and never deletes
+ * eBillet data — that is exclusively the eBillet sync's job.
  */
-export async function cleanupStaleData(): Promise<CleanupSummary> {
+export async function cleanupKultunautData(
+  desired: ShowtimeKeyed[] = [],
+  opts: { reconcileRemovals?: boolean } = {},
+): Promise<CleanupSummary> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const errors: string[] = [];
   const today = new Date().toISOString().slice(0, 10);
+  const ebilletCinemaIds = await loadEbilletCinemaIds(supabaseAdmin);
 
   let showtimesDeleted = 0;
-  const { data: deletedShowtimes, error: stErr } = await supabaseAdmin
+
+  // 1. Past Kultunaut showtimes.
+  const { data: past, error: pastErr } = await supabaseAdmin
     .from("showtimes")
     .delete()
+    .eq("source", KULTUNAUT_SOURCE)
     .lt("date", today)
     .select("id");
-  if (stErr) errors.push(`cleanup showtimes: ${stErr.message}`);
-  else showtimesDeleted = (deletedShowtimes ?? []).length;
+  if (pastErr) errors.push(`cleanup past kultunaut showtimes: ${pastErr.message}`);
+  else showtimesDeleted += (past ?? []).length;
 
-  const deleteOrphans = async (
-    table: "movies" | "cinemas",
-    fk: "movie_id" | "cinema_id",
-  ): Promise<number> => {
+  // 2. Upcoming Kultunaut showtimes that disappeared from the feed, scoped to
+  //    Kultunaut-authoritative cinemas.
+  if (opts.reconcileRemovals) {
     try {
-      const referenced = new Set(await allValues(supabaseAdmin, "showtimes", fk));
-      const ids = await allValues(supabaseAdmin, table, "id");
-      const orphans = ids.filter((id) => !referenced.has(id));
-      let deleted = 0;
-      const CHUNK = 200;
-      for (let i = 0; i < orphans.length; i += CHUNK) {
-        const slice = orphans.slice(i, i + CHUNK);
-        const { error } = await supabaseAdmin.from(table).delete().in("id", slice);
-        if (error) errors.push(`cleanup ${table}: ${error.message}`);
-        else deleted += slice.length;
+      const existing: ExistingShowtimeRow[] = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabaseAdmin
+          .from("showtimes")
+          .select("id, movie_id, cinema_id, date, hall, source")
+          .eq("source", KULTUNAUT_SOURCE)
+          .gte("date", today)
+          .range(from, from + PAGE - 1);
+        if (error) throw new Error(error.message);
+        const rows = (data ?? []) as ExistingShowtimeRow[];
+        existing.push(...rows);
+        if (rows.length < PAGE) break;
       }
-      return deleted;
+      const staleIds = staleKultunautShowtimeIds(existing, desired, ebilletCinemaIds);
+      const CHUNK = 200;
+      for (let i = 0; i < staleIds.length; i += CHUNK) {
+        const slice = staleIds.slice(i, i + CHUNK);
+        const { error } = await supabaseAdmin
+          .from("showtimes")
+          .delete()
+          .eq("source", KULTUNAUT_SOURCE)
+          .in("id", slice);
+        if (error) errors.push(`cleanup stale kultunaut showtimes: ${error.message}`);
+        else showtimesDeleted += slice.length;
+      }
     } catch (err) {
       errors.push(
-        `cleanup ${table}: ${err instanceof Error ? err.message : String(err)}`,
+        `cleanup stale kultunaut showtimes: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return 0;
     }
-  };
+  }
 
-  const moviesDeleted = await deleteOrphans("movies", "movie_id");
-  const cinemasDeleted = await deleteOrphans("cinemas", "cinema_id");
+  // 3. Kultunaut movies with no remaining showtimes at all. Cinemas are never
+  //    deleted here.
+  let moviesDeleted = 0;
+  try {
+    const referenced = new Set(await allValues(supabaseAdmin, "showtimes", "movie_id"));
+    const { data: knMovies, error: mErr } = await supabaseAdmin
+      .from("movies")
+      .select("id")
+      .eq("source", KULTUNAUT_SOURCE);
+    if (mErr) throw new Error(mErr.message);
+    const orphans = ((knMovies ?? []) as Array<{ id: string }>)
+      .map((m) => m.id)
+      .filter((id) => !referenced.has(id));
+    const CHUNK = 200;
+    for (let i = 0; i < orphans.length; i += CHUNK) {
+      const slice = orphans.slice(i, i + CHUNK);
+      const { error } = await supabaseAdmin
+        .from("movies")
+        .delete()
+        .eq("source", KULTUNAUT_SOURCE)
+        .in("id", slice);
+      if (error) errors.push(`cleanup movies: ${error.message}`);
+      else moviesDeleted += slice.length;
+    }
+  } catch (err) {
+    errors.push(`cleanup movies: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
-  return { showtimesDeleted, moviesDeleted, cinemasDeleted, errors };
+  return { showtimesDeleted, moviesDeleted, cinemasDeleted: 0, errors };
 }
+
 
 
 

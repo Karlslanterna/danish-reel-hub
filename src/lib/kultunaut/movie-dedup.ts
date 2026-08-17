@@ -5,7 +5,7 @@ export type MovieIdentity = {
 };
 
 const stripYearSuffix = (title: string): string =>
-  title.replace(/\s*[\(\[]\s*(?:19|20)\d{2}\s*[\)\]]\s*$/u, "").trim();
+  title.replace(/\s*(?:\(|\[)\s*(?:19|20)\d{2}\s*(?:\)|\])\s*$/u, "").trim();
 
 export const normalizeMovieTitle = (value: string): string =>
   stripYearSuffix(value)

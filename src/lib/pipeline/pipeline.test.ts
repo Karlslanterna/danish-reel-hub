@@ -63,6 +63,11 @@ describe("eBillet normalization", () => {
     expect(movieRefOf({ id: 950, baseId: 0 })).toBe("movie-950");
   });
 
+  it("scopes screening identity by organizer and showtime id", () => {
+    expect(screeningRefOf(177, 1)).toBe("eb-177-1");
+    expect(screeningRefOf(999, 1)).toBe("eb-999-1");
+  });
+
   it("collapses versions into one group per film", () => {
     const groups = buildMovieGroups(payload());
     expect(groups.map((g) => g.ref).sort()).toEqual(["base-500", "movie-950"]);
@@ -76,9 +81,9 @@ describe("eBillet normalization", () => {
     const rows = normalizeEbilletScreenings(177, payload());
     expect(rows).toHaveLength(3);
     expect(rows.every((r) => r.sourceCinemaRef === "177")).toBe(true);
-    expect(rows.map((r) => r.sourceRef)).toContain(screeningRefOf(1));
+    expect(rows.map((r) => r.sourceRef)).toContain(screeningRefOf(177, 1));
     // organizer 999's screening is excluded
-    expect(rows.map((r) => r.sourceRef)).not.toContain(screeningRefOf(4));
+    expect(rows.map((r) => r.sourceRef)).not.toContain(screeningRefOf(999, 4));
   });
 
   it("is idempotent: the same payload yields identical identities", () => {
@@ -94,7 +99,7 @@ describe("eBillet normalization", () => {
   });
 
   it("keeps price and seat metadata per screening", () => {
-    const row = normalizeEbilletScreenings(177, payload()).find((r) => r.sourceRef === "eb-1")!;
+    const row = normalizeEbilletScreenings(177, payload()).find((r) => r.sourceRef === "eb-177-1")!;
     expect(row.priceMin).toBe(95);
     expect(row.priceMax).toBe(120);
     expect(row.freeSeats).toBe(40);
@@ -161,7 +166,7 @@ describe("Kultunaut normalization", () => {
 
 describe("promotion shaping", () => {
   const base: NormalizedScreening = {
-    sourceRef: "eb-1",
+    sourceRef: "eb-177-1",
     sourceCinemaRef: "177",
     sourceMovieRef: "base-500",
     startsAt: "2026-02-01T18:00:00.000Z",
@@ -178,7 +183,7 @@ describe("promotion shaping", () => {
   };
 
   it("groups rows by cinema scope so promotion stays scoped", () => {
-    const grouped = groupByCinemaRef([base, { ...base, sourceRef: "eb-2", sourceCinemaRef: "195" }]);
+    const grouped = groupByCinemaRef([base, { ...base, sourceRef: "eb-195-2", sourceCinemaRef: "195" }]);
     expect([...grouped.keys()]).toEqual(["177", "195"]);
     expect(grouped.get("177")).toHaveLength(1);
   });
@@ -191,7 +196,7 @@ describe("promotion shaping", () => {
 
   it("maps a normalized screening onto the RPC row shape", () => {
     const row = toPromotionRow(base, "eb-base-500");
-    expect(row).toMatchObject({ source_ref: "eb-1", movie_id: "eb-base-500", hall: "Sal 1" });
+    expect(row).toMatchObject({ source_ref: "eb-177-1", movie_id: "eb-base-500", hall: "Sal 1" });
     expect(row).not.toHaveProperty("localDate");
   });
 });

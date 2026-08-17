@@ -127,14 +127,16 @@ export async function checkpoint(
   stats?: Record<string, unknown>,
   leaseSeconds = DEFAULT_LEASE_SECONDS,
 ): Promise<void> {
-  const patch: Record<string, unknown> = {
-    cursor: JSON.parse(JSON.stringify(cursor)),
-    last_heartbeat: new Date().toISOString(),
-    lease_until: new Date(Date.now() + leaseSeconds * 1000).toISOString(),
-    state: "running",
-  };
-  if (stats) patch.stats = JSON.parse(JSON.stringify(stats));
-  const { error } = await supabaseAdmin.from("import_runs").update(patch).eq("id", runId);
+  const { error } = await supabaseAdmin
+    .from("import_runs")
+    .update({
+      cursor: JSON.parse(JSON.stringify(cursor)),
+      last_heartbeat: new Date().toISOString(),
+      lease_until: new Date(Date.now() + leaseSeconds * 1000).toISOString(),
+      state: "running",
+      ...(stats ? { stats: JSON.parse(JSON.stringify(stats)) } : {}),
+    })
+    .eq("id", runId);
   if (error) throw new Error(`run: checkpoint failed — ${error.message}`);
 }
 

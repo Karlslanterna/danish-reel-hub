@@ -7,10 +7,13 @@ import { createFileRoute } from "@tanstack/react-router";
  * `import_runs` lease model; discovery is registry maintenance only and lives
  * in a separate service that cannot mutate canonical cinema/movie/screening data.
  *
- * Transitional authentication accepts both the new generic/eBillet headers and
- * the old Kultunaut-named headers so the existing scheduler does not break.
+ * Transitional authentication accepts both the generic/eBillet headers and
+ * the old Kultunaut-named headers so existing scheduler secrets stay valid.
  *
- *   header x-ebillet-mode: discover | sync   (default: sync)
+ *   x-ebillet-mode: discover | sync | resume
+ *   - sync: may start a fresh finite organizer cycle and drain it
+ *   - resume: may only drain an already queued/running cycle
+ *   - discover: registry discovery only
  */
 export const Route = createFileRoute("/api/public/ebillet-sync")({
   server: {
@@ -30,7 +33,8 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
         const ok = viaEnv || (await verifySchedulerToken(token));
         if (!ok) return new Response("Unauthorized", { status: 401 });
 
-        const mode = request.headers.get("x-ebillet-mode") === "discover" ? "discover" : "sync";
+        const rawMode = request.headers.get("x-ebillet-mode");
+        const mode = rawMode === "discover" || rawMode === "resume" ? rawMode : "sync";
 
         try {
           if (mode === "discover") {
@@ -46,7 +50,9 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
           }
 
           const { runEbilletQueueBatch } = await import("@/lib/ebillet/runner.server");
-          const result = await runEbilletQueueBatch(55_000);
+          const result = await runEbilletQueueBatch(55_000, {
+            allowStart: mode === "sync",
+          });
           return Response.json(result, {
             status: result.status === "dead_letter" ? 500 : 200,
             headers: { "cache-control": "no-store" },
@@ -54,8 +60,6 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
           console.error("[ebillet] scheduler run crashed:", message);
-          // The authenticated scheduler only needs a stable failure signal;
-          // detailed stack/data stays in server logs rather than the response.
           return Response.json({ status: "failed", reason: "eBillet sync failed" }, { status: 500 });
         }
       },

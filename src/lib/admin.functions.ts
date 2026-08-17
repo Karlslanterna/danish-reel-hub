@@ -50,7 +50,7 @@ export const adminCreateImportJob = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { createImportJob } = await import("@/lib/kultunaut/import.server");
+    const { createImportJob } = await import("@/lib/kultunaut/pipeline.server");
     return createImportJob(data.xml);
   });
 
@@ -60,7 +60,7 @@ export const adminProcessImportJob = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { processJobBatch } = await import("@/lib/kultunaut/import.server");
+    const { processJobBatch } = await import("@/lib/kultunaut/pipeline.server");
     return processJobBatch(data.jobId);
   });
 
@@ -70,7 +70,7 @@ export const adminGetImportJobStatus = createServerFn({ method: "GET" })
   .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { getJobStatus } = await import("@/lib/kultunaut/import.server");
+    const { getJobStatus } = await import("@/lib/kultunaut/pipeline.server");
     const job = await getJobStatus(data.jobId);
     if (!job) throw new Error("Job not found");
     return job;
@@ -120,6 +120,6 @@ export const adminRetryImportJob = createServerFn({ method: "POST" })
       .eq("id", data.jobId)
       .maybeSingle();
     if (error || !job?.xml) throw new Error("Kunne ikke genstarte importen");
-    const { createImportJob } = await import("@/lib/kultunaut/import.server");
+    const { createImportJob } = await import("@/lib/kultunaut/pipeline.server");
     return createImportJob(job.xml as string);
   });

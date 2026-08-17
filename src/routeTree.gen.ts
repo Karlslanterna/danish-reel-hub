@@ -40,6 +40,7 @@ import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authen
 import { Route as ApiPublicEbilletSyncRouteImport } from './routes/api/public/ebillet-sync'
 import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
+import { Route as ApiPublicTmdbEnrichRouteImport } from './routes/api/public/tmdb-enrich'
 import { Route as AuthenticatedAdminImportJobIdRouteImport } from './routes/_authenticated/admin.import_.$jobId'
 import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
 import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
@@ -207,6 +208,11 @@ const ApiPublicKultunautImportRoute =
     path: '/api/public/kultunaut-import',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicTmdbEnrichRoute = ApiPublicTmdbEnrichRouteImport.update({
+  id: '/api/public/tmdb-enrich',
+  path: '/api/public/tmdb-enrich',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminImportJobIdRoute =
   AuthenticatedAdminImportJobIdRouteImport.update({
     id: '/admin/import_/$jobId',
@@ -256,6 +262,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/api/public/tmdb-enrich': typeof ApiPublicTmdbEnrichRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
@@ -290,6 +297,7 @@ export interface FileRoutesByTo {
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/api/public/tmdb-enrich': typeof ApiPublicTmdbEnrichRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
+  '/api/public/tmdb-enrich': typeof ApiPublicTmdbEnrichRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/import_/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
@@ -364,6 +373,7 @@ export interface FileRouteTypes {
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
+    | '/api/public/tmdb-enrich'
     | '/admin/'
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
@@ -398,6 +408,7 @@ export interface FileRouteTypes {
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
+    | '/api/public/tmdb-enrich'
     | '/admin'
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
@@ -434,6 +445,7 @@ export interface FileRouteTypes {
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
+    | '/api/public/tmdb-enrich'
     | '/_authenticated/admin/'
     | '/_authenticated/admin/import_/$jobId'
     | '/api/public/kultunaut-import/process'
@@ -464,6 +476,7 @@ export interface RootRouteChildren {
   ApiPublicEbilletSyncRoute: typeof ApiPublicEbilletSyncRoute
   ApiPublicImportHealthRoute: typeof ApiPublicImportHealthRoute
   ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
+  ApiPublicTmdbEnrichRoute: typeof ApiPublicTmdbEnrichRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -685,6 +698,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicKultunautImportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/tmdb-enrich': {
+      id: '/api/public/tmdb-enrich'
+      path: '/api/public/tmdb-enrich'
+      fullPath: '/api/public/tmdb-enrich'
+      preLoaderRoute: typeof ApiPublicTmdbEnrichRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/import_/$jobId': {
       id: '/_authenticated/admin/import_/$jobId'
       path: '/admin/import/$jobId'
@@ -785,6 +805,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicEbilletSyncRoute: ApiPublicEbilletSyncRoute,
   ApiPublicImportHealthRoute: ApiPublicImportHealthRoute,
   ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,
+  ApiPublicTmdbEnrichRoute: ApiPublicTmdbEnrichRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

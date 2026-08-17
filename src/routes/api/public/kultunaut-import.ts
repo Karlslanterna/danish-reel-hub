@@ -68,7 +68,7 @@ export const Route = createFileRoute("/api/public/kultunaut-import")({
 
 
         try {
-          const { createImportJob } = await import("@/lib/kultunaut/import.server");
+          const { createImportJob } = await import("@/lib/kultunaut/pipeline.server");
           const { jobId } = await createImportJob(body);
           return Response.json({ jobId, status: "queued" }, { status: 202 });
         } catch (err) {

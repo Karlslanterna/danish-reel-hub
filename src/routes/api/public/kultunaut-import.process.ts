@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/public/kultunaut-import/process")({
         if (!jobId) return new Response("Missing jobId", { status: 400 });
 
         try {
-          const { processJobBatch } = await import("@/lib/kultunaut/import.server");
+          const { processJobBatch } = await import("@/lib/kultunaut/pipeline.server");
           const result = await processJobBatch(jobId);
           return Response.json(result);
         } catch (err) {

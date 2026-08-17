@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/kultunaut-import/status")({
         if (!jobId) return new Response("Missing jobId", { status: 400 });
 
         try {
-          const { getJobStatus } = await import("@/lib/kultunaut/import.server");
+          const { getJobStatus } = await import("@/lib/kultunaut/pipeline.server");
           const job = await getJobStatus(jobId);
           if (!job) return new Response("Not found", { status: 404 });
           return Response.json(job);

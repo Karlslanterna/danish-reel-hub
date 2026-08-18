@@ -18,6 +18,7 @@ import { addCalendarDays, windowStart, windowEnd, windowBounds } from "@/lib/dat
 import { canonicalCinemaId } from "@/lib/cinema-catalog";
 import type { TimePeriod } from "@/lib/time-filter";
 import {
+  SPECIAL_EVENT_TAGS,
   isSpecialEventTag,
   publicSpecialEventOptions,
   specialEventDefinition,
@@ -694,8 +695,11 @@ export function FilterBar({
   const sortedFormats = useMemo(() => sortTagOptions("formats", formats ?? []), [formats]);
   const sortedLanguages = useMemo(() => sortTagOptions("languages", languages ?? []), [languages]);
   const sortedEvents = useMemo(
-    () => publicSpecialEventOptions([...(events ?? []), ...(fixedEvent ? [fixedEvent] : [])]),
-    [events, fixedEvent],
+    () =>
+      eventRouteEnabled
+        ? [...SPECIAL_EVENT_TAGS]
+        : publicSpecialEventOptions([...(events ?? []), ...(fixedEvent ? [fixedEvent] : [])]),
+    [events, fixedEvent, eventRouteEnabled],
   );
 
   const sortedCities = useMemo(

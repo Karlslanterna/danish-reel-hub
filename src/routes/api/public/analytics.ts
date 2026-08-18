@@ -8,7 +8,9 @@ const textField = (value: unknown, max: number) =>
 
 type AnalyticsDb = {
   from: (table: "analytics_events") => {
-    insert: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>;
+    insert: (row: Record<string, unknown>) => PromiseLike<{
+      error: { message: string; code?: string } | null;
+    }>;
   };
 };
 
@@ -57,6 +59,10 @@ export const Route = createFileRoute("/api/public/analytics")({
               filter_value: textField(body.filterValue, 160),
               is_active: typeof body.isActive === "boolean" ? body.isActive : null,
             });
+          // Lovable's direct deploy publishes code without applying Supabase
+          // migrations. Keep measurement non-blocking until the checked-in
+          // migration has been applied through the database connection.
+          if (error?.code === "42P01") return new Response(null, { status: 204, headers });
           if (error) throw error;
           return new Response(null, { status: 204, headers });
         } catch (error) {

@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -40,6 +41,8 @@ export type HomeCatalogData = {
   showtimeIndex: CompactShowtimeIndex;
 };
 
+export const HOME_CATALOG_QUERY_KEY = ["public-home-catalog"] as const;
+
 export async function loadHomeCatalog(): Promise<HomeCatalogData> {
   const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
     fetchMovies(),
@@ -50,8 +53,15 @@ export async function loadHomeCatalog(): Promise<HomeCatalogData> {
   return { movies, cinemas, showtimeIndex: compactShowtimeIndex(showtimeIndex) };
 }
 
+export function loadCachedHomeCatalog(queryClient: QueryClient): Promise<HomeCatalogData> {
+  return queryClient.ensureQueryData({
+    queryKey: HOME_CATALOG_QUERY_KEY,
+    queryFn: loadHomeCatalog,
+  });
+}
+
 export const Route = createFileRoute("/")({
-  loader: loadHomeCatalog,
+  loader: ({ context }) => loadCachedHomeCatalog(context.queryClient),
   head: () => {
     const title = "Lanterna — Find film og spilletider i Danmark";
     const description =
@@ -106,7 +116,14 @@ export function HomePage({
   catalog: HomeCatalogData;
   childrenOnly?: boolean;
 }) {
+  const queryClient = useQueryClient();
   const { movies, cinemas, showtimeIndex: compactIndex } = catalog;
+
+  // Both `/` and `/for-boern` render from the same public catalog. Seeding the
+  // shared query cache avoids downloading and rebuilding it on every toggle.
+  useEffect(() => {
+    queryClient.setQueryData(HOME_CATALOG_QUERY_KEY, catalog);
+  }, [catalog, queryClient]);
   const showtimeIndex = useMemo(() => expandShowtimeIndex(compactIndex), [compactIndex]);
   const screeningsByMovie = useMemo(() => {
     const map = new Map<string, typeof showtimeIndex>();

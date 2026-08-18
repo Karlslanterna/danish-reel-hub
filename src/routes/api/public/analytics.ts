@@ -62,7 +62,9 @@ export const Route = createFileRoute("/api/public/analytics")({
           // Lovable's direct deploy publishes code without applying Supabase
           // migrations. Keep measurement non-blocking until the checked-in
           // migration has been applied through the database connection.
-          if (error?.code === "42P01") return new Response(null, { status: 204, headers });
+          if (error?.code === "42P01" || error?.code === "PGRST205") {
+            return new Response(null, { status: 204, headers });
+          }
           if (error) throw error;
           return new Response(null, { status: 204, headers });
         } catch (error) {

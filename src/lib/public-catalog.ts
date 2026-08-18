@@ -53,6 +53,36 @@ export type ConsolidatedCatalog = {
   movieIdMap: Map<string, string>;
 };
 
+const annotateRemakeYears = (movies: ConsolidatedMovie[]): ConsolidatedMovie[] => {
+  const byIdentity = new Map<string, ConsolidatedMovie[]>();
+  for (const movie of movies) {
+    const identity = publicMovieIdentityTitle(movie.title);
+    const group = byIdentity.get(identity) ?? [];
+    group.push(movie);
+    byIdentity.set(identity, group);
+  }
+
+  const needsYear = new Set<string>();
+  for (const [identity, group] of byIdentity) {
+    const years = new Set(
+      group.map((movie) => knownYear(movie.year)).filter((year): year is number => year !== null),
+    );
+    if (years.size > 1) needsYear.add(identity);
+  }
+
+  return movies.map((movie) => {
+    const year = knownYear(movie.year);
+    if (
+      !year ||
+      !needsYear.has(publicMovieIdentityTitle(movie.title)) ||
+      /\s*[([]\s*(?:19|20)\d{2}\s*[)\]]\s*$/u.test(movie.title)
+    ) {
+      return movie;
+    }
+    return { ...movie, title: `${movie.title} (${year})` };
+  });
+};
+
 /**
  * Collapse only near-certain duplicate film records: a shared TMDb id, or the
  * same normalized title with non-conflicting release years. Widely separated
@@ -213,7 +243,7 @@ export function consolidatePublicMovies(movies: Movie[]): ConsolidatedCatalog {
       return movie;
     });
 
-  return { movies: consolidated, movieIdMap };
+  return { movies: annotateRemakeYears(consolidated), movieIdMap };
 }
 
 const movieMapFrom = (movies: Array<Movie & { sourceIds?: string[] }>): Map<string, string> => {

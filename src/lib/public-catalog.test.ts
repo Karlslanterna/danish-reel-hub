@@ -59,6 +59,25 @@ describe("public catalog consolidation", () => {
       movie({ id: "new", slug: "gummi-tarzan-2022", title: "Gummi Tarzan", year: 2022 }),
     ]);
     expect(result.movies).toHaveLength(2);
+    expect(result.movies.map((item) => item.title)).toEqual([
+      "Gummi Tarzan (1981)",
+      "Gummi Tarzan (2022)",
+    ]);
+  });
+
+  it("adds a release year when active remakes would otherwise render as duplicate cards", () => {
+    const result = consolidatePublicMovies([
+      movie({ id: "animated", slug: "vaiana", title: "Vaiana", year: 2016, tmdbId: 277834 }),
+      movie({
+        id: "live-action",
+        slug: "vaiana-2026",
+        title: "Vaiana (2026)",
+        year: 2026,
+        tmdbId: 1108427,
+      }),
+    ]);
+
+    expect(result.movies.map((item) => item.title)).toEqual(["Vaiana (2016)", "Vaiana (2026)"]);
   });
 
   it("does not let an unknown-year row bridge two distant remakes", () => {

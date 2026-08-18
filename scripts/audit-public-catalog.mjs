@@ -119,6 +119,39 @@ function printRows(title, rows, fields, limit = 80) {
   if (rows.length > limit) console.log(`... ${rows.length - limit} more`);
 }
 
+function decodeHtml(value) {
+  return value
+    .replace(/<[^>]+>/g, "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&quot;", '"')
+    .trim();
+}
+
+function renderedTitleIdentity(value) {
+  return normalizePresentationTitle(value)
+    .replace(/\b(?:19|20)\d{2}\b$/u, "")
+    .replace(/\band\b/gu, " og ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function renderedTitleYear(value) {
+  const year = Number(value.match(/\s*[([]\s*((?:19|20)\d{2})\s*[)\]]\s*$/u)?.[1] ?? 0);
+  return year > 1880 ? year : null;
+}
+
+function hasCompatibleRenderedPair(group) {
+  for (let left = 0; left < group.length; left += 1) {
+    for (let right = left + 1; right < group.length; right += 1) {
+      const a = renderedTitleYear(group[left].title);
+      const b = renderedTitleYear(group[right].title);
+      if (a === null || b === null || Math.abs(a - b) <= 1) return true;
+    }
+  }
+  return false;
+}
+
 const start = copenhagenDate();
 const end = addDays(start, WINDOW_DAYS);
 const { url, key } = await loadPublicConfig();
@@ -330,3 +363,45 @@ const summary = {
 };
 console.log("\nAUDIT SUMMARY");
 console.log(JSON.stringify(summary, null, 2));
+
+// The database audit above measures source records. This rendered audit is the
+// regression guard the old report lacked: source labels can differ yet become
+// duplicate cards only after the public title transformations run.
+const publicBaseUrl = process.env.AUDIT_BASE_URL ?? "https://lanterna.dk";
+const homeResponse = await fetch(publicBaseUrl, { signal: AbortSignal.timeout(45_000) });
+if (!homeResponse.ok) {
+  throw new Error(`Rendered catalog fetch failed (${homeResponse.status})`);
+}
+const homeHtml = await homeResponse.text();
+const cards = [];
+for (const match of homeHtml.matchAll(/<a href="\/film\/([^"]+)"[^>]*>(.*?)<\/a>/gs)) {
+  const body = match[2];
+  const titleMatch = body.match(/<h3[^>]*>(.*?)<\/h3>/s);
+  if (!titleMatch) continue;
+  cards.push({
+    slug: match[1],
+    title: decodeHtml(titleMatch[1]),
+    hasPoster: /<img\s/iu.test(body),
+  });
+}
+const renderedDuplicates = [...groupBy(cards, (card) => renderedTitleIdentity(card.title))]
+  .filter(([, group]) => group.length > 1 && hasCompatibleRenderedPair(group))
+  .map(([identity, group]) => ({ identity, cards: group }));
+
+console.log("\nRENDERED PUBLIC CATALOG");
+console.log(
+  JSON.stringify(
+    {
+      cards: cards.length,
+      cardsWithoutPoster: cards.filter((card) => !card.hasPoster).length,
+      duplicateGroups: renderedDuplicates.length,
+      duplicates: renderedDuplicates,
+    },
+    null,
+    2,
+  ),
+);
+
+if (renderedDuplicates.length > 0) {
+  throw new Error(`Rendered public catalog contains ${renderedDuplicates.length} duplicate groups`);
+}

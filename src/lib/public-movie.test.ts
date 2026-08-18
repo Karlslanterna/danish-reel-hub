@@ -3,6 +3,7 @@ import {
   isPublicMovieTitle,
   normalizePublicGenres,
   publicMovieDisplayTitle,
+  publicMovieIdentityTitle,
   resolvePublicMovieYear,
   suppressCollidingSourcePosters,
 } from "./public-movie";
@@ -22,6 +23,10 @@ describe("public movie catalog rules", () => {
       "Foredrag og debat: Mens vi ser den anden vej...",
       "Koncert: Uklare Meldinger",
       "OFF: Hovedkonkurrence",
+      "OFF 2026 (Blok 1) - Events JUN-SEP",
+      "Hadsten Bio Filmklub - 0. 2.klasse Hold 1",
+      "Doktrin: Afgangspremiere årgang 1 Visning 1",
+      "Harry Potter 25års Jubilæum - De fire første film",
     ]) {
       expect(isPublicMovieTitle(title), title).toBe(false);
     }
@@ -68,10 +73,31 @@ describe("public movie catalog rules", () => {
       "Aphaca - Brug for hinanden",
     );
     expect(publicMovieDisplayTitle("Don't Look Back in Anger")).toBe("Don't Look Back in Anger");
+    expect(publicMovieDisplayTitle("Biler - Dansk Tale")).toBe("Biler");
+    expect(publicMovieDisplayTitle("Vaiana - Med dansk tale")).toBe("Vaiana");
+    expect(publicMovieDisplayTitle("Veronikas to liv - Cin. Præs.")).toBe("Veronikas to liv");
+    expect(publicMovieDisplayTitle("A Dessert for Constance - Sarah Maldoror")).toBe(
+      "A Dessert for Constance",
+    );
+  });
+
+  it("uses release-year and connector variants only for identity, not display", () => {
+    expect(publicMovieDisplayTitle("The Odyssey (2026)")).toBe("The Odyssey (2026)");
+    expect(publicMovieIdentityTitle("The Odyssey (2026)")).toBe("the odyssey");
+    expect(publicMovieIdentityTitle("Vishwanath & Sons")).toBe(
+      publicMovieIdentityTitle("Vishwanath and Sons"),
+    );
   });
 
   it("does not present an eBillet booking-programme year as the film's release year", () => {
     expect(resolvePublicMovieYear({ id: "eb-movie-38603", year: 2026 })).toBe(0);
+    expect(
+      resolvePublicMovieYear({
+        id: "eb-movie-16329",
+        title: "Dobbeltspil (2018)",
+        year: 2026,
+      }),
+    ).toBe(2018);
     expect(
       resolvePublicMovieYear({
         id: "eb-movie-38603",

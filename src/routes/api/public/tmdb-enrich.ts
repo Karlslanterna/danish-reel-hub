@@ -22,9 +22,10 @@ export const Route = createFileRoute("/api/public/tmdb-enrich")({
           Math.max(Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 1),
           100,
         );
+        const retrySkipped = url.searchParams.get("retry_skipped") === "1";
         try {
           const { enrichBatch } = await import("@/lib/tmdb/enrich.server");
-          const summary = await enrichBatch(limit);
+          const summary = await enrichBatch(limit, { retrySkipped });
           return Response.json({ ok: true, ...summary });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";

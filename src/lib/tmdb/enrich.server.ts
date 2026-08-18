@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { windowEnd } from "@/lib/date-window";
 import {
   getMovieDetails,
   imageUrl,
@@ -11,6 +12,7 @@ import {
   isNonFilmEvent,
   pickMatch,
   searchQueries,
+  sourceYearForMatch,
   type MatchCandidate,
   type MatchOutcome,
 } from "./match";
@@ -41,21 +43,59 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString
 async function selectWork(
   db: SupabaseClient,
   limit: number,
+  retrySkipped: boolean,
 ): Promise<{ rows: MovieRow[]; remaining: number }> {
   const cols = "id, title, original_title, year, tmdb_status";
+  const rows: MovieRow[] = [];
+  const seen = new Set<string>();
+  const append = (items: MovieRow[] | null) => {
+    for (const item of items ?? []) {
+      if (rows.length >= limit || seen.has(item.id)) continue;
+      seen.add(item.id);
+      rows.push(item);
+    }
+  };
 
-  const { data: pending, error: pErr } = await db
-    .from("movies")
+  // The public 30-day catalog comes first. Otherwise a large historical
+  // backlog can leave currently visible title cards unenriched indefinitely.
+  const { data: activePending, error: activePendingError } = await db
+    .from("movies_ranked")
     .select(cols)
     .eq("tmdb_status", "pending")
-    .order("id")
+    .gt("screening_count", 0)
+    .lte("next_screening_date", windowEnd())
+    .order("screening_count", { ascending: false })
     .limit(limit);
-  if (pErr) throw new Error(pErr.message);
+  if (activePendingError) throw new Error(activePendingError.message);
+  append((activePending ?? []) as MovieRow[]);
 
-  const rows: MovieRow[] = [...((pending ?? []) as MovieRow[])];
+  if (retrySkipped && rows.length < limit) {
+    const { data: activeSkipped, error: activeSkippedError } = await db
+      .from("movies_ranked")
+      .select(cols)
+      .eq("tmdb_status", "skipped")
+      .is("tmdb_id", null)
+      .gt("screening_count", 0)
+      .lte("next_screening_date", windowEnd())
+      .order("screening_count", { ascending: false })
+      .limit(limit - rows.length);
+    if (activeSkippedError) throw new Error(activeSkippedError.message);
+    append((activeSkipped ?? []) as MovieRow[]);
+  }
 
   if (rows.length < limit) {
-    const { data: stale, error: sErr } = await db
+    const { data: pending, error: pendingError } = await db
+      .from("movies")
+      .select(cols)
+      .eq("tmdb_status", "pending")
+      .order("id")
+      .limit(limit - rows.length);
+    if (pendingError) throw new Error(pendingError.message);
+    append((pending ?? []) as MovieRow[]);
+  }
+
+  if (rows.length < limit) {
+    const { data: stale, error: staleError } = await db
       .from("movies")
       .select(cols)
       .neq("tmdb_status", "pending")
@@ -65,8 +105,8 @@ async function selectWork(
       )
       .order("tmdb_fetched_at", { ascending: true })
       .limit(limit - rows.length);
-    if (sErr) throw new Error(sErr.message);
-    rows.push(...((stale ?? []) as MovieRow[]));
+    if (staleError) throw new Error(staleError.message);
+    append((stale ?? []) as MovieRow[]);
   }
 
   const { count } = await db
@@ -74,7 +114,8 @@ async function selectWork(
     .select("id", { count: "exact", head: true })
     .eq("tmdb_status", "pending");
 
-  return { rows, remaining: Math.max(0, (count ?? 0) - rows.length) };
+  const selectedPending = rows.filter((row) => row.tmdb_status === "pending").length;
+  return { rows, remaining: Math.max(0, (count ?? 0) - selectedPending) };
 }
 
 function trailerUrl(details: TmdbMovieDetails): string | null {
@@ -125,7 +166,10 @@ function buildUpdate(details: TmdbMovieDetails) {
  * the critical import transaction: per-film or service failures never roll
  * back a successfully promoted source snapshot.
  */
-export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
+export async function enrichBatch(
+  limit = 20,
+  options: { retrySkipped?: boolean } = {},
+): Promise<EnrichSummary> {
   const empty: EnrichSummary = {
     processed: 0,
     matched: 0,
@@ -147,7 +191,7 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
 
   let work: { rows: MovieRow[]; remaining: number };
   try {
-    work = await selectWork(supabaseAdmin, limit);
+    work = await selectWork(supabaseAdmin, limit, options.retrySkipped ?? false);
   } catch (err) {
     return {
       ...empty,
@@ -159,12 +203,13 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
 
   for (const movie of work.rows) {
     try {
-      const year = movie.year && movie.year > 1880 ? movie.year : null;
-      let outcome: MatchOutcome = isNonFilmEvent(movie.title)
+      const year = sourceYearForMatch(movie);
+      const cleanTitle = searchQueries(movie.title, movie.original_title)[0] ?? movie.title;
+      let outcome: MatchOutcome = isNonFilmEvent(cleanTitle)
         ? { matched: false, reason: "ikke en film (arrangement)" }
         : { matched: false, reason: "ingen TMDb-resultater" };
 
-      if (!isNonFilmEvent(movie.title)) {
+      if (!isNonFilmEvent(cleanTitle)) {
         for (const query of searchQueries(movie.title, movie.original_title)) {
           let candidates = (await searchMovies(query, year ?? undefined)) as MatchCandidate[];
           if (candidates.length === 0 && year)

@@ -1,14 +1,9 @@
 import type { Movie, Showtime, ShowtimeIndexRow } from "@/lib/cinema-data";
+import { publicMovieIdentityTitle } from "@/lib/public-movie";
 import { sortShowtimes } from "@/lib/showtime-sort";
 
-const identityTitle = (title: string): string =>
-  title
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("da")
-    .replace(/[^a-z0-9æøå]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+const compactIdentityTitle = (title: string): string =>
+  publicMovieIdentityTitle(title).replace(/\s+/g, "");
 
 const knownYear = (year: number): number | null =>
   Number.isFinite(year) && year >= 1888 && year <= 2100 ? year : null;
@@ -24,6 +19,29 @@ const metadataScore = (movie: Movie): number =>
   (movie.director.trim() ? 15 : 0) +
   (movie.trailerUrl ? 10 : 0) +
   ((movie.cast?.length ?? 0) > 0 ? 10 : 0);
+
+const synopsisIdentity = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("da")
+    .replace(/[^a-z0-9æøå]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Strong enough to assign an unknown-year source row to one of several remakes. */
+const hasMatchingSynopsis = (left: Movie, right: Movie): boolean => {
+  const a = synopsisIdentity(left.synopsis);
+  const b = synopsisIdentity(right.synopsis);
+  if (Math.min(a.length, b.length) < 48) return false;
+  if (a.includes(b) || b.includes(a)) return true;
+  const aTokens = new Set(a.split(" ").filter((token) => token.length > 2));
+  const bTokens = new Set(b.split(" ").filter((token) => token.length > 2));
+  if (Math.min(aTokens.size, bTokens.size) < 8) return false;
+  let shared = 0;
+  for (const token of aTokens) if (bTokens.has(token)) shared += 1;
+  return shared / Math.min(aTokens.size, bTokens.size) >= 0.78;
+};
 
 export type ConsolidatedMovie = Movie & {
   sourceIds: string[];
@@ -58,20 +76,27 @@ export function consolidatePublicMovies(movies: Movie[]): ConsolidatedCatalog {
 
   const byTmdb = new Map<number, number>();
   const byTitle = new Map<string, number[]>();
+  const byCompactTitle = new Map<string, number[]>();
+  const byOriginalTitle = new Map<string, number[]>();
+  const addToBucket = (bucket: Map<string, number[]>, key: string, index: number) => {
+    if (!key) return;
+    const matching = bucket.get(key) ?? [];
+    matching.push(index);
+    bucket.set(key, matching);
+  };
   movies.forEach((movie, index) => {
     if (movie.tmdbId) {
       const previous = byTmdb.get(movie.tmdbId);
       if (previous !== undefined) join(previous, index);
       else byTmdb.set(movie.tmdbId, index);
     }
-    const title = identityTitle(movie.title);
-    if (!title) return;
-    const matching = byTitle.get(title) ?? [];
-    matching.push(index);
-    byTitle.set(title, matching);
+    addToBucket(byTitle, publicMovieIdentityTitle(movie.title), index);
+    addToBucket(byCompactTitle, compactIdentityTitle(movie.title), index);
+    addToBucket(byOriginalTitle, publicMovieIdentityTitle(movie.originalTitle ?? ""), index);
   });
 
-  for (const indexes of byTitle.values()) {
+  const joinCompatibleYears = (indexes: number[]) => {
+    if (indexes.length < 2) return;
     const known = indexes
       .map((index) => ({ index, year: knownYear(movies[index]!.year) }))
       .filter((item): item is { index: number; year: number } => item.year !== null)
@@ -87,13 +112,29 @@ export function consolidatePublicMovies(movies: Movie[]): ConsolidatedCatalog {
       for (const item of cluster.slice(1)) join(cluster[0]!.index, item.index);
     }
 
-    // A missing year is safe only when the title points at one release. If the
-    // active catalog contains multiple remakes, the unknown row must not bridge
-    // them into one film.
-    if (unknown.length > 0) {
+    if (yearClusters.length === 0) {
       for (const index of unknown.slice(1)) join(unknown[0]!, index);
-      if (yearClusters.length === 1) join(unknown[0]!, yearClusters[0]![0]!.index);
+      return;
     }
+
+    if (yearClusters.length === 1) {
+      for (const index of unknown) join(index, yearClusters[0]![0]!.index);
+      return;
+    }
+
+    // Multiple active remakes make an unknown year ambiguous. Attach it only
+    // when its real synopsis uniquely identifies one release; otherwise retain
+    // a separate card instead of silently joining the wrong film.
+    for (const index of unknown) {
+      const matchingClusters = yearClusters.filter((cluster) =>
+        cluster.some((item) => hasMatchingSynopsis(movies[index]!, movies[item.index]!)),
+      );
+      if (matchingClusters.length === 1) join(index, matchingClusters[0]![0]!.index);
+    }
+  };
+
+  for (const bucket of [byTitle, byOriginalTitle, byCompactTitle]) {
+    for (const indexes of bucket.values()) joinCompatibleYears(indexes);
   }
 
   const groups = new Map<number, number[]>();

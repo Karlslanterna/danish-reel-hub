@@ -179,6 +179,7 @@ const mapMovie = (r: MovieRow): Movie => {
     : nonEmpty(sourcePoster.url);
   const publicYear = resolvePublicMovieYear({
     id: r.id,
+    title: r.title,
     source: r.source,
     year: r.year,
     releaseDate: r.release_date,

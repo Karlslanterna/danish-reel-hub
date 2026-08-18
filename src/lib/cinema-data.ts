@@ -10,9 +10,9 @@ import { windowStart, windowEnd } from "@/lib/date-window";
 import {
   isPublicMovieTitle,
   normalizePublicGenres,
+  preparePublicMoviePosters,
   publicMovieDisplayTitle,
   resolvePublicMovieYear,
-  suppressCollidingSourcePosters,
 } from "@/lib/public-movie";
 import {
   groupScreeningIndexForUi,
@@ -31,6 +31,7 @@ export type Poster = {
   d?: string;
   url?: string;
   alt?: string;
+  fit?: "cover" | "contain";
 };
 
 export type CastMember = { name: string; character?: string | null; profile_path?: string | null };
@@ -57,7 +58,7 @@ export type Movie = {
   nextScreeningDate?: string | null;
   /** Used only to reject ambiguous source artwork at the public read boundary. */
   tmdbId?: number | null;
-  posterSource?: "tmdb" | "source" | null;
+  posterSource?: "tmdb" | "source" | "programme" | null;
   /** All source rows represented by this public film card. */
   sourceIds?: string[];
   sourceSlugs?: string[];
@@ -258,7 +259,7 @@ export async function fetchMovies(
   }
   const { data, error } = await query;
   if (error) throw error;
-  const visible = suppressCollidingSourcePosters(
+  const visible = preparePublicMoviePosters(
     (data ?? [])
       .map((row) => row as MovieRow)
       .filter((row) => isPublicMovieTitle(row.title))
@@ -281,8 +282,7 @@ export async function fetchMovieBySlug(slug: string): Promise<Movie | null> {
   const { data, error } = await supabase.from("movies").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
   if (!data || !isPublicMovieTitle(data.title)) return null;
-  const movie = mapMovie(data as MovieRow);
-  return movie;
+  return preparePublicMoviePosters([mapMovie(data as MovieRow)])[0] ?? null;
 }
 
 export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
@@ -349,7 +349,7 @@ export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
     seen.add(row.movie_id);
     out.push(movie);
   }
-  const visible = suppressCollidingSourcePosters(out);
+  const visible = preparePublicMoviePosters(out);
   return consolidatePublicMovies(visible).movies.sort((a, b) =>
     a.title.localeCompare(b.title, "da"),
   );
@@ -506,7 +506,7 @@ export async function fetchMoviesAndShowtimesForCinemas(
       movies.push(mapMovie(row.movies));
     }
   }
-  const visibleMovies = suppressCollidingSourcePosters(movies);
+  const visibleMovies = preparePublicMoviePosters(movies);
   const consolidated = consolidatePublicMovies(visibleMovies).movies;
   return {
     movies: consolidated,

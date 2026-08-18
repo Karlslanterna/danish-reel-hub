@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  BORNEBIFFEN_POSTER_URL,
   isPublicMovieTitle,
   normalizePublicGenres,
+  preparePublicMoviePosters,
   publicMovieDisplayTitle,
   publicMovieIdentityTitle,
   resolvePublicMovieYear,
@@ -12,9 +14,6 @@ describe("public movie catalog rules", () => {
   it("hides obvious event shells and operational placeholders", () => {
     for (const title of [
       "Særvisning",
-      "Børnebiffen - Fra 3 år",
-      "Børnebiffen september 2026 - 5-7 år",
-      "SommerBørneBiffen 3-4 år",
       "SeniorBio - Ældresagen",
       "Bestil bord og mad",
       "Ferielukket/Lukket i dag - Biografkompagniet",
@@ -29,6 +28,16 @@ describe("public movie catalog rules", () => {
       "Harry Potter 25års Jubilæum - De fire første film",
     ]) {
       expect(isPublicMovieTitle(title), title).toBe(false);
+    }
+  });
+
+  it("keeps bookable Børnebiffen film packages public", () => {
+    for (const title of [
+      "Børnebiffen - Fra 3 år",
+      "Børnebiffen august 2026 - 5-7 år (Havet)",
+      "SommerBørneBiffen 3-4 år",
+    ]) {
+      expect(isPublicMovieTitle(title), title).toBe(true);
     }
   });
 
@@ -150,5 +159,28 @@ describe("public movie catalog rules", () => {
 
     expect(tmdbMovies.every((movie) => movie.poster.url === shared)).toBe(true);
     expect(sourceMovies.every((movie) => movie.poster.url === "same.jpg")).toBe(true);
+  });
+
+  it("uses the local Børnebiffen poster after rejecting shared source artwork", () => {
+    const movies = preparePublicMoviePosters([
+      {
+        title: "The Witch - Late Night",
+        posterSource: "source" as const,
+        poster: { url: "https://poster.ebillet.dk/shared.hd.jpg" },
+      },
+      {
+        title: "Børnebiffen august 2026 - 3-5 år (Havet)",
+        posterSource: "source" as const,
+        poster: { url: "https://poster.ebillet.dk/shared.hd.jpg" },
+      },
+    ]);
+
+    expect(movies[0]?.poster.url).toBeUndefined();
+    expect(movies[1]?.poster).toMatchObject({
+      url: BORNEBIFFEN_POSTER_URL,
+      alt: "Cinemateket – Det Danske Filminstitut",
+      fit: "contain",
+    });
+    expect(movies[1]?.posterSource).toBe("programme");
   });
 });

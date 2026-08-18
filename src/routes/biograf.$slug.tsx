@@ -6,7 +6,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, fmtDateLabel } from "@/lib/filters";
-import { collectTagOptions, showtimeMatchesTags } from "@/lib/showtime-tags";
+import { collectTagOptions } from "@/lib/showtime-tags";
+import { cinemaProgramShowtimesByMovie, groupCinemaShowtimesByDate } from "@/lib/cinema-program";
 import {
   fetchCinemaBySlug,
   fetchMoviesAndShowtimesForCinemas,
@@ -20,7 +21,6 @@ import { baseCityOf, citySlug } from "@/lib/city-slug";
 import { cinemaSchemas } from "@/lib/jsonld";
 import { SiteFooter } from "@/components/SiteFooter";
 import { cinemaTitle, cinemaDescription } from "@/lib/seo";
-import { windowStart } from "@/lib/date-window";
 
 export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
@@ -97,7 +97,6 @@ function CinemaPage() {
   };
   const { selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent } =
     useFilters();
-  const activeDate = selectedDate ?? windowStart();
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
   const tagSel = useMemo(
@@ -110,14 +109,10 @@ function CinemaPage() {
     [movies, selectedGenre],
   );
 
-  const showtimesByMovie = new Map<string, Showtime[]>();
-  for (const s of showtimes) {
-    if (s.date !== activeDate) continue;
-    if (!showtimeMatchesTags(s, tagSel)) continue;
-    const arr = showtimesByMovie.get(s.movieId) ?? [];
-    arr.push(s);
-    showtimesByMovie.set(s.movieId, arr);
-  }
+  const showtimesByMovie = useMemo(
+    () => cinemaProgramShowtimesByMovie(showtimes, { date: selectedDate, ...tagSel }),
+    [showtimes, selectedDate, tagSel],
+  );
 
   const rows = rankMoviesByScreenings(filteredMovies, [...showtimesByMovie.values()].flat()).map(
     (m) => ({ movie: m, shows: showtimesByMovie.get(m.id) ?? [] }),
@@ -208,20 +203,23 @@ function CinemaPage() {
             events={tagOptions.events}
           />
           <div className="ml-auto text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            {withShows.length} film · {fmtDateLabel(activeDate)}
+            {withShows.length} film
+            {selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : " på programmet"}
           </div>
         </div>
 
         {withShows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border py-16 text-center">
             <p className="font-display text-xl text-foreground">
-              Ingen forestillinger {fmtDateLabel(activeDate).toLowerCase()}
+              {selectedDate
+                ? `Ingen forestillinger ${fmtDateLabel(selectedDate).toLowerCase()}`
+                : "Ingen film på programmet"}
             </p>
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8">
             {withShows.map(({ movie, shows }) => (
-              <MovieRow key={movie.id} movie={movie} shows={shows} />
+              <MovieRow key={movie.id} movie={movie} shows={shows} showDateLabels={!selectedDate} />
             ))}
           </div>
         )}
@@ -271,13 +269,16 @@ function ActionLink({
 function MovieRow({
   movie,
   shows,
+  showDateLabels,
   dim = false,
 }: {
   movie: Movie;
   shows: Showtime[];
+  showDateLabels: boolean;
   dim?: boolean;
 }) {
   const facts = [formatRuntime(movie.runtime), movie.genre.join(", ")].filter(Boolean);
+  const dateGroups = groupCinemaShowtimesByDate(shows);
   return (
     <div
       className={`rounded-xl border border-border/60 bg-card/30 p-4 sm:p-6 ${dim ? "opacity-60" : ""}`}
@@ -306,35 +307,48 @@ function MovieRow({
             </div>
           )}
 
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
             {shows.length === 0 ? (
               <div className="text-xs text-muted-foreground">Ingen forestillinger denne dag</div>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {shows.flatMap((s, i) =>
-                  s.times.map((t, idx) => {
-                    const url = s.ticketUrls?.[idx] || s.bookingUrl;
-                    return url ? (
-                      <a
-                        key={`${i}-${t}-${idx}`}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
-                      >
-                        {t}
-                      </a>
-                    ) : (
-                      <span
-                        key={`${i}-${t}-${idx}`}
-                        className="rounded-md border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
-                      >
-                        {t}
-                      </span>
-                    );
-                  }),
-                )}
-              </div>
+              dateGroups.map(({ date, showtimes: dateShowtimes }) => (
+                <div
+                  key={date}
+                  className={showDateLabels ? "grid gap-2 sm:grid-cols-[5rem_1fr]" : undefined}
+                >
+                  {showDateLabels && (
+                    <div className="pt-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                      {fmtDateLabel(date)}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {dateShowtimes.flatMap((showtime, showtimeIndex) =>
+                      showtime.times.map((time, timeIndex) => {
+                        const url = showtime.ticketUrls?.[timeIndex] || showtime.bookingUrl;
+                        const key = `${date}-${showtime.hall}-${showtimeIndex}-${time}-${timeIndex}`;
+                        return url ? (
+                          <a
+                            key={key}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
+                          >
+                            {time}
+                          </a>
+                        ) : (
+                          <span
+                            key={key}
+                            className="rounded-md border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
+                          >
+                            {time}
+                          </span>
+                        );
+                      }),
+                    )}
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>

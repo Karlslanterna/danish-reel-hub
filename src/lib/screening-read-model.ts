@@ -20,7 +20,7 @@ export type ScreeningReadRow = {
 
 export type ScreeningIndexReadRow = Pick<
   ScreeningReadRow,
-  "movie_id" | "cinema_id" | "local_date" | "formats" | "languages" | "events"
+  "movie_id" | "cinema_id" | "local_date" | "local_time" | "formats" | "languages" | "events"
 >;
 
 export type UiShowtime = {
@@ -40,6 +40,7 @@ export type UiShowtimeIndexRow = {
   movieId: string;
   cinemaId: string;
   date: string;
+  times: string[];
   formats: string[];
   languages: string[];
   events: string[];
@@ -152,19 +153,23 @@ export function groupScreeningIndexForUi(rows: ScreeningIndexReadRow[]): UiShowt
       movieId: row.movie_id,
       cinemaId: row.cinema_id,
       date: row.local_date,
+      times: [],
       formats: [],
       languages: [],
       events: [],
     };
+    addUnique(group.times, [row.local_time.slice(0, 5)]);
     addUnique(group.formats, row.formats);
     addUnique(group.languages, row.languages);
     addUnique(group.events, row.events);
     groups.set(key, group);
   }
-  return [...groups.values()].sort(
-    (a, b) =>
-      a.date.localeCompare(b.date) ||
-      a.movieId.localeCompare(b.movieId) ||
-      a.cinemaId.localeCompare(b.cinemaId),
-  );
+  return [...groups.values()]
+    .map((group) => ({ ...group, times: group.times.sort((a, b) => a.localeCompare(b)) }))
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        a.movieId.localeCompare(b.movieId) ||
+        a.cinemaId.localeCompare(b.cinemaId),
+    );
 }

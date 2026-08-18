@@ -116,6 +116,7 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
 
   const core: SitemapEntry[] = [
     { loc: `${baseUrl}/`, lastmod: siteMod, changefreq: "daily", priority: "1.0" },
+    { loc: `${baseUrl}/for-boern`, lastmod: siteMod, changefreq: "daily", priority: "0.9" },
     { loc: `${baseUrl}/film`, lastmod: siteMod, changefreq: "daily", priority: "0.8" },
     { loc: `${baseUrl}/biograf`, lastmod: siteMod, changefreq: "daily", priority: "0.8" },
     ...[...cityMod.entries()]

@@ -38,6 +38,38 @@ export function homeSchemas() {
   ];
 }
 
+export function childrenMoviesSchemas(movies: Movie[]) {
+  const url = canonicalUrl("/for-boern");
+  return [
+    ld({
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "Børnefilm i biografen",
+      description: "Aktuelle børnefilm og spilletider i biografer i hele Danmark.",
+      url,
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: movies.length,
+        itemListElement: movies.slice(0, 100).map((movie, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          item: {
+            "@type": "Movie",
+            name: movie.title,
+            url: canonicalUrl(`/film/${movie.slug}`),
+            image: movie.poster.url || undefined,
+            contentRating: movie.rating || undefined,
+          },
+        })),
+      },
+    }),
+    breadcrumbSchema([
+      { name: "Forside", url: canonicalUrl("/") },
+      { name: "For børn", url },
+    ]),
+  ];
+}
+
 function breadcrumbSchema(items: { name: string; url: string }[]) {
   return ld({
     "@context": "https://schema.org",

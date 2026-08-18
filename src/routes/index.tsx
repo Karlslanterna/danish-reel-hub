@@ -25,6 +25,8 @@ import { canonicalUrl } from "@/lib/canonical";
 import { slugifyCity } from "@/lib/city-slug";
 import { homeSchemas } from "@/lib/jsonld";
 import { useLanguage } from "@/lib/i18n";
+import { isMovieForChildren } from "@/lib/children-filter";
+import { showtimeMatchesTimePeriod } from "@/lib/time-filter";
 import {
   compactShowtimeIndex,
   expandShowtimeIndex,
@@ -32,16 +34,24 @@ import {
   type CompactShowtimeIndex,
 } from "@/lib/public-catalog";
 
+export type HomeCatalogData = {
+  movies: Movie[];
+  cinemas: Cinema[];
+  showtimeIndex: CompactShowtimeIndex;
+};
+
+export async function loadHomeCatalog(): Promise<HomeCatalogData> {
+  const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
+    fetchMovies(),
+    fetchCinemas(),
+    fetchShowtimeIndex(),
+  ]);
+  const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, movies);
+  return { movies, cinemas, showtimeIndex: compactShowtimeIndex(showtimeIndex) };
+}
+
 export const Route = createFileRoute("/")({
-  loader: async () => {
-    const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
-      fetchMovies(),
-      fetchCinemas(),
-      fetchShowtimeIndex(),
-    ]);
-    const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, movies);
-    return { movies, cinemas, showtimeIndex: compactShowtimeIndex(showtimeIndex) };
-  },
+  loader: loadHomeCatalog,
   head: () => {
     const title = "Lanterna — Find film og spilletider i Danmark";
     const description =
@@ -71,7 +81,7 @@ export const Route = createFileRoute("/")({
     </div>
   ),
   notFoundComponent: () => <div className="p-12">Siden findes ikke</div>,
-  component: HomePage,
+  component: IndexPage,
 });
 
 type Suggestion =
@@ -85,17 +95,35 @@ const baseCityOf = (s: string) =>
     .replace(/\s+[A-ZÆØÅ]{1,3}$/u, "")
     .trim();
 
-function HomePage() {
-  const {
-    movies,
-    cinemas,
-    showtimeIndex: compactIndex,
-  } = Route.useLoaderData() as {
-    movies: Movie[];
-    cinemas: Cinema[];
-    showtimeIndex: CompactShowtimeIndex;
-  };
+function IndexPage() {
+  return <HomePage catalog={Route.useLoaderData()} />;
+}
+
+export function HomePage({
+  catalog,
+  childrenOnly = false,
+}: {
+  catalog: HomeCatalogData;
+  childrenOnly?: boolean;
+}) {
+  const { movies, cinemas, showtimeIndex: compactIndex } = catalog;
   const showtimeIndex = useMemo(() => expandShowtimeIndex(compactIndex), [compactIndex]);
+  const screeningsByMovie = useMemo(() => {
+    const map = new Map<string, typeof showtimeIndex>();
+    for (const screening of showtimeIndex) {
+      const rows = map.get(screening.movieId) ?? [];
+      rows.push(screening);
+      map.set(screening.movieId, rows);
+    }
+    return map;
+  }, [showtimeIndex]);
+  const catalogMovies = useMemo(
+    () =>
+      childrenOnly
+        ? movies.filter((movie) => isMovieForChildren(movie, screeningsByMovie.get(movie.id) ?? []))
+        : movies,
+    [childrenOnly, movies, screeningsByMovie],
+  );
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -103,6 +131,7 @@ function HomePage() {
     radius,
     userLoc,
     selectedDate,
+    selectedTime,
     selectedGenre,
     selectedFormat,
     selectedLanguage,
@@ -124,7 +153,7 @@ function HomePage() {
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
-  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
+  const allGenres = useMemo(() => catalogMovies.flatMap((m) => m.genre), [catalogMovies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimeIndex), [showtimeIndex]);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -236,7 +265,7 @@ function HomePage() {
         seenCities.add(c.city.toLowerCase());
       }
     }
-    for (const m of movies) {
+    for (const m of catalogMovies) {
       if (m.title.toLowerCase().includes(q) || m.director.toLowerCase().includes(q)) {
         out.push({ kind: "movie", label: m.title, sub: m.director, slug: m.slug });
       }
@@ -247,7 +276,7 @@ function HomePage() {
       }
     }
     return out.slice(0, 8);
-  }, [query, movies, cinemas, cities, baseCities, t]);
+  }, [query, catalogMovies, cinemas, cities, baseCities, t]);
 
   // Screenings that survive the active cinema/date/tag filters — they drive the ranking.
   const matchingScreenings = useMemo(() => {
@@ -255,22 +284,23 @@ function HomePage() {
     return showtimeIndex.filter((s) => {
       if (activeCinemaIds && !activeCinemaIds.has(s.cinemaId)) return false;
       if (selectedDate && s.date !== selectedDate) return false;
+      if (selectedTime && !showtimeMatchesTimePeriod(s.times, selectedTime)) return false;
       if (tagged && !showtimeMatchesTags(s, tagSel)) return false;
       return true;
     });
-  }, [showtimeIndex, activeCinemaIds, selectedDate, tagSel]);
+  }, [showtimeIndex, activeCinemaIds, selectedDate, selectedTime, tagSel]);
 
   // Every active screening constraint must match the same screening. Intersecting
   // separate movie-id sets would otherwise show a film whose requested format or
   // date only exists at a different cinema.
   const matchingMovieIds = useMemo(() => {
-    if (!activeCinemaIds && !selectedDate && !hasTagSelection(tagSel)) return null;
+    if (!activeCinemaIds && !selectedDate && !selectedTime && !hasTagSelection(tagSel)) return null;
     return new Set(matchingScreenings.map((screening) => screening.movieId));
-  }, [activeCinemaIds, selectedDate, tagSel, matchingScreenings]);
+  }, [activeCinemaIds, selectedDate, selectedTime, tagSel, matchingScreenings]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const visible = movies.filter((m) => {
+    const visible = catalogMovies.filter((m) => {
       if (matchingMovieIds && !matchingMovieIds.has(m.id)) return false;
       if (selectedGenre && !m.genre.includes(selectedGenre)) return false;
       return (
@@ -283,7 +313,7 @@ function HomePage() {
     // Unfiltered view keeps the database ranking from `movies_ranked`.
     const noScreeningFilter = matchingMovieIds === null;
     return noScreeningFilter ? visible : rankMoviesByScreenings(visible, matchingScreenings);
-  }, [query, movies, matchingMovieIds, selectedGenre, matchingScreenings]);
+  }, [query, catalogMovies, matchingMovieIds, selectedGenre, matchingScreenings]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 
@@ -456,15 +486,15 @@ function HomePage() {
           <div className="flex items-end justify-between gap-6">
             <div className="max-w-2xl">
               <h1 className="font-hero text-3xl leading-[0.95] tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-                {t("home.hero")}
+                {childrenOnly ? t("home.childrenHero") : t("home.hero")}
               </h1>
               <p className="font-hero mt-2 max-w-md text-sm leading-relaxed text-muted-foreground sm:mt-4">
-                {t("home.sub")}
+                {childrenOnly ? t("home.childrenSub") : t("home.sub")}
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
               <div>
-                {movies.length} {t("home.movies")}
+                {catalogMovies.length} {t("home.movies")}
               </div>
               <div className="mt-1">
                 {cinemas.length} {t("home.cinemas")}
@@ -474,11 +504,14 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1400px] px-6 py-6 sm:px-8 sm:py-10">
+      <section className="mx-auto max-w-[1400px] px-4 py-5 sm:px-8 sm:py-10">
         <GeoNotice className="mb-4" />
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <FilterBar
+              showChildrenFilter
+              childrenOnly={childrenOnly}
+              showTimeFilter
               genres={allGenres}
               formats={tagOptions.formats}
               languages={tagOptions.languages}

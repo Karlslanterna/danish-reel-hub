@@ -314,7 +314,15 @@ export function remapShowtimeIndexToMovies(
     const movieId = movieMap.get(row.movieId);
     if (!movieId) continue;
     const key = `${movieId}|${row.cinemaId}|${row.date}`;
-    const group = groups.get(key) ?? { ...row, movieId, formats: [], languages: [], events: [] };
+    const group = groups.get(key) ?? {
+      ...row,
+      movieId,
+      times: [],
+      formats: [],
+      languages: [],
+      events: [],
+    };
+    addUnique(group.times, row.times);
     addUnique(group.formats, row.formats);
     addUnique(group.languages, row.languages);
     addUnique(group.events, row.events);
@@ -332,10 +340,11 @@ export type CompactShowtimeIndex = {
   movieIds: string[];
   cinemaIds: string[];
   dates: string[];
+  times: string[];
   formats: string[];
   languages: string[];
   events: string[];
-  rows: Array<[number, number, number, number[], number[], number[]]>;
+  rows: Array<[number, number, number, number[], number[], number[], number[]]>;
 };
 
 const dictionary = (values: string[]): { values: string[]; index: Map<string, number> } => {
@@ -348,6 +357,7 @@ export function compactShowtimeIndex(rows: ShowtimeIndexRow[]): CompactShowtimeI
   const movieIds = dictionary(rows.map((row) => row.movieId));
   const cinemaIds = dictionary(rows.map((row) => row.cinemaId));
   const dates = dictionary(rows.map((row) => row.date));
+  const times = dictionary(rows.flatMap((row) => row.times));
   const formats = dictionary(rows.flatMap((row) => row.formats));
   const languages = dictionary(rows.flatMap((row) => row.languages));
   const events = dictionary(rows.flatMap((row) => row.events));
@@ -355,6 +365,7 @@ export function compactShowtimeIndex(rows: ShowtimeIndexRow[]): CompactShowtimeI
     movieIds: movieIds.values,
     cinemaIds: cinemaIds.values,
     dates: dates.values,
+    times: times.values,
     formats: formats.values,
     languages: languages.values,
     events: events.values,
@@ -362,6 +373,7 @@ export function compactShowtimeIndex(rows: ShowtimeIndexRow[]): CompactShowtimeI
       movieIds.index.get(row.movieId)!,
       cinemaIds.index.get(row.cinemaId)!,
       dates.index.get(row.date)!,
+      row.times.map((value) => times.index.get(value)!),
       row.formats.map((value) => formats.index.get(value)!),
       row.languages.map((value) => languages.index.get(value)!),
       row.events.map((value) => events.index.get(value)!),
@@ -370,10 +382,11 @@ export function compactShowtimeIndex(rows: ShowtimeIndexRow[]): CompactShowtimeI
 }
 
 export function expandShowtimeIndex(compact: CompactShowtimeIndex): ShowtimeIndexRow[] {
-  return compact.rows.map(([movie, cinema, date, formats, languages, events]) => ({
+  return compact.rows.map(([movie, cinema, date, times, formats, languages, events]) => ({
     movieId: compact.movieIds[movie]!,
     cinemaId: compact.cinemaIds[cinema]!,
     date: compact.dates[date]!,
+    times: times.map((index) => compact.times[index]!),
     formats: formats.map((index) => compact.formats[index]!),
     languages: languages.map((index) => compact.languages[index]!),
     events: events.map((index) => compact.events[index]!),

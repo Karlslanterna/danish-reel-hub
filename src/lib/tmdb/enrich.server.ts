@@ -43,7 +43,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString
 async function selectWork(
   db: SupabaseClient,
   limit: number,
-  retrySkipped: boolean,
+  retrySkippedBefore: string | null,
 ): Promise<{ rows: MovieRow[]; remaining: number }> {
   const cols = "id, title, original_title, year, tmdb_status";
   const rows: MovieRow[] = [];
@@ -69,12 +69,13 @@ async function selectWork(
   if (activePendingError) throw new Error(activePendingError.message);
   append((activePending ?? []) as MovieRow[]);
 
-  if (retrySkipped && rows.length < limit) {
+  if (retrySkippedBefore && rows.length < limit) {
     const { data: activeSkipped, error: activeSkippedError } = await db
       .from("movies_ranked")
       .select(cols)
       .eq("tmdb_status", "skipped")
       .is("tmdb_id", null)
+      .lt("tmdb_fetched_at", retrySkippedBefore)
       .gt("screening_count", 0)
       .lte("next_screening_date", windowEnd())
       .order("screening_count", { ascending: false })
@@ -168,7 +169,7 @@ function buildUpdate(details: TmdbMovieDetails) {
  */
 export async function enrichBatch(
   limit = 20,
-  options: { retrySkipped?: boolean } = {},
+  options: { retrySkippedBefore?: string | null } = {},
 ): Promise<EnrichSummary> {
   const empty: EnrichSummary = {
     processed: 0,
@@ -191,7 +192,7 @@ export async function enrichBatch(
 
   let work: { rows: MovieRow[]; remaining: number };
   try {
-    work = await selectWork(supabaseAdmin, limit, options.retrySkipped ?? false);
+    work = await selectWork(supabaseAdmin, limit, options.retrySkippedBefore ?? null);
   } catch (err) {
     return {
       ...empty,

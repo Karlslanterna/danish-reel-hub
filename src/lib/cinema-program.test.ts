@@ -82,4 +82,20 @@ describe("cinema programme date groups", () => {
       "21:30",
     ]);
   });
+
+  it("shows one useful button when duplicate sources advertise the same physical time", () => {
+    const result = groupCinemaShowtimesByDate([
+      showtime({ hall: "Kultunaut", times: ["16:00"], ticketUrls: [""] }),
+      showtime({
+        hall: "Sal 1",
+        times: ["16:00"],
+        bookingUrl: "https://tickets.example/16",
+        ticketUrls: ["https://tickets.example/16"],
+      }),
+    ]);
+
+    expect(result[0]?.slots).toEqual([
+      { time: "16:00", url: "https://tickets.example/16", hall: "Sal 1" },
+    ]);
+  });
 });

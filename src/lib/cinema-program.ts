@@ -44,17 +44,32 @@ export function groupCinemaShowtimesByDate(showtimes: Showtime[]): Array<{
 
   return [...byDate.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, dateShowtimes]) => ({
-      date,
-      showtimes: dateShowtimes,
-      slots: dateShowtimes
-        .flatMap((showtime) =>
-          showtime.times.map((time, index) => ({
+    .map(([date, dateShowtimes]) => {
+      // The same physical screening can arrive from both Kultunaut and
+      // eBillet after duplicate cinema/movie records are consolidated. Since
+      // the UI does not expose halls, identical time buttons are ambiguous and
+      // provide no value. Keep one button and prefer the source with a working
+      // ticket URL. This also keeps genuinely simultaneous auditorium listings
+      // usable instead of rendering indistinguishable duplicate controls.
+      const slotsByTime = new Map<string, { time: string; url: string | null; hall: string }>();
+      for (const showtime of dateShowtimes) {
+        showtime.times.forEach((time, index) => {
+          const incoming = {
             time,
             url: showtime.ticketUrls?.[index] || showtime.bookingUrl || null,
             hall: showtime.hall,
-          })),
-        )
-        .sort((a, b) => timeKey(a.time) - timeKey(b.time) || a.hall.localeCompare(b.hall, "da")),
-    }));
+          };
+          const current = slotsByTime.get(time);
+          if (!current || (!current.url && incoming.url)) slotsByTime.set(time, incoming);
+        });
+      }
+
+      return {
+        date,
+        showtimes: dateShowtimes,
+        slots: [...slotsByTime.values()].sort(
+          (a, b) => timeKey(a.time) - timeKey(b.time) || a.hall.localeCompare(b.hall, "da"),
+        ),
+      };
+    });
 }

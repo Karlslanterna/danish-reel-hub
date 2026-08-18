@@ -54,6 +54,29 @@ describe("TMDb matching", () => {
     ).toMatchObject({ matched: false });
   });
 
+  it("accepts a dominant exact candidate without a year but keeps close remakes ambiguous", () => {
+    const canonical = {
+      id: 10,
+      title: "The Witch",
+      original_title: "The Witch",
+      release_date: "2015-01-27",
+      vote_count: 7_000,
+      popularity: 20,
+    };
+    expect(
+      pickMatch("The Witch", null, [
+        canonical,
+        { ...canonical, id: 11, release_date: "1966-01-01", vote_count: 100 },
+      ]),
+    ).toMatchObject({ matched: true, id: 10 });
+    expect(
+      pickMatch("The Witch", null, [
+        canonical,
+        { ...canonical, id: 11, release_date: "2026-01-01", vote_count: 2_000 },
+      ]),
+    ).toMatchObject({ matched: false });
+  });
+
   it("does not use eBillet's programme year unless the title states it", () => {
     expect(sourceYearForMatch({ id: "eb-movie-1", title: "Spirillen", year: 2026 })).toBeNull();
     expect(
@@ -67,5 +90,7 @@ describe("TMDb matching", () => {
     expect(searchQueries("A Dessert for Constance - Sarah Maldoror")[0]).toBe(
       "A Dessert for Constance",
     );
+    expect(searchQueries("Den lille havfrue - Havet")).toContain("The Little Mermaid");
+    expect(searchQueries("1776 - Viva la Revolución")).not.toContain("Viva la Revolución");
   });
 });

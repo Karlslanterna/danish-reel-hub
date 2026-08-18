@@ -118,6 +118,19 @@ export function pickMatch(
     return { matched: true, id: best.c.id, confidence: 0.93 };
   }
 
+  // A yearless programme title can still be unambiguous when one exact-title
+  // film is overwhelmingly better established than every same-title remake.
+  // Keep the bar deliberately high so a new or obscure release is never
+  // guessed from popularity alone.
+  if (
+    !feedYear &&
+    runnerUp &&
+    best.c.vote_count >= 100 &&
+    best.c.vote_count >= Math.max(100, runnerUp.c.vote_count * 5)
+  ) {
+    return { matched: true, id: best.c.id, confidence: 0.92 };
+  }
+
   if (best.s < ACCEPT) {
     return { matched: false, reason: `lav sikkerhed (${best.s.toFixed(2)})` };
   }
@@ -184,6 +197,9 @@ const DANISH_ALIASES: Record<string, string[]> = {
   "den lille havfrue": ["The Little Mermaid"],
   "paw patrol dino filmen": ["PAW Patrol: The Dino Movie", "PAW Patrol"],
   "skolen med magiske dyr filmen": ["The School of Magical Animals"],
+  "der var engang i amerika": ["Once Upon a Time in America"],
+  "farven lilla": ["The Color Purple"],
+  "pandoras aeske": ["Pandora's Box"],
 };
 
 /**
@@ -200,20 +216,30 @@ export function searchQueries(title: string, originalTitle?: string | null): str
   };
 
   const base = stripYearSuffix(title);
-  push(publicMovieDisplayTitle(base));
+  const displayTitle = publicMovieDisplayTitle(base);
+  push(displayTitle);
   push(base);
 
   // "Pigen Holly (Breakfast at Tiffany's)" -> "Breakfast at Tiffany's"
   const paren = base.match(/\(([^)]{2,})\)\s*$/u);
   if (paren && !/^(?:19|20)\d{2}$/.test(paren[1].trim())) push(paren[1]);
 
-  // "Hadet - La Haine" -> both halves
+  // Split a bilingual title only when the two halves are a known alias pair.
+  // Arbitrary dash splitting is unsafe: programme labels such as
+  // "Viva la Revolución" can otherwise make unrelated films share a match.
   const dash = base.split(/\s+[-–—]\s+/u);
-  if (dash.length === 2) dash.forEach(push);
+  if (dash.length === 2) {
+    const aliases = DANISH_ALIASES[normalizeTitle(dash[0])] ?? [];
+    if (aliases.some((alias) => normalizeTitle(alias) === normalizeTitle(dash[1]))) {
+      dash.forEach(push);
+    }
+  }
 
   push(originalTitle);
 
-  for (const q of DANISH_ALIASES[normalizeTitle(base)] ?? []) push(q);
+  for (const key of [normalizeTitle(displayTitle), normalizeTitle(base)]) {
+    for (const q of DANISH_ALIASES[key] ?? []) push(q);
+  }
 
   return out;
 }

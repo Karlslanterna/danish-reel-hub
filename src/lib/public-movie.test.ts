@@ -79,6 +79,11 @@ describe("public movie catalog rules", () => {
     expect(publicMovieDisplayTitle("A Dessert for Constance - Sarah Maldoror")).toBe(
       "A Dessert for Constance",
     );
+    expect(publicMovieDisplayTitle("1776 - Viva la Revolución")).toBe("1776");
+    expect(publicMovieDisplayTitle("The End of Oak Street - (2/9 sidste dag)")).toBe(
+      "The End of Oak Street",
+    );
+    expect(publicMovieDisplayTitle("Nøjsomheden (Vises m. Dk. tekster)")).toBe("Nøjsomheden");
   });
 
   it("uses release-year and connector variants only for identity, not display", () => {

@@ -12,10 +12,13 @@ export type FooterCinema = { slug: string; name: string; city: string };
 export function SiteFooter({
   cinemas = [],
   specialEvents = [],
+  childrenCitySlugs = [],
 }: {
   cinemas?: FooterCinema[];
   specialEvents?: string[];
+  childrenCitySlugs?: string[];
 }) {
+  const childCities = new Set(childrenCitySlugs);
   const cityMap = new Map<string, { name: string; slug: string; count: number }>();
   for (const c of cinemas) {
     const name = baseCityOf(c.city);
@@ -52,11 +55,11 @@ export function SiteFooter({
               {cities.map((c) => (
                 <li key={c.slug}>
                   <Link
-                    to="/$city"
+                    to={childCities.has(c.slug) ? "/$city/for-boern" : "/$city"}
                     params={{ city: c.slug }}
                     className="text-sm text-muted-foreground hover:text-foreground"
                   >
-                    Biograf i {c.name}
+                    {childCities.has(c.slug) ? `Børnefilm i ${c.name}` : `Biograf i ${c.name}`}
                   </Link>
                 </li>
               ))}

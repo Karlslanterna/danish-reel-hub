@@ -39,14 +39,18 @@ export function homeSchemas() {
   ];
 }
 
-export function childrenMoviesSchemas(movies: Movie[]) {
-  const url = canonicalUrl("/for-boern");
+export function childrenMoviesSchemas(
+  movies: Movie[],
+  options?: { path?: string; name?: string; description?: string },
+) {
+  const url = canonicalUrl(options?.path ?? "/for-boern");
   return [
     ld({
       "@context": "https://schema.org",
       "@type": "CollectionPage",
-      name: "Børnefilm i biografen",
-      description: "Aktuelle børnefilm og spilletider i biografer i hele Danmark.",
+      name: options?.name ?? "Børnefilm i biografen",
+      description:
+        options?.description ?? "Aktuelle børnefilm og spilletider i biografer i hele Danmark.",
       url,
       mainEntity: {
         "@type": "ItemList",

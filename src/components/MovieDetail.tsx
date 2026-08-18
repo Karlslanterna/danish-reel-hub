@@ -7,10 +7,12 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { useLanguage } from "@/lib/i18n";
-import { collectTagOptions, showtimeMatchesTags } from "@/lib/showtime-tags";
+import { showtimeMatchesTags } from "@/lib/showtime-tags";
 import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
-import { trackAnalyticsEvent } from "@/lib/analytics";
+import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
+import { filterShowtimeTimesByPeriod } from "@/lib/time-filter";
+import { buildFilterFacets } from "@/lib/filter-facets";
 
 export type MovieDetailCity = { name: string; slug: string };
 
@@ -31,9 +33,11 @@ export function MovieDetail({
     radius,
     userLoc,
     selectedDate,
+    selectedTime,
     selectedFormat,
     selectedLanguage,
     selectedEvent,
+    childrenOnly,
     selectedCity,
     setSelectedCity,
     selectedCinemaId,
@@ -54,7 +58,6 @@ export function MovieDetail({
     language: selectedLanguage,
     event: selectedEvent,
   };
-  const tagOptions = collectTagOptions(showtimes);
   const hasGeo = radius !== "all" && userLoc !== null;
   const movieFacts = [
     formatRuntime(movie.runtime),
@@ -74,13 +77,52 @@ export function MovieDetail({
     ? geoCinemas.filter((c) => c.id === selectedCinemaId)
     : geoCinemas;
 
-  const filteredShowtimes = showtimes.filter(
-    (s) => (!selectedDate || s.date === selectedDate) && showtimeMatchesTags(s, tagSel),
-  );
+  const baseCinemaIds = new Set(geoCinemas.map((cinema) => cinema.id));
+  const selectedCinemaIds = selectedCinemaId ? new Set([selectedCinemaId]) : null;
+  const facets = buildFilterFacets(showtimes, [movie], {
+    baseCinemaIds,
+    cinemaIds: selectedCinemaIds,
+    date: selectedDate,
+    time: selectedTime,
+    format: selectedFormat,
+    language: selectedLanguage,
+    event: selectedEvent,
+  });
+
+  const filteredShowtimes = showtimes.flatMap((showtime) => {
+    if (selectedDate && showtime.date !== selectedDate) return [];
+    if (!showtimeMatchesTags(showtime, tagSel)) return [];
+    if (!selectedTime) return [showtime];
+    const visible = filterShowtimeTimesByPeriod(showtime, selectedTime);
+    return visible ? [visible] : [];
+  });
 
   const byCinema = filteredCinemas
     .map((c) => ({ cinema: c, days: filteredShowtimes.filter((s) => s.cinemaId === c.id) }))
     .filter((x) => x.days.length > 0);
+
+  useTrackZeroResults(
+    byCinema.length,
+    Boolean(
+      selectedDate ||
+        selectedTime ||
+        selectedFormat ||
+        selectedLanguage ||
+        selectedEvent ||
+        selectedCinemaId ||
+        hasGeo
+    ),
+    [
+      movie.slug,
+      selectedDate,
+      selectedTime,
+      selectedFormat,
+      selectedLanguage,
+      selectedEvent,
+      selectedCinemaId,
+      radius,
+    ],
+  );
 
   const cityFilterOptions = (cityOptions ?? []).map((c) => ({
     value: c.name,
@@ -206,11 +248,15 @@ export function MovieDetail({
       <section id="showtimes" className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <FilterBar
-            formats={tagOptions.formats}
-            languages={tagOptions.languages}
-            events={tagOptions.events}
+            showChildrenFilter={childrenOnly}
+            showTimeFilter
+            availableDates={facets.dates}
+            availableTimes={facets.times}
+            formats={facets.formats}
+            languages={facets.languages}
+            events={facets.events}
             cities={cityFilterOptions}
-            cinemas={geoCinemas.map((c) => ({
+            cinemas={geoCinemas.filter((c) => facets.cinemaIds.has(c.id)).map((c) => ({
               id: c.id,
               slug: c.slug,
               name: c.name,

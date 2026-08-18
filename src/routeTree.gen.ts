@@ -26,6 +26,7 @@ import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]x
 import { Route as SitemapMoviesDotxmlRouteImport } from './routes/sitemap-movies[.]xml'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as CityIndexRouteImport } from './routes/$city.index'
+import { Route as CityForBoernRouteImport } from './routes/$city.for-boern'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as BiografIndexRouteImport } from './routes/biograf.index'
@@ -37,11 +38,16 @@ import { Route as CityFilmSlugRouteImport } from './routes/$city.film.$slug'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminAdvancedRouteImport } from './routes/_authenticated/admin.advanced'
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
+import { Route as AuthenticatedAdminDataRouteImport } from './routes/_authenticated/admin.data'
 import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenticated/admin.denied'
 import { Route as AuthenticatedAdminEbilletRouteImport } from './routes/_authenticated/admin.ebillet'
+import { Route as AuthenticatedAdminFiltersRouteImport } from './routes/_authenticated/admin.filters'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
 import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authenticated/admin.pipeline'
+import { Route as AuthenticatedAdminQualityRouteImport } from './routes/_authenticated/admin.quality'
+import { Route as AuthenticatedAdminSeoRouteImport } from './routes/_authenticated/admin.seo'
 import { Route as ApiPublicAnalyticsRouteImport } from './routes/api/public/analytics'
 import { Route as ApiPublicEbilletSyncRouteImport } from './routes/api/public/ebillet-sync'
 import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
@@ -135,6 +141,11 @@ const CityIndexRoute = CityIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CityRoute,
 } as any)
+const CityForBoernRoute = CityForBoernRouteImport.update({
+  id: '/for-boern',
+  path: '/for-boern',
+  getParentRoute: () => CityRoute,
+} as any)
 const Char91DotmcpChar93ListToolsRoute =
   Char91DotmcpChar93ListToolsRouteImport.update({
     id: '/.mcp/list-tools',
@@ -193,12 +204,23 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminAdvancedRoute =
+  AuthenticatedAdminAdvancedRouteImport.update({
+    id: '/admin/advanced',
+    path: '/admin/advanced',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminAnalyticsRoute =
   AuthenticatedAdminAnalyticsRouteImport.update({
     id: '/admin/analytics',
     path: '/admin/analytics',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminDataRoute = AuthenticatedAdminDataRouteImport.update({
+  id: '/admin/data',
+  path: '/admin/data',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminDeniedRoute =
   AuthenticatedAdminDeniedRouteImport.update({
     id: '/admin/denied',
@@ -209,6 +231,12 @@ const AuthenticatedAdminEbilletRoute =
   AuthenticatedAdminEbilletRouteImport.update({
     id: '/admin/ebillet',
     path: '/admin/ebillet',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminFiltersRoute =
+  AuthenticatedAdminFiltersRouteImport.update({
+    id: '/admin/filters',
+    path: '/admin/filters',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminImportRoute =
@@ -223,6 +251,17 @@ const AuthenticatedAdminPipelineRoute =
     path: '/admin/pipeline',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminQualityRoute =
+  AuthenticatedAdminQualityRouteImport.update({
+    id: '/admin/quality',
+    path: '/admin/quality',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminSeoRoute = AuthenticatedAdminSeoRouteImport.update({
+  id: '/admin/seo',
+  path: '/admin/seo',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const ApiPublicAnalyticsRoute = ApiPublicAnalyticsRouteImport.update({
   id: '/api/public/analytics',
   path: '/api/public/analytics',
@@ -284,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
   '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/$city/for-boern': typeof CityForBoernRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/biograf/$slug': typeof BiografSlugRoute
@@ -295,11 +335,16 @@ export interface FileRoutesByFullPath {
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/admin/advanced': typeof AuthenticatedAdminAdvancedRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
+  '/admin/filters': typeof AuthenticatedAdminFiltersRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/admin/quality': typeof AuthenticatedAdminQualityRoute
+  '/admin/seo': typeof AuthenticatedAdminSeoRoute
   '/api/public/analytics': typeof ApiPublicAnalyticsRoute
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
@@ -325,6 +370,7 @@ export interface FileRoutesByTo {
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
   '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/$city/for-boern': typeof CityForBoernRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/biograf/$slug': typeof BiografSlugRoute
@@ -336,11 +382,16 @@ export interface FileRoutesByTo {
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/admin/advanced': typeof AuthenticatedAdminAdvancedRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
+  '/admin/filters': typeof AuthenticatedAdminFiltersRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/admin/quality': typeof AuthenticatedAdminQualityRoute
+  '/admin/seo': typeof AuthenticatedAdminSeoRoute
   '/api/public/analytics': typeof ApiPublicAnalyticsRoute
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
@@ -369,6 +420,7 @@ export interface FileRoutesById {
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
   '/sitemap-movies.xml': typeof SitemapMoviesDotxmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/$city/for-boern': typeof CityForBoernRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/biograf/$slug': typeof BiografSlugRoute
@@ -380,11 +432,16 @@ export interface FileRoutesById {
   '/$city/film/$slug': typeof CityFilmSlugRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/_authenticated/admin/advanced': typeof AuthenticatedAdminAdvancedRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/_authenticated/admin/data': typeof AuthenticatedAdminDataRoute
   '/_authenticated/admin/denied': typeof AuthenticatedAdminDeniedRoute
   '/_authenticated/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
+  '/_authenticated/admin/filters': typeof AuthenticatedAdminFiltersRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/_authenticated/admin/quality': typeof AuthenticatedAdminQualityRoute
+  '/_authenticated/admin/seo': typeof AuthenticatedAdminSeoRoute
   '/api/public/analytics': typeof ApiPublicAnalyticsRoute
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
@@ -413,6 +470,7 @@ export interface FileRouteTypes {
     | '/sitemap-core.xml'
     | '/sitemap-movies.xml'
     | '/sitemap.xml'
+    | '/$city/for-boern'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/biograf/$slug'
@@ -424,11 +482,16 @@ export interface FileRouteTypes {
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/admin/advanced'
     | '/admin/analytics'
+    | '/admin/data'
     | '/admin/denied'
     | '/admin/ebillet'
+    | '/admin/filters'
     | '/admin/import'
     | '/admin/pipeline'
+    | '/admin/quality'
+    | '/admin/seo'
     | '/api/public/analytics'
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
@@ -454,6 +517,7 @@ export interface FileRouteTypes {
     | '/sitemap-core.xml'
     | '/sitemap-movies.xml'
     | '/sitemap.xml'
+    | '/$city/for-boern'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/biograf/$slug'
@@ -465,11 +529,16 @@ export interface FileRouteTypes {
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/admin/advanced'
     | '/admin/analytics'
+    | '/admin/data'
     | '/admin/denied'
     | '/admin/ebillet'
+    | '/admin/filters'
     | '/admin/import'
     | '/admin/pipeline'
+    | '/admin/quality'
+    | '/admin/seo'
     | '/api/public/analytics'
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
@@ -497,6 +566,7 @@ export interface FileRouteTypes {
     | '/sitemap-core.xml'
     | '/sitemap-movies.xml'
     | '/sitemap.xml'
+    | '/$city/for-boern'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/biograf/$slug'
@@ -508,11 +578,16 @@ export interface FileRouteTypes {
     | '/$city/film/$slug'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/_authenticated/admin/advanced'
     | '/_authenticated/admin/analytics'
+    | '/_authenticated/admin/data'
     | '/_authenticated/admin/denied'
     | '/_authenticated/admin/ebillet'
+    | '/_authenticated/admin/filters'
     | '/_authenticated/admin/import'
     | '/_authenticated/admin/pipeline'
+    | '/_authenticated/admin/quality'
+    | '/_authenticated/admin/seo'
     | '/api/public/analytics'
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
@@ -678,6 +753,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CityIndexRouteImport
       parentRoute: typeof CityRoute
     }
+    '/$city/for-boern': {
+      id: '/$city/for-boern'
+      path: '/for-boern'
+      fullPath: '/$city/for-boern'
+      preLoaderRoute: typeof CityForBoernRouteImport
+      parentRoute: typeof CityRoute
+    }
     '/.mcp/list-tools': {
       id: '/.mcp/list-tools'
       path: '/.mcp/list-tools'
@@ -755,11 +837,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/advanced': {
+      id: '/_authenticated/admin/advanced'
+      path: '/admin/advanced'
+      fullPath: '/admin/advanced'
+      preLoaderRoute: typeof AuthenticatedAdminAdvancedRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/analytics': {
       id: '/_authenticated/admin/analytics'
       path: '/admin/analytics'
       fullPath: '/admin/analytics'
       preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/data': {
+      id: '/_authenticated/admin/data'
+      path: '/admin/data'
+      fullPath: '/admin/data'
+      preLoaderRoute: typeof AuthenticatedAdminDataRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/denied': {
@@ -776,6 +872,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminEbilletRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/filters': {
+      id: '/_authenticated/admin/filters'
+      path: '/admin/filters'
+      fullPath: '/admin/filters'
+      preLoaderRoute: typeof AuthenticatedAdminFiltersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/import': {
       id: '/_authenticated/admin/import'
       path: '/admin/import'
@@ -788,6 +891,20 @@ declare module '@tanstack/react-router' {
       path: '/admin/pipeline'
       fullPath: '/admin/pipeline'
       preLoaderRoute: typeof AuthenticatedAdminPipelineRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/quality': {
+      id: '/_authenticated/admin/quality'
+      path: '/admin/quality'
+      fullPath: '/admin/quality'
+      preLoaderRoute: typeof AuthenticatedAdminQualityRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/seo': {
+      id: '/_authenticated/admin/seo'
+      path: '/admin/seo'
+      fullPath: '/admin/seo'
+      preLoaderRoute: typeof AuthenticatedAdminSeoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/analytics': {
@@ -850,21 +967,31 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminAdvancedRoute: typeof AuthenticatedAdminAdvancedRoute
   AuthenticatedAdminAnalyticsRoute: typeof AuthenticatedAdminAnalyticsRoute
+  AuthenticatedAdminDataRoute: typeof AuthenticatedAdminDataRoute
   AuthenticatedAdminDeniedRoute: typeof AuthenticatedAdminDeniedRoute
   AuthenticatedAdminEbilletRoute: typeof AuthenticatedAdminEbilletRoute
+  AuthenticatedAdminFiltersRoute: typeof AuthenticatedAdminFiltersRoute
   AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
   AuthenticatedAdminPipelineRoute: typeof AuthenticatedAdminPipelineRoute
+  AuthenticatedAdminQualityRoute: typeof AuthenticatedAdminQualityRoute
+  AuthenticatedAdminSeoRoute: typeof AuthenticatedAdminSeoRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedAdminImportJobIdRoute: typeof AuthenticatedAdminImportJobIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminAdvancedRoute: AuthenticatedAdminAdvancedRoute,
   AuthenticatedAdminAnalyticsRoute: AuthenticatedAdminAnalyticsRoute,
+  AuthenticatedAdminDataRoute: AuthenticatedAdminDataRoute,
   AuthenticatedAdminDeniedRoute: AuthenticatedAdminDeniedRoute,
   AuthenticatedAdminEbilletRoute: AuthenticatedAdminEbilletRoute,
+  AuthenticatedAdminFiltersRoute: AuthenticatedAdminFiltersRoute,
   AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
   AuthenticatedAdminPipelineRoute: AuthenticatedAdminPipelineRoute,
+  AuthenticatedAdminQualityRoute: AuthenticatedAdminQualityRoute,
+  AuthenticatedAdminSeoRoute: AuthenticatedAdminSeoRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedAdminImportJobIdRoute: AuthenticatedAdminImportJobIdRoute,
 }
@@ -873,11 +1000,13 @@ const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface CityRouteChildren {
+  CityForBoernRoute: typeof CityForBoernRoute
   CityIndexRoute: typeof CityIndexRoute
   CityFilmSlugRoute: typeof CityFilmSlugRoute
 }
 
 const CityRouteChildren: CityRouteChildren = {
+  CityForBoernRoute: CityForBoernRoute,
   CityIndexRoute: CityIndexRoute,
   CityFilmSlugRoute: CityFilmSlugRoute,
 }

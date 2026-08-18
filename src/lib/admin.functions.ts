@@ -38,7 +38,7 @@ async function isAdmin(context: unknown): Promise<boolean> {
   return !!data;
 }
 
-async function assertAdmin(context: unknown) {
+export async function assertAdmin(context: unknown) {
   if (!(await isAdmin(context))) throw new Error("Forbidden: admin role required");
 }
 

@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 export type AnalyticsEventType = "page_view" | "filter_change" | "zero_results" | "ticket_click";
 
 export type AnalyticsEvent = {
@@ -49,4 +51,19 @@ export function trackFilterChange(filterName: string, value: string | null, isAc
     filterValue: value ?? "all",
     isActive,
   });
+}
+
+/** Record one anonymous zero-result event per distinct active filter state. */
+export function useTrackZeroResults(resultCount: number, active: boolean, signature: unknown) {
+  const lastSignature = useRef("");
+  useEffect(() => {
+    if (!active || resultCount > 0) {
+      lastSignature.current = "";
+      return;
+    }
+    const value = JSON.stringify(signature);
+    if (lastSignature.current === value) return;
+    lastSignature.current = value;
+    trackAnalyticsEvent({ eventType: "zero_results" });
+  }, [active, resultCount, signature]);
 }

@@ -6,6 +6,7 @@ import {
   normalizeLanguage,
   type ShowtimeTags,
 } from "@/lib/showtime-tags";
+import { applyCuratedProgrammeTags } from "@/lib/film-programmes";
 import { toHttpsUrl } from "@/lib/poster-url";
 
 /**
@@ -406,7 +407,10 @@ export function parseKultunautXml(xml: string): ParsedKultunaut {
   for (const m of movies.values()) {
     movieTagsById.set(
       m.external_id,
-      extractTags(m.title, m.original_title, m.genre.join(" · "), m.synopsis),
+      applyCuratedProgrammeTags(
+        extractTags(m.title, m.original_title, m.genre.join(" · "), m.synopsis),
+        m.title,
+      ),
     );
   }
 

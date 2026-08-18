@@ -1,9 +1,11 @@
 import type { Showtime } from "@/lib/cinema-data";
 import { showtimeMatchesTags, type TagSelection } from "@/lib/showtime-tags";
 import { timeKey } from "@/lib/showtime-sort";
+import { filterShowtimeTimesByPeriod, type TimePeriod } from "@/lib/time-filter";
 
 export type CinemaProgramFilters = TagSelection & {
   date: string | null;
+  time?: TimePeriod | null;
 };
 
 /**
@@ -21,8 +23,12 @@ export function cinemaProgramShowtimesByMovie(
   for (const showtime of showtimes) {
     if (filters.date && showtime.date !== filters.date) continue;
     if (!showtimeMatchesTags(showtime, filters)) continue;
+    const visibleShowtime = filters.time
+      ? filterShowtimeTimesByPeriod(showtime, filters.time)
+      : showtime;
+    if (!visibleShowtime) continue;
     const movieShowtimes = byMovie.get(showtime.movieId) ?? [];
-    movieShowtimes.push(showtime);
+    movieShowtimes.push(visibleShowtime);
     byMovie.set(showtime.movieId, movieShowtimes);
   }
 

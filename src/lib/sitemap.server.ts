@@ -8,6 +8,7 @@
 import { citySlug } from "./city-slug";
 import { windowStart, windowEnd } from "./date-window";
 import { fetchMovies, type Movie } from "./cinema-data";
+import { consolidatePublicCinemas } from "./cinema-catalog";
 
 export type SitemapEntry = {
   loc: string;
@@ -77,9 +78,13 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
   const movieSlug = canonicalMovieSlugMap(publicMovies);
 
   const cinemaInfo = new Map<string, { slug: string; city: string }>();
-  for (const c of cinemasRes.data ?? []) {
+  if (cinemasRes.error) throw cinemasRes.error;
+  const publicCinemas = consolidatePublicCinemas(cinemasRes.data ?? []);
+  for (const c of publicCinemas) {
     if (!c.slug) continue;
-    cinemaInfo.set(c.id, { slug: c.slug, city: c.city ?? "" });
+    for (const sourceId of c.sourceIds) {
+      cinemaInfo.set(sourceId, { slug: c.slug, city: c.city ?? "" });
+    }
   }
 
   const movieMod = new Map<string, string | undefined>();

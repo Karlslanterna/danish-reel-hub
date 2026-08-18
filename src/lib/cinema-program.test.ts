@@ -67,4 +67,19 @@ describe("cinema programme date groups", () => {
       ["2026-08-24", 1],
     ]);
   });
+
+  it("orders all visible time buttons globally across halls", () => {
+    const result = groupCinemaShowtimesByDate([
+      showtime({ hall: "Sal 1", times: ["12:30", "15:30", "21:30"] }),
+      showtime({ hall: "Sal 2", times: ["17:00", "20:00"] }),
+    ]);
+
+    expect(result[0]?.slots.map((slot) => slot.time)).toEqual([
+      "12:30",
+      "15:30",
+      "17:00",
+      "20:00",
+      "21:30",
+    ]);
+  });
 });

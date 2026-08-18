@@ -58,6 +58,12 @@ describe("groupScreeningsForUi", () => {
     );
   });
 
+  it("suppresses malformed, relative and unsafe ticket URLs", () => {
+    expect(normalizeTicketUrl("&start=2026-08-20T18:00:00Z")).toBeNull();
+    expect(normalizeTicketUrl("/relative-ticket-path")).toBeNull();
+    expect(normalizeTicketUrl("javascript:alert(1)")).toBeNull();
+  });
+
   it("keeps halls separate", () => {
     const base = {
       movie_id: "m1",

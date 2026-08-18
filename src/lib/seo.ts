@@ -50,7 +50,7 @@ export function cityMovieDescription(movie: string, city: string, cinemaCount: n
 
 export function cinemaDescription(cinema: string, city: string, movieCount: number) {
   return clamp(
-    `Se det aktuelle program i ${cinema} i ${city}: ${plural(movieCount, "film", "film")} på plakaten, dagens spilletider og direkte køb af billetter.`,
+    `Se det aktuelle program i ${cinema} i ${city}: ${plural(movieCount, "film", "film")} på plakaten, kommende spilletider og direkte køb af billetter.`,
   );
 }
 
@@ -66,5 +66,5 @@ export const indexDescription = (what: "film" | "cinemas") =>
         `Oversigt over alle film der spiller i danske biografer lige nu. Find spilletider, biografer og billetter til hver enkelt film.`,
       )
     : clamp(
-        `Oversigt over alle biografer i Danmark med aktuelle film. Find din biograf, se programmet og køb billetter til dagens spilletider.`,
+        `Oversigt over alle biografer i Danmark med aktuelle film. Find din biograf, se hele programmet og køb billetter til kommende spilletider.`,
       );

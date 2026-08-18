@@ -1,5 +1,5 @@
 import { canonicalUrl } from "./canonical";
-import { baseCityOf, citySlug as citySlugOf } from "./city-slug";
+import { baseCityOf, displayCityOf, citySlug as citySlugOf } from "./city-slug";
 import type { Movie, Cinema, Showtime } from "./cinema-data";
 
 const ld = (obj: unknown) => ({
@@ -81,7 +81,7 @@ export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtim
       location.address = {
         "@type": "PostalAddress",
         streetAddress: cinema.address,
-        addressLocality: cinema.city,
+        addressLocality: displayCityOf(cinema.city),
         addressCountry: "DK",
       };
     }
@@ -138,7 +138,7 @@ export function cinemaSchemas(cinema: Cinema) {
     obj.address = {
       "@type": "PostalAddress",
       streetAddress: cinema.address,
-      addressLocality: cinema.city,
+      addressLocality: displayCityOf(cinema.city),
       addressCountry: "DK",
     };
   }

@@ -1,5 +1,5 @@
 import { rankMoviesByScreenings } from "@/lib/movie-sort";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { MapPin, Clapperboard, Drama, Navigation, Globe } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -26,12 +26,18 @@ export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
     const cinema = await fetchCinemaBySlug(params.slug);
     if (!cinema) throw notFound();
+    if (params.slug !== cinema.slug) {
+      throw redirect({
+        to: "/biograf/$slug",
+        params: { slug: cinema.slug },
+        statusCode: 301,
+      });
+    }
     const { movies, showtimes } = await fetchMoviesAndShowtimesForCinemas([cinema.id]);
     movies.sort((a, b) => a.title.localeCompare(b.title, "da"));
     return { cinema, movies, showtimes };
   },
-  head: ({ params, loaderData }) => {
-    const href = canonicalUrl(`/biograf/${params.slug}`);
+  head: ({ loaderData }) => {
     if (!loaderData)
       return {
         meta: [
@@ -40,6 +46,7 @@ export const Route = createFileRoute("/biograf/$slug")({
         ],
       };
     const { cinema, movies, showtimes } = loaderData;
+    const href = canonicalUrl(`/biograf/${cinema.slug}`);
     const cityLabel = baseCityOf(cinema.city);
     const hasScreenings = showtimes.length > 0;
     const title = cinemaTitle(cinema.name);
@@ -281,6 +288,7 @@ function MovieRow({
   const dateGroups = groupCinemaShowtimesByDate(shows);
   return (
     <div
+      data-testid="cinema-movie-row"
       className={`rounded-xl border border-border/60 bg-card/30 p-4 sm:p-6 ${dim ? "opacity-60" : ""}`}
     >
       <div className="grid grid-cols-[96px_1fr] gap-4 sm:grid-cols-[150px_1fr] sm:gap-8">
@@ -311,9 +319,10 @@ function MovieRow({
             {shows.length === 0 ? (
               <div className="text-xs text-muted-foreground">Ingen forestillinger denne dag</div>
             ) : (
-              dateGroups.map(({ date, showtimes: dateShowtimes }) => (
+              dateGroups.map(({ date, slots }) => (
                 <div
                   key={date}
+                  data-testid="cinema-program-date"
                   className={showDateLabels ? "grid gap-2 sm:grid-cols-[5rem_1fr]" : undefined}
                 >
                   {showDateLabels && (
@@ -322,30 +331,31 @@ function MovieRow({
                     </div>
                   )}
                   <div className="flex flex-wrap gap-1.5">
-                    {dateShowtimes.flatMap((showtime, showtimeIndex) =>
-                      showtime.times.map((time, timeIndex) => {
-                        const url = showtime.ticketUrls?.[timeIndex] || showtime.bookingUrl;
-                        const key = `${date}-${showtime.hall}-${showtimeIndex}-${time}-${timeIndex}`;
-                        return url ? (
-                          <a
-                            key={key}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
-                          >
-                            {time}
-                          </a>
-                        ) : (
-                          <span
-                            key={key}
-                            className="rounded-md border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
-                          >
-                            {time}
-                          </span>
-                        );
-                      }),
-                    )}
+                    {slots.map(({ time, url, hall }, index) => {
+                      const key = `${date}-${hall}-${time}-${index}`;
+                      return url ? (
+                        <a
+                          key={key}
+                          data-testid="cinema-showtime"
+                          data-showtime-time={time}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow sponsored"
+                          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
+                        >
+                          {time}
+                        </a>
+                      ) : (
+                        <span
+                          key={key}
+                          data-testid="cinema-showtime"
+                          data-showtime-time={time}
+                          className="rounded-md border border-border bg-card/40 px-3 py-1.5 text-sm font-medium tabular-nums text-muted-foreground"
+                        >
+                          {time}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               ))

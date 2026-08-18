@@ -69,6 +69,7 @@ export function normalizeTicketUrl(value: string | null | undefined): string | n
 
   try {
     const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     if (url.hostname !== "flow.ebillet.dk") return raw;
 
     const match = url.pathname.match(/^\/booking\/(\d+)\/(\d+)\/?$/);
@@ -77,7 +78,7 @@ export function normalizeTicketUrl(value: string | null | undefined): string | n
 
     return `https://flow.ebillet.dk/billetter/${match[1]}/${match[2]}?org=${organizerId}`;
   } catch {
-    return raw;
+    return null;
   }
 }
 

@@ -296,7 +296,7 @@ export function MovieDetail({
                                 key={t + idx}
                                 href={url}
                                 target="_blank"
-                                rel="noopener noreferrer"
+                                rel="noopener noreferrer nofollow sponsored"
                                 className="rounded-md bg-primary px-2.5 py-1.5 text-center text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"
                               >
                                 {t}

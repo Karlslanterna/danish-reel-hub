@@ -23,6 +23,12 @@ import {
   type UiShowtimeIndexRow,
 } from "@/lib/screening-read-model";
 import { consolidatePublicMovies, remapShowtimesToMovies } from "@/lib/public-catalog";
+import {
+  canonicalCinemaId,
+  consolidatePublicCinemas,
+  expandCinemaIds,
+  remapScreeningCinemaIds,
+} from "@/lib/cinema-catalog";
 
 export type Poster = {
   a?: string;
@@ -75,6 +81,9 @@ export type Cinema = {
   latitude: number | null;
   longitude: number | null;
   website: string | null;
+  /** All source rows represented by this physical public cinema. */
+  sourceIds?: string[];
+  sourceSlugs?: string[];
 };
 
 export type Showtime = UiShowtime;
@@ -271,7 +280,20 @@ export async function fetchMovies(
 export async function fetchCinemas(): Promise<Cinema[]> {
   const { data, error } = await supabase.from("cinemas").select("*").order("name");
   if (error) throw error;
-  return (data ?? []).map((r) => mapCinema(r as CinemaRow));
+  const sourceCinemas = (data ?? []).map((r) => mapCinema(r as CinemaRow));
+  const sourceById = new Map(sourceCinemas.map((cinema) => [cinema.id, cinema] as const));
+  return consolidatePublicCinemas(sourceCinemas)
+    .map((cinema) => {
+      const members = cinema.sourceIds.map((id) => sourceById.get(id)).filter(Boolean) as Cinema[];
+      return {
+        ...cinema,
+        description:
+          cinema.description || members.find((member) => member.description)?.description || "",
+        screens: Math.max(cinema.screens, ...members.map((member) => member.screens)),
+        website: cinema.website || members.find((member) => member.website)?.website || null,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "da"));
 }
 
 export async function fetchMovieBySlug(slug: string): Promise<Movie | null> {
@@ -286,9 +308,8 @@ export async function fetchMovieBySlug(slug: string): Promise<Movie | null> {
 }
 
 export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
-  const { data, error } = await supabase.from("cinemas").select("*").eq("slug", slug).maybeSingle();
-  if (error) throw error;
-  return data ? mapCinema(data as CinemaRow) : null;
+  const cinemas = await fetchCinemas();
+  return cinemas.find((cinema) => (cinema.sourceSlugs ?? [cinema.slug]).includes(slug)) ?? null;
 }
 
 export async function fetchShowtimesForMovie(movieId: string | string[]): Promise<Showtime[]> {
@@ -308,7 +329,7 @@ export async function fetchShowtimesForMovie(movieId: string | string[]): Promis
       .order("id", { ascending: true })
       .range(from, to);
   });
-  const grouped = groupScreeningsForUi(rows);
+  const grouped = groupScreeningsForUi(remapScreeningCinemaIds(rows));
   if (movieIds.length === 1) return grouped;
   const canonicalMovie: Movie = {
     id: movieIds[0]!,
@@ -328,11 +349,12 @@ export async function fetchShowtimesForMovie(movieId: string | string[]): Promis
 
 export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
   const bounds = screeningBounds();
+  const cinemaIds = expandCinemaIds([cinemaId]);
   const rows = await collectPages<{ movie_id: string; movies: MovieRow | null }>((from, to) =>
     supabase
       .from("screenings")
       .select("movie_id, movies(*)")
-      .eq("cinema_id", cinemaId)
+      .in("cinema_id", cinemaIds)
       .gte("starts_at", bounds.startsAfter)
       .gte("local_date", bounds.firstDate)
       .lte("local_date", bounds.lastDate)
@@ -372,14 +394,9 @@ export async function fetchCinemasForMovie(movieId: string | string[]): Promise<
       .order("id", { ascending: true })
       .range(from, to);
   });
-  const seen = new Set<string>();
-  const out: Cinema[] = [];
-  for (const row of rows) {
-    if (!row.cinemas || seen.has(row.cinema_id)) continue;
-    seen.add(row.cinema_id);
-    out.push(mapCinema(row.cinemas));
-  }
-  return out;
+  const cinemaIds = new Set(rows.map((row) => canonicalCinemaId(row.cinema_id)));
+  const cinemas = await fetchCinemas();
+  return cinemas.filter((cinema) => cinemaIds.has(cinema.id));
 }
 
 export function formatRuntime(min: number) {
@@ -412,10 +429,11 @@ export async function fetchMovieCinemaPairs(): Promise<
   const out: Array<{ movieId: string; cinemaId: string }> = [];
   for (const row of rows) {
     if (!publicMovieIds.has(row.movie_id)) continue;
-    const key = `${row.movie_id}|${row.cinema_id}`;
+    const cinemaId = canonicalCinemaId(row.cinema_id);
+    const key = `${row.movie_id}|${cinemaId}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ movieId: row.movie_id, cinemaId: row.cinema_id });
+    out.push({ movieId: row.movie_id, cinemaId });
   }
   return out;
 }
@@ -436,7 +454,9 @@ export async function fetchShowtimes(): Promise<Showtime[]> {
     ),
     fetchPublicMovieIdSet(),
   ]);
-  return groupScreeningsForUi(rows.filter((row) => publicMovieIds.has(row.movie_id)));
+  return groupScreeningsForUi(
+    remapScreeningCinemaIds(rows.filter((row) => publicMovieIds.has(row.movie_id))),
+  );
 }
 
 /** Lightweight index used by homepage radius/date/tag filtering. */
@@ -456,17 +476,20 @@ export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
     ),
     fetchPublicMovieIdSet(),
   ]);
-  return groupScreeningIndexForUi(rows.filter((row) => publicMovieIds.has(row.movie_id)));
+  return groupScreeningIndexForUi(
+    remapScreeningCinemaIds(rows.filter((row) => publicMovieIds.has(row.movie_id))),
+  );
 }
 
 export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtime[]> {
   const bounds = screeningBounds();
+  const cinemaIds = expandCinemaIds([cinemaId]);
   const [rows, publicMovieIds] = await Promise.all([
     collectPages<ScreeningReadRow>((from, to) =>
       supabase
         .from("screenings")
         .select(SCREENING_COLUMNS)
-        .eq("cinema_id", cinemaId)
+        .in("cinema_id", cinemaIds)
         .gte("starts_at", bounds.startsAfter)
         .gte("local_date", bounds.firstDate)
         .lte("local_date", bounds.lastDate)
@@ -476,7 +499,9 @@ export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtim
     ),
     fetchPublicMovieIdSet(),
   ]);
-  return groupScreeningsForUi(rows.filter((row) => publicMovieIds.has(row.movie_id)));
+  return groupScreeningsForUi(
+    remapScreeningCinemaIds(rows.filter((row) => publicMovieIds.has(row.movie_id))),
+  );
 }
 
 export async function fetchMoviesAndShowtimesForCinemas(
@@ -484,11 +509,12 @@ export async function fetchMoviesAndShowtimesForCinemas(
 ): Promise<{ movies: Movie[]; showtimes: Showtime[] }> {
   if (cinemaIds.length === 0) return { movies: [], showtimes: [] };
   const bounds = screeningBounds();
+  const sourceCinemaIds = expandCinemaIds(cinemaIds);
   const rows = await collectPages<ScreeningMovieRow>((from, to) =>
     supabase
       .from("screenings")
       .select(`${SCREENING_COLUMNS}, movies(*)`)
-      .in("cinema_id", cinemaIds)
+      .in("cinema_id", sourceCinemaIds)
       .gte("starts_at", bounds.startsAfter)
       .gte("local_date", bounds.firstDate)
       .lte("local_date", bounds.lastDate)
@@ -510,6 +536,9 @@ export async function fetchMoviesAndShowtimesForCinemas(
   const consolidated = consolidatePublicMovies(visibleMovies).movies;
   return {
     movies: consolidated,
-    showtimes: remapShowtimesToMovies(groupScreeningsForUi(visibleRows), consolidated),
+    showtimes: remapShowtimesToMovies(
+      groupScreeningsForUi(remapScreeningCinemaIds(visibleRows)),
+      consolidated,
+    ),
   };
 }

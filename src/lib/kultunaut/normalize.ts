@@ -10,6 +10,7 @@ import { createHash } from "crypto";
 import type { ParsedShowtime } from "./parser.server";
 import { copenhagenToUtcIso } from "@/lib/pipeline/localtime";
 import type { NormalizedScreening } from "@/lib/pipeline/types";
+import { normalizeTicketUrl } from "@/lib/screening-read-model";
 
 /** Stable per-screening identity within the Kultunaut source. */
 export function kultunautScreeningRef(input: {
@@ -32,9 +33,7 @@ export function kultunautScreeningRef(input: {
 const TIME_RE = /^\d{2}:\d{2}$/;
 
 /** One row per physical screening — `times[]` is exploded here. */
-export function normalizeKultunautScreenings(
-  showtimes: ParsedShowtime[],
-): NormalizedScreening[] {
+export function normalizeKultunautScreenings(showtimes: ParsedShowtime[]): NormalizedScreening[] {
   const out = new Map<string, NormalizedScreening>();
   for (const st of showtimes) {
     if (!st.cinema_external_id || !st.movie_external_id) continue;
@@ -67,7 +66,7 @@ export function normalizeKultunautScreenings(
         localDate: st.date,
         localTime: time,
         hall,
-        ticketUrl: ticketUrl || null,
+        ticketUrl: normalizeTicketUrl(ticketUrl),
         priceMin: null,
         priceMax: null,
         freeSeats: null,

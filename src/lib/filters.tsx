@@ -15,6 +15,7 @@ import { sortTagOptions } from "@/lib/showtime-tags";
 import { slugifyCity, baseCityOf } from "@/lib/city-slug";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { addCalendarDays, windowStart, windowEnd, windowBounds } from "@/lib/date-window";
+import { canonicalCinemaId } from "@/lib/cinema-catalog";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -137,6 +138,7 @@ function loadPersisted(): Persisted {
     let selectedDate = typeof p.selectedDate === "string" ? p.selectedDate : null;
     const selectedGenre =
       typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
+    const storedCinemaId = str(p.selectedCinemaId);
     // drop dates outside the visible window (past, or beyond +30 days)
     if (selectedDate && (selectedDate < windowStart() || selectedDate > windowEnd()))
       selectedDate = null;
@@ -149,7 +151,7 @@ function loadPersisted(): Persisted {
       selectedLanguage: str(p.selectedLanguage),
       selectedEvent: str(p.selectedEvent),
       selectedCity: str(p.selectedCity),
-      selectedCinemaId: str(p.selectedCinemaId),
+      selectedCinemaId: storedCinemaId ? canonicalCinemaId(storedCinemaId) : null,
       selectedCinemaSlug: str(p.selectedCinemaSlug),
       selectedCinemaName: str(p.selectedCinemaName),
     };
@@ -236,9 +238,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         const res = await (
           navigator as unknown as {
             permissions: {
-              query: (
-                o: unknown,
-              ) => Promise<{
+              query: (o: unknown) => Promise<{
                 state: string;
                 addEventListener: (type: string, fn: () => void) => void;
                 removeEventListener: (type: string, fn: () => void) => void;

@@ -29,7 +29,9 @@ export const Route = createFileRoute("/biograf/")({
   },
   errorComponent: ({ reset }) => (
     <div className="p-12">
-      <button onClick={reset} className="text-primary">Prøv igen</button>
+      <button onClick={reset} className="text-primary">
+        Prøv igen
+      </button>
     </div>
   ),
   component: CinemaIndexPage,
@@ -59,7 +61,7 @@ function CinemaIndexPage() {
         </h1>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
           {cinemas.length} biografer i {sorted.length} byer. Vælg en biograf for at se programmet og
-          dagens spilletider.
+          kommende spilletider.
         </p>
 
         <div className="mt-10 space-y-10">

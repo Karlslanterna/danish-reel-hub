@@ -1,5 +1,6 @@
 import type { Showtime } from "@/lib/cinema-data";
 import { showtimeMatchesTags, type TagSelection } from "@/lib/showtime-tags";
+import { timeKey } from "@/lib/showtime-sort";
 
 export type CinemaProgramFilters = TagSelection & {
   date: string | null;
@@ -29,9 +30,11 @@ export function cinemaProgramShowtimesByMovie(
 }
 
 /** Keep dates explicit when several programme days are visible at once. */
-export function groupCinemaShowtimesByDate(
-  showtimes: Showtime[],
-): Array<{ date: string; showtimes: Showtime[] }> {
+export function groupCinemaShowtimesByDate(showtimes: Showtime[]): Array<{
+  date: string;
+  showtimes: Showtime[];
+  slots: Array<{ time: string; url: string | null; hall: string }>;
+}> {
   const byDate = new Map<string, Showtime[]>();
   for (const showtime of showtimes) {
     const dateShowtimes = byDate.get(showtime.date) ?? [];
@@ -41,5 +44,17 @@ export function groupCinemaShowtimesByDate(
 
   return [...byDate.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, dateShowtimes]) => ({ date, showtimes: dateShowtimes }));
+    .map(([date, dateShowtimes]) => ({
+      date,
+      showtimes: dateShowtimes,
+      slots: dateShowtimes
+        .flatMap((showtime) =>
+          showtime.times.map((time, index) => ({
+            time,
+            url: showtime.ticketUrls?.[index] || showtime.bookingUrl || null,
+            hall: showtime.hall,
+          })),
+        )
+        .sort((a, b) => timeKey(a.time) - timeKey(b.time) || a.hall.localeCompare(b.hall, "da")),
+    }));
 }

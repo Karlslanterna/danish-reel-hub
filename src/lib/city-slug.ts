@@ -8,9 +8,13 @@ export const stripPostcode = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").tri
 /** "2200 København N" -> "København N" */
 export const displayCityOf = (s: string) => stripPostcode(s);
 
-/** "2200 København N" -> "København" (drops the trailing area letters) */
-export const baseCityOf = (s: string) =>
-  stripPostcode(s).replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+const DISTRICT_CITY_RE = /^(København|Odense|Aarhus|Aalborg|Randers)\s+[A-ZÆØÅ]{1,3}\.?$/u;
+
+/** "2200 København N" -> "København" without merging towns such as Nykøbing F/M. */
+export const baseCityOf = (s: string) => {
+  const city = stripPostcode(s);
+  return city.replace(DISTRICT_CITY_RE, "$1").trim();
+};
 
 export function slugifyCity(name: string): string {
   return stripPostcode(name)

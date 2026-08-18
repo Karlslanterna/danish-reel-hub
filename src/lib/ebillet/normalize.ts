@@ -178,13 +178,21 @@ export function normalizeEbilletScreenings(
 
     const { date, time } = copenhagenParts(startsAt);
     const base = movie.baseId && movie.baseId > 0 ? baseById.get(movie.baseId) : undefined;
-    const eventName = st.type != null ? typeName.get(String(st.type)) : undefined;
+    const eventName =
+      st.type && typeof st.type === "object"
+        ? st.type.name?.trim() ||
+          (st.type.id != null ? typeName.get(String(st.type.id)) : undefined)
+        : st.type != null
+          ? typeName.get(String(st.type))
+          : undefined;
     const tags = extractTags(
       base?.name,
       movie.name,
       movie.subName,
       movie.originalName,
       eventName,
+      st.movieBaseShowName,
+      st.info,
       st.locationName,
     );
     const formats: string[] = [movie.is3D || movie.dimension === "3" ? "3D" : "2D"];

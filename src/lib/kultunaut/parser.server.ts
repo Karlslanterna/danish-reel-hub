@@ -1,5 +1,11 @@
 import { XMLParser } from "fast-xml-parser";
-import { extractTags, mergeTags, emptyTags, normalizeLanguage, type ShowtimeTags } from "@/lib/showtime-tags";
+import {
+  extractTags,
+  mergeTags,
+  emptyTags,
+  normalizeLanguage,
+  type ShowtimeTags,
+} from "@/lib/showtime-tags";
 import { toHttpsUrl } from "@/lib/poster-url";
 
 /**
@@ -229,15 +235,16 @@ const parseMovieNode = (n: AnyNode): ParsedMovie | null => {
   for (const g of genres) {
     const t = textOf(g);
     if (t) {
-      for (const part of t.split(/[/,;|]/).map((s) => s.trim()).filter(Boolean)) {
+      for (const part of t
+        .split(/[/,;|]/)
+        .map((s) => s.trim())
+        .filter(Boolean)) {
         if (!genreList.includes(part)) genreList.push(part);
       }
     }
   }
 
-  const thumbnails = toArray(
-    child(child(n, "thumbnails"), "thumbnail"),
-  ) as AnyNode[];
+  const thumbnails = toArray(child(child(n, "thumbnails"), "thumbnail")) as AnyNode[];
   const poster = thumbnails.find((t) => attr(t, "type") === "poster") ?? thumbnails[0];
   // Kultunaut publishes http:// image links; upgrade to https:// to avoid mixed content.
   const posterUrl = toHttpsUrl(poster ? textOf(child(poster, "imageURL")) : "") ?? "";
@@ -272,10 +279,11 @@ const tagsFromShowTimeAttrs = (n: AnyNode): ShowtimeTags => {
   let tags = emptyTags();
   const subtitled = attr(n, "subtitled");
   if (subtitled) {
-    const label =
-      subtitled.toLowerCase().startsWith("da") ? "Danske undertekster"
-      : subtitled.toLowerCase().startsWith("en") ? "Engelske undertekster"
-      : null;
+    const label = subtitled.toLowerCase().startsWith("da")
+      ? "Danske undertekster"
+      : subtitled.toLowerCase().startsWith("en")
+        ? "Engelske undertekster"
+        : null;
     if (label) tags = mergeTags(tags, { formats: [], languages: [label], events: [] });
   }
   const dubbed = attr(n, "dubbed");
@@ -309,7 +317,10 @@ const parseShowTimeNode = (n: AnyNode, movieTags?: ShowtimeTags): ParsedShowtime
     const time = normalizeTime(textOf(t));
     if (!time) continue;
     // A single <time> may carry its own labelling (e.g. "3D", "Babybio").
-    const timeTags = mergeTags(baseTags, extractTags(attr(t, "version"), attr(t, "note"), attr(t, "type")));
+    const timeTags = mergeTags(
+      baseTags,
+      extractTags(attr(t, "version"), attr(t, "note"), attr(t, "type")),
+    );
     out.push({
       movie_external_id: movieId,
       cinema_external_id: theaterId,
@@ -370,7 +381,11 @@ export function parseKultunautXml(xml: string): ParsedKultunaut {
       else if (Array.isArray(v)) for (const c of v as AnyNode[]) findContainers(c, out);
     }
   };
-  const containers = { theaters: [] as AnyNode[], movies: [] as AnyNode[], showTimes: [] as AnyNode[] };
+  const containers = {
+    theaters: [] as AnyNode[],
+    movies: [] as AnyNode[],
+    showTimes: [] as AnyNode[],
+  };
   findContainers(doc, containers);
 
   for (const t of containers.theaters) {
@@ -389,7 +404,10 @@ export function parseKultunautXml(xml: string): ParsedKultunaut {
   // apply to every screening of that movie.
   const movieTagsById = new Map<string, ShowtimeTags>();
   for (const m of movies.values()) {
-    movieTagsById.set(m.external_id, extractTags(m.title, m.original_title, m.genre.join(" · ")));
+    movieTagsById.set(
+      m.external_id,
+      extractTags(m.title, m.original_title, m.genre.join(" · "), m.synopsis),
+    );
   }
 
   for (const s of containers.showTimes) {

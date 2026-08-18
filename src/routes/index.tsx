@@ -59,6 +59,8 @@ export function loadCachedHomeCatalog(queryClient: QueryClient): Promise<HomeCat
   return queryClient.ensureQueryData({
     queryKey: HOME_CATALOG_QUERY_KEY,
     queryFn: loadHomeCatalog,
+    staleTime: 5 * 60 * 1000,
+    revalidateIfStale: true,
   });
 }
 

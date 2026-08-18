@@ -70,6 +70,81 @@ describe("public catalog consolidation", () => {
     expect(result.movies).toHaveLength(3);
   });
 
+  it("merges a trailing-year source title with its unknown-year duplicate", () => {
+    const result = consolidatePublicMovies([
+      movie({
+        id: "canonical",
+        slug: "the-odyssey-2026",
+        title: "The Odyssey (2026)",
+        year: 2026,
+        poster: { url: "poster.jpg" },
+      }),
+      movie({ id: "variant", slug: "the-odyssey", title: "The Odyssey", year: 0 }),
+    ]);
+
+    expect(result.movies).toHaveLength(1);
+    expect(result.movies[0]?.sourceIds).toEqual(expect.arrayContaining(["canonical", "variant"]));
+    expect(result.movies[0]?.poster.url).toBe("poster.jpg");
+  });
+
+  it("merges connector and compound-spacing variants with compatible years", () => {
+    const result = consolidatePublicMovies([
+      movie({
+        id: "vishwanath-a",
+        slug: "vishwanath-and-sons",
+        title: "Vishwanath and Sons",
+        year: 2026,
+      }),
+      movie({
+        id: "vishwanath-b",
+        slug: "vishwanath-sons",
+        title: "Vishwanath & Sons",
+      }),
+      movie({ id: "olsen-a", slug: "olsenbanden", title: "Olsenbanden Ser Rødt", year: 1976 }),
+      movie({ id: "olsen-b", slug: "olsen-banden", title: "Olsen Banden Ser Rødt" }),
+    ]);
+
+    expect(result.movies).toHaveLength(2);
+    expect(result.movies.map((item) => item.sourceIds.sort())).toEqual(
+      expect.arrayContaining([
+        ["vishwanath-a", "vishwanath-b"],
+        ["olsen-a", "olsen-b"],
+      ]),
+    );
+  });
+
+  it("uses a matching synopsis to place an unknown-year row among active remakes", () => {
+    const currentSynopsis =
+      "Clara lever et tilsyneladende perfekt liv med en succesfuld karriere og sin charmerende kæreste Tobias.";
+    const result = consolidatePublicMovies([
+      movie({
+        id: "current",
+        slug: "dobbeltspil-2026",
+        title: "Dobbeltspil (2026)",
+        year: 2026,
+        synopsis: `${currentSynopsis} Men facaden begynder at krakelere.`,
+      }),
+      movie({
+        id: "unknown",
+        slug: "dobbeltspil",
+        title: "Dobbeltspil",
+        synopsis: currentSynopsis,
+      }),
+      movie({
+        id: "old",
+        slug: "dobbeltspil-2018",
+        title: "Dobbeltspil (2018)",
+        year: 2018,
+        synopsis: "En helt anden film med andre personer og en anden historie.",
+      }),
+    ]);
+
+    expect(result.movies).toHaveLength(2);
+    const current = result.movies.find((item) => item.sourceIds.includes("current"));
+    expect(current?.sourceIds).toEqual(expect.arrayContaining(["current", "unknown"]));
+    expect(result.movies.find((item) => item.id === "old")?.sourceIds).toEqual(["old"]);
+  });
+
   it("uses a shared TMDb id as stronger identity than localized titles", () => {
     const result = consolidatePublicMovies([
       movie({

@@ -10,6 +10,24 @@ import { publicMovieDisplayTitle } from "@/lib/public-movie";
 export const stripYearSuffix = (title: string): string =>
   title.replace(/\s*[([]\s*(?:19|20)\d{2}\s*[)\]]\s*$/u, "").trim();
 
+export const titleYear = (title: string): number | null => {
+  const value = title.match(/\s*[([]\s*((?:19|20)\d{2})\s*[)\]]\s*$/u)?.[1];
+  const year = Number(value ?? 0);
+  return year > 1880 ? year : null;
+};
+
+/** eBillet's programme year is not a film release year; an explicit title year is. */
+export function sourceYearForMatch(movie: {
+  id: string;
+  title: string;
+  year: number | null;
+}): number | null {
+  const explicit = titleYear(movie.title);
+  if (explicit) return explicit;
+  if (movie.id.startsWith("eb-")) return null;
+  return movie.year && movie.year > 1880 ? movie.year : null;
+}
+
 /** Screening-format / event noise that Kultunaut appends to titles. */
 const NOISE =
   /\b(2d|3d|imax|4dx|ov|originalversion|dansk\s*tale|m\/?\s*dansk\s*tale|med\s*dansk\s*tale|dubbet|eng\.?\s*tale|babybio|seniorbio|filmklub|forpremiere|premiere|sing[\s-]?along|dolby|atmos|kortfilm|genudsendelse|reprise)\b/gi;
@@ -88,6 +106,18 @@ export function pickMatch(
   const best = scored[0];
   const runnerUp = scored[1];
 
+  // With no trustworthy source year, accept only one exact title candidate
+  // with a real TMDb release date and at least a minimal popularity signal.
+  // Multiple remakes remain ambiguous and are still rejected.
+  if (
+    !feedYear &&
+    scored.length === 1 &&
+    yearOf(best.c.release_date) &&
+    (best.c.vote_count > 0 || best.c.popularity >= 1)
+  ) {
+    return { matched: true, id: best.c.id, confidence: 0.93 };
+  }
+
   if (best.s < ACCEPT) {
     return { matched: false, reason: `lav sikkerhed (${best.s.toFixed(2)})` };
   }
@@ -105,7 +135,7 @@ export function pickMatch(
 const NON_FILM_PATTERNS: RegExp[] = [
   /børnebiff/i,
   /biffen/i,
-  /\bfilmklub\b/i,
+  /^filmklub\b/i,
   /\bforedrag\b/i,
   /\bdebat\b/i,
   /\bq\s*&\s*a\b/i,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickMatch, searchQueries } from "./match";
+import { pickMatch, searchQueries, sourceYearForMatch } from "./match";
 
 describe("TMDb matching", () => {
   it("searches a clean film title before source programme labels", () => {
@@ -34,5 +34,38 @@ describe("TMDb matching", () => {
         },
       ]),
     ).toMatchObject({ matched: false });
+  });
+
+  it("accepts one credible exact candidate without a year but rejects remakes", () => {
+    const candidate = {
+      id: 10,
+      title: "Biler",
+      original_title: "Cars",
+      release_date: "2006-06-08",
+      vote_count: 100,
+      popularity: 4,
+    };
+    expect(pickMatch("Biler", null, [candidate])).toMatchObject({ matched: true, id: 10 });
+    expect(
+      pickMatch("Biler", null, [
+        candidate,
+        { ...candidate, id: 11, release_date: "2026-06-08" },
+      ]),
+    ).toMatchObject({ matched: false });
+  });
+
+  it("does not use eBillet's programme year unless the title states it", () => {
+    expect(sourceYearForMatch({ id: "eb-movie-1", title: "Spirillen", year: 2026 })).toBeNull();
+    expect(
+      sourceYearForMatch({ id: "eb-movie-2", title: "Dobbeltspil (2018)", year: 2026 }),
+    ).toBe(2018);
+    expect(sourceYearForMatch({ id: "kn-1", title: "Autofiktion", year: 2026 })).toBe(2026);
+  });
+
+  it("strips language and programme variants before searching", () => {
+    expect(searchQueries("Biler - Dansk Tale")[0]).toBe("Biler");
+    expect(searchQueries("A Dessert for Constance - Sarah Maldoror")[0]).toBe(
+      "A Dessert for Constance",
+    );
   });
 });

@@ -41,6 +41,10 @@ const NON_FILM_PATTERNS: RegExp[] = [
   /^seniorbio(?:\b|$)/,
   /^erindringsbio(?:\b|$)/,
   /^bfk\b/,
+  /^hadsten bio filmklub\b/,
+  /^doktrin:\s*afgangspremiere\b/,
+  /^harry potter 25ars jubilæum\s*[-–—]\s*de fire (?:første|sidste) film$/,
+  /^off 2026\s*\(blok\s*\d+\)/,
   /^off\s*:\s*/,
   /^off\s*-\s*børnebiffen\b/,
   /^off\s*-\s*bornebiffen\b/,
@@ -67,7 +71,12 @@ export function isPublicMovieTitle(title: string | null | undefined): boolean {
 }
 
 const PROGRAMME_SUFFIX =
-  /\s*[-–—]\s*(?=(?:event\b|late\s+night\b|fright\s+night\b|h\.?\s*bio\b|musikfilm\b|musik\s+i\s+mørket\b|havet\b|klassikere\b|filmuniversitetet\b|events?\b|arabiske\s+stemmer\b|monstrene\b|sergej\s+paradjanov\b|carla\s+sim[oó]n\b|alexander\s+payne\b|strikkebio\b|psych-out\b|lang\s*\(som\)\s+søndag\b|film,\s*tapas\b|lejre\s+klimauge\b|hvalsø\s+bio\b|mørkekammerater\b))/iu;
+  /\s*[-–—]\s*(?=(?:event\b|late\s+night\b|fright\s+night\b|h\.?\s*bio\b|musikfilm\b|musik\s+i\s+mørket\b|havet\b|klassikere\b|filmuniversitetet\b|events?\b|arabiske\s+stemmer\b|monstrene\b|sergej\s+paradjanov\b|sarah\s+maldoror\b|carla\s+sim[oó]n\b|alexander\s+payne\b|hitchcock(?:-hits)?\b|tupac\s+shakur\b|venedig-vindere\b|udflugt\s+på\s+landet\b|strikkebio\b|psych-out\b|anime\b|lang\s*\(som\)\s+søndag\b|film,\s*tapas\b|lejre\s+klimauge\b|hvalsø\s+bio\b|mørkekammerater\b))/iu;
+
+const LANGUAGE_SUFFIX =
+  /\s*[-–—]?\s*(?:(?:med\s+)?(?:dansk|dk|engelsk|eng|ensk|original|org)\s+(?:tale|tala|tekst|undertekster)|med\s+danske?\s+undertekster|danske?\s+undertekster|tekstet|dubbet)\s*$/iu;
+
+const PRESENTATION_SUFFIX = /\s*[-–—]?\s*(?:CI|CIN)(?:\.?\s*præs\.?)?\s*$/iu;
 
 /** Remove source-specific programme labels from the public film title only. */
 export function publicMovieDisplayTitle(title: string): string {
@@ -76,8 +85,27 @@ export function publicMovieDisplayTitle(title: string): string {
   if (suffix?.index && suffix.index > 0) value = value.slice(0, suffix.index).trim();
   return value
     .replace(/\s{2,}[BCGN]\s*$/u, "")
-    .replace(/\s+(?:dk|danske?)\s+undertekster\s*$/iu, "")
-    .replace(/\s*[-–—]\s*(?:CI|CIN)\s*$/iu, "")
+    .replace(LANGUAGE_SUFFIX, "")
+    .replace(PRESENTATION_SUFFIX, "")
+    .trim();
+}
+
+/**
+ * Identity-only title normalization. A year or screening-language suffix may
+ * distinguish source records without making them different films. Keep those
+ * qualifiers available in the stored/display title, but exclude them from the
+ * duplicate key used at the public boundary.
+ */
+export function publicMovieIdentityTitle(title: string): string {
+  return publicMovieDisplayTitle(title)
+    .replace(/\s*[([]\s*(?:19|20)\d{2}\s*[)\]]\s*$/u, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("da")
+    .replace(/&/g, " and ")
+    .replace(/\b(?:and|og)\b/gu, " og ")
+    .replace(/[^a-z0-9æøå]+/gu, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -89,6 +117,7 @@ export function publicMovieDisplayTitle(title: string): string {
  */
 export function resolvePublicMovieYear(input: {
   id: string;
+  title?: string | null;
   source?: string | null;
   year?: number | null;
   releaseDate?: string | null;
@@ -96,6 +125,10 @@ export function resolvePublicMovieYear(input: {
 }): number {
   const releaseYear = Number.parseInt((input.releaseDate ?? "").slice(0, 4), 10);
   if (Number.isFinite(releaseYear) && releaseYear > 1880) return releaseYear;
+  const titleYear = Number(
+    (input.title ?? "").match(/\s*[([]\s*((?:19|20)\d{2})\s*[)\]]\s*$/u)?.[1] ?? 0,
+  );
+  if (titleYear > 1880) return titleYear;
   const isEbillet = input.source === "ebillet" || input.id.startsWith("eb-");
   if (isEbillet && !input.tmdbId) return 0;
   return Number(input.year ?? 0) || 0;

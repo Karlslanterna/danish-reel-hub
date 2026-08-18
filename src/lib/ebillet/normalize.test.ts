@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EbilletMoviesResponse } from "./api.server";
-import {
-  buildMovieGroups,
-  ebilletStartsAt,
-  normalizeEbilletScreenings,
-} from "./normalize";
+import { buildMovieGroups, ebilletStartsAt, normalizeEbilletScreenings } from "./normalize";
 
 const ORG = 108;
 const NOW = new Date("2026-08-17T12:00:00.000Z");
@@ -59,6 +55,45 @@ describe("eBillet normalization", () => {
   it("does not create movie groups that are backed only by rejected screenings", () => {
     const groups = buildMovieGroups(payload, NOW);
     expect(groups.map((g) => g.ref)).toEqual(["base-10"]);
+  });
+
+  it("does not persist one eBillet poster reused by unrelated movie bases", () => {
+    const sharedPoster = "https://poster.ebillet.dk/shared.hd.jpg";
+    const withCollision: EbilletMoviesResponse = {
+      organizers: payload.organizers,
+      movieBases: [
+        { id: 40, name: "The Witch", posters: { hd: sharedPoster } },
+        { id: 50, name: "Børnebiffen", posters: { hd: sharedPoster } },
+      ],
+      movies: [
+        { id: 400, baseId: 40, name: "The Witch" },
+        { id: 500, baseId: 50, name: "Børnebiffen" },
+      ],
+      showtimes: [
+        {
+          id: 70,
+          movieId: 400,
+          movieBaseId: 40,
+          locationId: 1,
+          organizerId: ORG,
+          dateTime: "2026-08-20T20:00:00",
+        },
+        {
+          id: 71,
+          movieId: 500,
+          movieBaseId: 50,
+          locationId: 1,
+          organizerId: ORG,
+          dateTime: "2026-08-20T10:00:00",
+        },
+      ],
+      showtimeTypes: [],
+    };
+
+    expect(buildMovieGroups(withCollision, NOW).map((group) => group.posterUrl)).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it("collapses multiple booking ids for one physical screening deterministically", () => {

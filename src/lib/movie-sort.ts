@@ -5,11 +5,7 @@
  * view, which aggregates upcoming screenings live), never in the frontend.
  * Add a new strategy here and it becomes available everywhere.
  */
-export type MovieSortStrategy =
-  | "most-screenings"
-  | "newest"
-  | "top-rated"
-  | "title";
+export type MovieSortStrategy = "most-screenings" | "newest" | "top-rated" | "title";
 
 export const DEFAULT_MOVIE_SORT: MovieSortStrategy = "most-screenings";
 
@@ -25,10 +21,7 @@ const TIE_BREAKERS: OrderClause[] = [
 ];
 
 export const MOVIE_SORT_ORDERS: Record<MovieSortStrategy, OrderClause[]> = {
-  "most-screenings": [
-    { column: "screening_count", ascending: false },
-    ...TIE_BREAKERS,
-  ],
+  "most-screenings": [{ column: "screening_count", ascending: false }, ...TIE_BREAKERS],
   newest: [
     { column: "release_date", ascending: false, nullsFirst: false },
     { column: "year", ascending: false },
@@ -50,6 +43,39 @@ export const MOVIE_SORT_LABELS: Record<MovieSortStrategy, { da: string; en: stri
 
 type RankableEntry = { movieId: string; date: string; times?: string[] };
 type RankableMovie = { id: string; title: string };
+
+type ConsolidatedRankableMovie = RankableMovie & {
+  screeningCount?: number;
+  nextScreeningDate?: string | null;
+  year?: number;
+  voteAverage?: number | null;
+};
+
+/** Re-apply the selected ordering after duplicate source records are merged. */
+export function sortConsolidatedMovies<T extends ConsolidatedRankableMovie>(
+  movies: T[],
+  strategy: MovieSortStrategy,
+): T[] {
+  return [...movies].sort((a, b) => {
+    if (strategy === "most-screenings") {
+      const count = (b.screeningCount ?? 0) - (a.screeningCount ?? 0);
+      if (count !== 0) return count;
+    } else if (strategy === "newest") {
+      const year = (b.year ?? 0) - (a.year ?? 0);
+      if (year !== 0) return year;
+    } else if (strategy === "top-rated") {
+      const vote = (b.voteAverage ?? 0) - (a.voteAverage ?? 0);
+      if (vote !== 0) return vote;
+    }
+
+    if (strategy !== "title" && a.nextScreeningDate !== b.nextScreeningDate) {
+      if (!a.nextScreeningDate) return 1;
+      if (!b.nextScreeningDate) return -1;
+      return a.nextScreeningDate.localeCompare(b.nextScreeningDate);
+    }
+    return a.title.localeCompare(b.title, "da");
+  });
+}
 
 /**
  * Client-side equivalent of the `movies_ranked` ordering, applied to the

@@ -5,31 +5,48 @@
  */
 export const DATE_WINDOW_DAYS = 30;
 
-const iso = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+const CINEMA_TIME_ZONE = "Europe/Copenhagen";
+
+const CINEMA_DATE_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: CINEMA_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** Calendar date in Denmark for an instant, independent of server/user timezone. */
+export function cinemaDate(now: Date = new Date()): string {
+  const parts: Record<string, string> = {};
+  for (const part of CINEMA_DATE_FORMAT.formatToParts(now)) parts[part.type] = part.value;
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/** Add whole calendar days to a YYYY-MM-DD value without host-timezone drift. */
+export function addCalendarDays(date: string, days: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day + days, 12));
+  return value.toISOString().slice(0, 10);
+}
+
+/** First selectable/visible date in the Danish cinema timezone. */
+export function windowStart(now: Date = new Date()): string {
+  return cinemaDate(now);
+}
+
+/** Last selectable/visible Danish date, inclusive. */
+export function windowEnd(now: Date = new Date()): string {
+  return addCalendarDays(windowStart(now), DATE_WINDOW_DAYS);
+}
+
+const localDateObject = (date: string): Date => {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day);
 };
 
-/** First selectable/visible date (local time). */
-export function windowStart(): string {
-  return iso(new Date());
-}
-
-/** Last selectable/visible date (local time), inclusive. */
-export function windowEnd(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + DATE_WINDOW_DAYS);
-  return iso(d);
-}
-
-/** Date-only Date objects, handy for calendar `disabled` bounds. */
-export function windowBounds(): { from: Date; to: Date } {
-  const from = new Date();
-  from.setHours(0, 0, 0, 0);
-  const to = new Date(from);
-  to.setDate(to.getDate() + DATE_WINDOW_DAYS);
+/** Date-only objects for the calendar, derived from Danish date boundaries. */
+export function windowBounds(now: Date = new Date()): { from: Date; to: Date } {
+  const from = localDateObject(windowStart(now));
+  const to = localDateObject(windowEnd(now));
   return { from, to };
 }
 

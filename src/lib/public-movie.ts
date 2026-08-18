@@ -31,6 +31,8 @@ const NON_FILM_PATTERNS: RegExp[] = [
   /^pressevisning(?:\b|$)/,
   /^børnebiffen(?:\b|$)/,
   /^bornebiffen(?:\b|$)/,
+  /^sommerbørnebiffen(?:\b|$)/,
+  /^sommerbornebiffen(?:\b|$)/,
   /^bamsebio(?:\b|$)/,
   /^børnefilmklub(?:\b|$)/,
   /^bornefilmklub(?:\b|$)/,
@@ -53,6 +55,8 @@ const NON_FILM_PATTERNS: RegExp[] = [
   /^dfi forkørsel\b/,
   /^dfi forkoersel\b/,
   /^5 kurdiske film$/,
+  /^ampas$/,
+  /\bdebataften$/,
   /^fejr fremtidens filmoplevelser sammen med os!?$/,
 ];
 
@@ -60,6 +64,41 @@ export function isPublicMovieTitle(title: string | null | undefined): boolean {
   const value = fold(title ?? "");
   if (!value) return false;
   return !NON_FILM_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+const PROGRAMME_SUFFIX =
+  /\s*[-–—]\s*(?=(?:event\b|late\s+night\b|fright\s+night\b|h\.?\s*bio\b|musikfilm\b|musik\s+i\s+mørket\b|havet\b|klassikere\b|filmuniversitetet\b|events?\b|arabiske\s+stemmer\b|monstrene\b|sergej\s+paradjanov\b|carla\s+sim[oó]n\b|alexander\s+payne\b|strikkebio\b|psych-out\b|lang\s*\(som\)\s+søndag\b|film,\s*tapas\b|lejre\s+klimauge\b|hvalsø\s+bio\b|mørkekammerater\b))/iu;
+
+/** Remove source-specific programme labels from the public film title only. */
+export function publicMovieDisplayTitle(title: string): string {
+  let value = title.replace(/^MSIC\s+\d{2}-\d{2}:\s*/iu, "").trim();
+  const suffix = value.match(PROGRAMME_SUFFIX);
+  if (suffix?.index && suffix.index > 0) value = value.slice(0, suffix.index).trim();
+  return value
+    .replace(/\s{2,}[BCGN]\s*$/u, "")
+    .replace(/\s+(?:dk|danske?)\s+undertekster\s*$/iu, "")
+    .replace(/\s*[-–—]\s*(?:CI|CIN)\s*$/iu, "")
+    .trim();
+}
+
+/**
+ * eBillet's `openingDate` describes this booking programme, not necessarily the
+ * film's original release (a 1986 classic may therefore say 2026). Do not show
+ * that value as a production year unless TMDb or an explicit release date has
+ * verified it.
+ */
+export function resolvePublicMovieYear(input: {
+  id: string;
+  source?: string | null;
+  year?: number | null;
+  releaseDate?: string | null;
+  tmdbId?: number | null;
+}): number {
+  const releaseYear = Number.parseInt((input.releaseDate ?? "").slice(0, 4), 10);
+  if (Number.isFinite(releaseYear) && releaseYear > 1880) return releaseYear;
+  const isEbillet = input.source === "ebillet" || input.id.startsWith("eb-");
+  if (isEbillet && !input.tmdbId) return 0;
+  return Number(input.year ?? 0) || 0;
 }
 
 const GENRE_ALIASES: Record<string, string | null> = {
@@ -95,4 +134,44 @@ export function normalizePublicGenres(values: string[] | null | undefined): stri
     if (mapped && !out.includes(mapped)) out.push(mapped);
   }
   return out;
+}
+
+type PosterBearingMovie = {
+  title: string;
+  tmdbId?: number | null;
+  posterSource?: "tmdb" | "source" | null;
+  poster: { url?: string };
+};
+
+/**
+ * Some source feeds reuse a programme graphic as the poster for many unrelated
+ * films. Keep an image when the rows clearly represent the same film, but fall
+ * back to Lanterna's neutral placeholder when one source URL spans titles.
+ */
+export function suppressCollidingSourcePosters<T extends PosterBearingMovie>(movies: T[]): T[] {
+  const byUrl = new Map<string, T[]>();
+  for (const movie of movies) {
+    const url = movie.posterSource === "source" ? movie.poster.url?.trim() : undefined;
+    if (!url) continue;
+    const group = byUrl.get(url) ?? [];
+    group.push(movie);
+    byUrl.set(url, group);
+  }
+
+  const colliding = new Set<string>();
+  for (const [url, group] of byUrl) {
+    const titles = new Set(group.map((movie) => fold(movie.title)));
+    const tmdbIds = new Set(
+      group.map((movie) => movie.tmdbId).filter((id): id is number => Boolean(id)),
+    );
+    const allShareTmdbIdentity = tmdbIds.size === 1 && group.every((movie) => movie.tmdbId);
+    if (titles.size > 1 && !allShareTmdbIdentity) colliding.add(url);
+  }
+
+  if (colliding.size === 0) return movies;
+  return movies.map((movie) =>
+    movie.poster.url && colliding.has(movie.poster.url)
+      ? { ...movie, poster: { ...movie.poster, url: undefined } }
+      : movie,
+  );
 }

@@ -4,23 +4,48 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { MovieCard } from "@/components/MovieCard";
-import { FilterBar, GeoNotice, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
+import {
+  FilterBar,
+  GeoNotice,
+  useFilters,
+  useCinemaUrlSync,
+  haversineKm,
+  fmtDateLabel,
+} from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { rankMoviesByScreenings } from "@/lib/movie-sort";
-import { fetchMovies, fetchCinemas, fetchShowtimeIndex, type Movie, type Cinema, type ShowtimeIndexRow } from "@/lib/cinema-data";
+import {
+  fetchMovies,
+  fetchCinemas,
+  fetchShowtimeIndex,
+  type Movie,
+  type Cinema,
+} from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
 import { slugifyCity } from "@/lib/city-slug";
 import { homeSchemas } from "@/lib/jsonld";
 import { useLanguage } from "@/lib/i18n";
+import {
+  compactShowtimeIndex,
+  expandShowtimeIndex,
+  remapShowtimeIndexToMovies,
+  type CompactShowtimeIndex,
+} from "@/lib/public-catalog";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [movies, cinemas, showtimeIndex] = await Promise.all([fetchMovies(), fetchCinemas(), fetchShowtimeIndex()]);
-    return { movies, cinemas, showtimeIndex };
+    const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
+      fetchMovies(),
+      fetchCinemas(),
+      fetchShowtimeIndex(),
+    ]);
+    const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, movies);
+    return { movies, cinemas, showtimeIndex: compactShowtimeIndex(showtimeIndex) };
   },
   head: () => {
     const title = "Lanterna — Find film og spilletider i Danmark";
-    const description = "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg.";
+    const description =
+      "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg.";
     const image = "https://lanterna.dk/og-image.jpg";
     return {
       meta: [
@@ -40,7 +65,9 @@ export const Route = createFileRoute("/")({
   },
   errorComponent: ({ reset }) => (
     <div className="p-12">
-      <button onClick={reset} className="text-primary">Prøv igen</button>
+      <button onClick={reset} className="text-primary">
+        Prøv igen
+      </button>
     </div>
   ),
   notFoundComponent: () => <div className="p-12">Siden findes ikke</div>,
@@ -53,16 +80,47 @@ type Suggestion =
   | { kind: "city"; label: string; sub: string; city: string };
 
 const displayCityOf = (s: string) => s.replace(/^\s*\d{3,4}\s+/u, "").trim();
-const baseCityOf = (s: string) => displayCityOf(s).replace(/\s+[A-ZÆØÅ]{1,3}$/u, "").trim();
+const baseCityOf = (s: string) =>
+  displayCityOf(s)
+    .replace(/\s+[A-ZÆØÅ]{1,3}$/u, "")
+    .trim();
 
 function HomePage() {
-  const { movies, cinemas, showtimeIndex } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[]; showtimeIndex: ShowtimeIndexRow[] };
+  const {
+    movies,
+    cinemas,
+    showtimeIndex: compactIndex,
+  } = Route.useLoaderData() as {
+    movies: Movie[];
+    cinemas: Cinema[];
+    showtimeIndex: CompactShowtimeIndex;
+  };
+  const showtimeIndex = useMemo(() => expandShowtimeIndex(compactIndex), [compactIndex]);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const { radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, geoLoading } = useFilters();
-  useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
-  const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
+  const {
+    radius,
+    userLoc,
+    selectedDate,
+    selectedGenre,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    selectedCity,
+    selectedCinemaId,
+    geoLoading,
+  } = useFilters();
+  useCinemaUrlSync(
+    useMemo(
+      () => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
+      [cinemas],
+    ),
+  );
+  const tagSel = useMemo(
+    () => ({ format: selectedFormat, language: selectedLanguage, event: selectedEvent }),
+    [selectedFormat, selectedLanguage, selectedEvent],
+  );
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
@@ -109,31 +167,10 @@ function HomePage() {
   }, [selectedCity, cinemas, nearbyCinemaIds]);
 
   // A specific cinema is the narrowest selection and wins over city / radius.
-  const activeCinemaIds = selectedCinemaId
-    ? new Set([selectedCinemaId])
-    : (nearbyCinemaIds ?? cityCinemaIds);
-
-  const nearbyMovieIds = useMemo(() => {
-    if (!activeCinemaIds) return null;
-    const ids = new Set<string>();
-    for (const p of showtimeIndex) {
-      if (activeCinemaIds.has(p.cinemaId)) ids.add(p.movieId);
-    }
-    return ids;
-  }, [activeCinemaIds, showtimeIndex]);
-
-  // Date + screening-tag filters are evaluated on the same screening (AND logic).
-  const dateMovieIds = useMemo(() => {
-    const tagged = hasTagSelection(tagSel);
-    if (!selectedDate && !tagged) return null;
-    const ids = new Set<string>();
-    for (const s of showtimeIndex) {
-      if (selectedDate && s.date !== selectedDate) continue;
-      if (tagged && !showtimeMatchesTags(s, tagSel)) continue;
-      ids.add(s.movieId);
-    }
-    return ids;
-  }, [selectedDate, showtimeIndex, selectedFormat, selectedLanguage, selectedEvent]);
+  const activeCinemaIds = useMemo(
+    () => (selectedCinemaId ? new Set([selectedCinemaId]) : (nearbyCinemaIds ?? cityCinemaIds)),
+    [selectedCinemaId, nearbyCinemaIds, cityCinemaIds],
+  );
 
   const cities = useMemo(() => {
     const map = new Map<string, { count: number; raws: string[] }>();
@@ -157,7 +194,12 @@ function HomePage() {
       entry.raws.push(c.city);
       map.set(base, entry);
     }
-    return Array.from(map, ([city, v]) => ({ city, cinemas: v.cinemas, variants: v.variants.size, raws: v.raws }));
+    return Array.from(map, ([city, v]) => ({
+      city,
+      cinemas: v.cinemas,
+      variants: v.variants.size,
+      raws: v.raws,
+    }));
   }, [cinemas]);
 
   const suggestions = useMemo<Suggestion[]>(() => {
@@ -205,7 +247,7 @@ function HomePage() {
       }
     }
     return out.slice(0, 8);
-  }, [query, movies, cinemas, cities, baseCities]);
+  }, [query, movies, cinemas, cities, baseCities, t]);
 
   // Screenings that survive the active cinema/date/tag filters — they drive the ranking.
   const matchingScreenings = useMemo(() => {
@@ -216,27 +258,32 @@ function HomePage() {
       if (tagged && !showtimeMatchesTags(s, tagSel)) return false;
       return true;
     });
-  }, [showtimeIndex, activeCinemaIds, selectedDate, selectedFormat, selectedLanguage, selectedEvent]);
+  }, [showtimeIndex, activeCinemaIds, selectedDate, tagSel]);
+
+  // Every active screening constraint must match the same screening. Intersecting
+  // separate movie-id sets would otherwise show a film whose requested format or
+  // date only exists at a different cinema.
+  const matchingMovieIds = useMemo(() => {
+    if (!activeCinemaIds && !selectedDate && !hasTagSelection(tagSel)) return null;
+    return new Set(matchingScreenings.map((screening) => screening.movieId));
+  }, [activeCinemaIds, selectedDate, tagSel, matchingScreenings]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const visible = movies.filter(
-      (m) => {
-        if (nearbyMovieIds && !nearbyMovieIds.has(m.id)) return false;
-        if (dateMovieIds && !dateMovieIds.has(m.id)) return false;
-        if (selectedGenre && !m.genre.includes(selectedGenre)) return false;
-        return (
-          !q ||
-          m.title.toLowerCase().includes(q) ||
-          m.director.toLowerCase().includes(q) ||
-          m.genre.some((g) => g.toLowerCase().includes(q))
-        );
-      },
-    );
+    const visible = movies.filter((m) => {
+      if (matchingMovieIds && !matchingMovieIds.has(m.id)) return false;
+      if (selectedGenre && !m.genre.includes(selectedGenre)) return false;
+      return (
+        !q ||
+        m.title.toLowerCase().includes(q) ||
+        m.director.toLowerCase().includes(q) ||
+        m.genre.some((g) => g.toLowerCase().includes(q))
+      );
+    });
     // Unfiltered view keeps the database ranking from `movies_ranked`.
-    const noScreeningFilter = !activeCinemaIds && !selectedDate && !hasTagSelection(tagSel);
+    const noScreeningFilter = matchingMovieIds === null;
     return noScreeningFilter ? visible : rankMoviesByScreenings(visible, matchingScreenings);
-  }, [query, movies, nearbyMovieIds, dateMovieIds, selectedGenre, matchingScreenings, activeCinemaIds, selectedDate, selectedFormat, selectedLanguage, selectedEvent]);
+  }, [query, movies, matchingMovieIds, selectedGenre, matchingScreenings]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 
@@ -297,7 +344,7 @@ function HomePage() {
       {open && (
         <div
           className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
-          
+
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
           }}
@@ -309,7 +356,16 @@ function HomePage() {
             >
               <div className="relative">
                 <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-primary-foreground/70">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <circle cx="11" cy="11" r="7" />
                     <path d="m20 20-3.5-3.5" />
                   </svg>
@@ -338,7 +394,15 @@ function HomePage() {
                     aria-label="Luk"
                     className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    >
                       <path d="M6 6l12 12M18 6 6 18" />
                     </svg>
                   </button>
@@ -351,7 +415,11 @@ function HomePage() {
                   className="mt-3 max-h-[60vh] overflow-y-auto rounded-md border border-border/80 bg-card"
                 >
                   {suggestions.map((s, i) => (
-                    <li key={`${s.kind}-${s.label}-${i}`} role="option" aria-selected={i === active}>
+                    <li
+                      key={`${s.kind}-${s.label}-${i}`}
+                      role="option"
+                      aria-selected={i === active}
+                    >
                       <button
                         type="button"
                         onMouseEnter={() => setActive(i)}
@@ -361,11 +429,17 @@ function HomePage() {
                         }`}
                       >
                         <div className="min-w-0">
-                          <div className="truncate font-display text-base text-foreground">{s.label}</div>
+                          <div className="truncate font-display text-base text-foreground">
+                            {s.label}
+                          </div>
                           <div className="truncate text-xs text-muted-foreground">{s.sub}</div>
                         </div>
                         <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-primary">
-                          {s.kind === "movie" ? t("kind.movie") : s.kind === "cinema" ? t("kind.cinema") : t("kind.city")}
+                          {s.kind === "movie"
+                            ? t("kind.movie")
+                            : s.kind === "cinema"
+                              ? t("kind.cinema")
+                              : t("kind.city")}
                         </span>
                       </button>
                     </li>
@@ -389,29 +463,46 @@ function HomePage() {
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
-              <div>{movies.length} {t("home.movies")}</div>
-              <div className="mt-1">{cinemas.length} {t("home.cinemas")}</div>
+              <div>
+                {movies.length} {t("home.movies")}
+              </div>
+              <div className="mt-1">
+                {cinemas.length} {t("home.cinemas")}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-
-
       <section className="mx-auto max-w-[1400px] px-6 py-6 sm:px-8 sm:py-10">
         <GeoNotice className="mb-4" />
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
-
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <FilterBar genres={allGenres} formats={tagOptions.formats} languages={tagOptions.languages} events={tagOptions.events} cities={cityOptions} cinemas={cinemaOptions} />
+            <FilterBar
+              genres={allGenres}
+              formats={tagOptions.formats}
+              languages={tagOptions.languages}
+              events={tagOptions.events}
+              cities={cityOptions}
+              cinemas={cinemaOptions}
+            />
           </div>
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>{t("home.locating")}</div>}
             {radius !== "all" && userLoc && nearbyCinemaCount !== null && (
-              <div>{nearbyCinemaCount} {t("home.cinemas")} · {filtered.length} {t("home.movies")} {t("home.within")} {radius} km{selectedDate ? ` · ${fmtDateLabel(selectedDate, lang)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
+              <div>
+                {nearbyCinemaCount} {t("home.cinemas")} · {filtered.length} {t("home.movies")}{" "}
+                {t("home.within")} {radius} km
+                {selectedDate ? ` · ${fmtDateLabel(selectedDate, lang)}` : ""}
+                {selectedGenre ? ` · ${selectedGenre}` : ""}
+              </div>
             )}
             {(radius === "all" || (!userLoc && !geoLoading)) && (
-              <div>{filtered.length} {t("home.movies")}{selectedDate ? ` · ${fmtDateLabel(selectedDate, lang)}` : ""}{selectedGenre ? ` · ${selectedGenre}` : ""}</div>
+              <div>
+                {filtered.length} {t("home.movies")}
+                {selectedDate ? ` · ${fmtDateLabel(selectedDate, lang)}` : ""}
+                {selectedGenre ? ` · ${selectedGenre}` : ""}
+              </div>
             )}
           </div>
         </div>
@@ -426,40 +517,61 @@ function HomePage() {
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((m) => (
-              <MovieCard key={m.id} movie={m} citySlug={selectedCity && !nearbyCinemaIds ? slugifyCity(selectedCity) : null} />
+              <MovieCard
+                key={m.id}
+                movie={m}
+                citySlug={selectedCity && !nearbyCinemaIds ? slugifyCity(selectedCity) : null}
+              />
             ))}
           </div>
         )}
       </section>
-
 
       <section id="cinemas" className="border-t border-border/60 bg-card/30">
         <div className="mx-auto max-w-[1400px] px-8 py-16">
           <div className="mb-8 flex items-baseline justify-between">
             <h2 className="font-display text-2xl tracking-tight">{t("home.cinemasHeading")}</h2>
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {nearbyCinemaIds ? `${nearbyCinemaIds.size} ${t("home.within")} ${radius} km` : `${activeCinemaIds ? activeCinemaIds.size : cinemas.length} ${t("home.places")}`}
+              {nearbyCinemaIds
+                ? `${nearbyCinemaIds.size} ${t("home.within")} ${radius} km`
+                : `${activeCinemaIds ? activeCinemaIds.size : cinemas.length} ${t("home.places")}`}
             </div>
           </div>
           <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md bg-border md:grid-cols-2 lg:grid-cols-3">
-            {cinemas.filter((c) => !activeCinemaIds || activeCinemaIds.has(c.id)).map((c) => (
-              <Link
-                key={c.id}
-                to="/biograf/$slug"
-                params={{ slug: c.slug }}
-                className="group flex items-center justify-between bg-background p-6 transition-colors hover:bg-card"
-              >
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{displayCityOf(c.city)}</div>
-                  <h3 className="mt-2 font-display text-2xl tracking-tight text-foreground group-hover:text-primary">{c.name}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.description}</p>
-                </div>
-                <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{c.screens} {t("home.screens")}</span>
-                  <span className="text-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary">→</span>
-                </div>
-              </Link>
-            ))}
+            {cinemas
+              .filter((c) => !activeCinemaIds || activeCinemaIds.has(c.id))
+              .map((c) => (
+                <Link
+                  key={c.id}
+                  to="/biograf/$slug"
+                  params={{ slug: c.slug }}
+                  className="group flex items-center justify-between bg-background p-6 transition-colors hover:bg-card"
+                >
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                      {displayCityOf(c.city)}
+                    </div>
+                    <h3 className="mt-2 font-display text-2xl tracking-tight text-foreground group-hover:text-primary">
+                      {c.name}
+                    </h3>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      {c.description}
+                    </p>
+                  </div>
+                  <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
+                    {c.screens > 0 ? (
+                      <span>
+                        {c.screens} {t("home.screens")}
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="text-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary">
+                      →
+                    </span>
+                  </div>
+                </Link>
+              ))}
           </div>
         </div>
       </section>

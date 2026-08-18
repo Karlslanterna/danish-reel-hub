@@ -5,13 +5,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
-import {
-  FilterBar,
-  useFilters,
-  useCinemaUrlSync,
-  haversineKm,
-  fmtDateLabel,
-} from "@/lib/filters";
+import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { useLanguage } from "@/lib/i18n";
 import { collectTagOptions, showtimeMatchesTags } from "@/lib/showtime-tags";
 import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
@@ -61,6 +55,11 @@ export function MovieDetail({
   };
   const tagOptions = collectTagOptions(showtimes);
   const hasGeo = radius !== "all" && userLoc !== null;
+  const movieFacts = [
+    formatRuntime(movie.runtime),
+    movie.genre.join(", "),
+    movie.year > 0 ? String(movie.year) : "",
+  ].filter(Boolean);
 
   const geoCinemas = hasGeo
     ? cinemasShowing.filter((c) => {
@@ -158,13 +157,16 @@ export function MovieDetail({
                 {city ? `${movie.title} i ${city.name}` : movie.title}
               </h1>
 
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:text-sm">
-                <span className="text-foreground">{formatRuntime(movie.runtime)}</span>
-                <Dot />
-                <span>{movie.genre.join(", ")}</span>
-                <Dot />
-                <span>{movie.year}</span>
-              </div>
+              {movieFacts.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:text-sm">
+                  {movieFacts.map((fact, index) => (
+                    <span key={fact} className={index === 0 ? "text-foreground" : undefined}>
+                      {index > 0 && <Dot />}
+                      {fact}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {movie.trailerUrl && (
@@ -200,10 +202,7 @@ export function MovieDetail({
         </div>
       </section>
 
-      <section
-        id="showtimes"
-        className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12"
-      >
+      <section id="showtimes" className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 md:px-8 md:py-12">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <FilterBar
             formats={tagOptions.formats}
@@ -362,5 +361,5 @@ export function MovieDetail({
 }
 
 function Dot() {
-  return <span className="text-foreground/20">·</span>;
+  return <span className="mr-2 text-foreground/20">·</span>;
 }

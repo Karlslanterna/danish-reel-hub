@@ -4,6 +4,8 @@
  * never fails because of a bad or missing match.
  */
 
+import { publicMovieDisplayTitle } from "@/lib/public-movie";
+
 /** Strip a trailing year in brackets, e.g. "Michael (2025)" -> "Michael". */
 export const stripYearSuffix = (title: string): string =>
   title.replace(/\s*[([]\s*(?:19|20)\d{2}\s*[)\]]\s*$/u, "").trim();
@@ -35,8 +37,7 @@ export type MatchCandidate = {
 };
 
 export type MatchOutcome =
-  | { matched: true; id: number; confidence: number }
-  | { matched: false; reason: string };
+  { matched: true; id: number; confidence: number } | { matched: false; reason: string };
 
 const yearOf = (releaseDate: string | null): number | null => {
   const y = Number((releaseDate ?? "").slice(0, 4));
@@ -141,14 +142,14 @@ const DANISH_ALIASES: Record<string, string[]> = {
   "vaiana 2": ["Moana 2"],
   "pigen holly": ["Breakfast at Tiffany's"],
   "de utrolige": ["The Incredibles"],
-  "istid": ["Ice Age"],
-  "syng": ["Sing"],
+  istid: ["Ice Age"],
+  syng: ["Sing"],
   "grisen babe": ["Babe"],
   "troldmandens laerling": ["The Sorcerer's Apprentice"],
-  "biler": ["Cars"],
+  biler: ["Cars"],
   "et vildt liv": ["The Wild Robot"],
   "flugten fra hoensegaarden": ["Chicken Run"],
-  "shrek": ["Shrek"],
+  shrek: ["Shrek"],
   "skoenheden og udyret": ["Beauty and the Beast"],
   "den lille havfrue": ["The Little Mermaid"],
   "paw patrol dino filmen": ["PAW Patrol: The Dino Movie", "PAW Patrol"],
@@ -169,6 +170,7 @@ export function searchQueries(title: string, originalTitle?: string | null): str
   };
 
   const base = stripYearSuffix(title);
+  push(publicMovieDisplayTitle(base));
   push(base);
 
   // "Pigen Holly (Breakfast at Tiffany's)" -> "Breakfast at Tiffany's"

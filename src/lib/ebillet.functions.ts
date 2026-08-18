@@ -7,8 +7,14 @@ async function assertAdmin(context: { supabase: unknown; userId: string }) {
     supabase: {
       from: (table: string) => {
         select: (cols: string) => {
-          eq: (col: string, val: unknown) => {
-            eq: (col: string, val: unknown) => {
+          eq: (
+            col: string,
+            val: unknown,
+          ) => {
+            eq: (
+              col: string,
+              val: unknown,
+            ) => {
               maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
             };
           };
@@ -111,7 +117,7 @@ export const ebilletOverview = createServerFn({ method: "GET" })
 
 export const ebilletDiscover = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({ maxId: z.number().int().min(50).max(2000).optional() }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
@@ -131,7 +137,7 @@ export const ebilletSyncAll = createServerFn({ method: "POST" })
 
 export const ebilletSyncOne = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ organizerId: z.number().int().positive() }).parse(input))
+  .validator((input) => z.object({ organizerId: z.number().int().positive() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     // Manual single-organizer sync uses the same canonical pipeline as the

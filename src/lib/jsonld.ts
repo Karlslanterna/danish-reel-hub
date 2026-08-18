@@ -78,13 +78,25 @@ export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtim
       url: canonicalUrl(`/biograf/${cinema.slug}`),
     };
     if (cinema.address) {
-      location.address = { "@type": "PostalAddress", streetAddress: cinema.address, addressLocality: cinema.city, addressCountry: "DK" };
+      location.address = {
+        "@type": "PostalAddress",
+        streetAddress: cinema.address,
+        addressLocality: cinema.city,
+        addressCountry: "DK",
+      };
     }
     if (cinema.latitude != null && cinema.longitude != null) {
-      location.geo = { "@type": "GeoCoordinates", latitude: cinema.latitude, longitude: cinema.longitude };
+      location.geo = {
+        "@type": "GeoCoordinates",
+        latitude: cinema.latitude,
+        longitude: cinema.longitude,
+      };
     }
     s.times.forEach((t, i) => {
-      const startDate = /^\d{4}-\d{2}-\d{2}$/.test(s.date) && /^\d{2}:\d{2}$/.test(t) ? `${s.date}T${t}:00` : undefined;
+      const startDate =
+        /^\d{4}-\d{2}-\d{2}$/.test(s.date) && /^\d{2}:\d{2}$/.test(t)
+          ? `${s.date}T${t}:00`
+          : undefined;
       const ticketUrl = s.ticketUrls?.[i] || s.bookingUrl || undefined;
       const ev: Record<string, unknown> = {
         "@type": "ScreeningEvent",
@@ -102,7 +114,17 @@ export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtim
     { name: movie.title, url: canonicalUrl(`/film/${movie.slug}`) },
   ]);
 
-  return [ld(movieObj), ...events.map((e) => ld(e)), crumbs];
+  // Search engines only need a representative set. Serializing thousands of
+  // near-identical ScreeningEvent scripts made popular film pages megabytes
+  // larger without improving the visitor experience or the core Movie entity.
+  const representativeEvents = events.slice(0, 100);
+  return [
+    ld(movieObj),
+    ...(representativeEvents.length > 0
+      ? [ld({ "@context": "https://schema.org", "@graph": representativeEvents })]
+      : []),
+    crumbs,
+  ];
 }
 
 export function cinemaSchemas(cinema: Cinema) {

@@ -7,7 +7,13 @@
 
 import { citySlug } from "./city-slug";
 import { windowStart, windowEnd } from "./date-window";
-import { isPublicMovieTitle } from "./public-movie";
+import {
+  isPublicMovieTitle,
+  publicMovieDisplayTitle,
+  resolvePublicMovieYear,
+} from "./public-movie";
+import { consolidatePublicMovies } from "./public-catalog";
+import type { Movie } from "./cinema-data";
 
 export type SitemapEntry = {
   loc: string;
@@ -25,8 +31,7 @@ export type SitemapData = {
 
 const day = (v: unknown) => (v ? String(v).slice(0, 10) : undefined);
 
-const newer = (a: string | undefined, b: string | undefined) =>
-  !a ? b : !b ? a : a > b ? a : b;
+const newer = (a: string | undefined, b: string | undefined) => (!a ? b : !b ? a : a > b ? a : b);
 
 type ScreeningRow = {
   movie_id: string;
@@ -60,14 +65,42 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const [moviesRes, cinemasRes, screenings] = await Promise.all([
-    supabaseAdmin.from("movies").select("id, slug, title"),
+    supabaseAdmin
+      .from("movies")
+      .select("id, slug, title, year, tmdb_id, source, release_date"),
     supabaseAdmin.from("cinemas").select("id, slug, city"),
     loadUpcomingScreenings(),
   ]);
 
+  const publicMovieRows = (moviesRes.data ?? []).filter(
+    (movie) => movie.slug && isPublicMovieTitle(movie.title),
+  );
+  const publicMovies = publicMovieRows.map((movie): Movie => ({
+    id: movie.id,
+    slug: movie.slug,
+    title: publicMovieDisplayTitle(movie.title),
+    runtime: 0,
+    genre: [],
+    year: resolvePublicMovieYear({
+      id: movie.id,
+      source: movie.source,
+      year: movie.year,
+      releaseDate: movie.release_date,
+      tmdbId: movie.tmdb_id,
+    }),
+    director: "",
+    rating: "",
+    synopsis: "",
+    poster: {},
+    tmdbId: movie.tmdb_id ?? null,
+  }));
+  const consolidated = consolidatePublicMovies(publicMovies);
+  const canonicalSlug = new Map(consolidated.movies.map((movie) => [movie.id, movie.slug]));
   const movieSlug = new Map<string, string>();
-  for (const m of moviesRes.data ?? []) {
-    if (m.slug && isPublicMovieTitle(m.title)) movieSlug.set(m.id, m.slug);
+  for (const movie of publicMovieRows) {
+    const canonicalId = consolidated.movieIdMap.get(movie.id);
+    const slug = canonicalId ? canonicalSlug.get(canonicalId) : undefined;
+    if (slug) movieSlug.set(movie.id, slug);
   }
 
   const cinemaInfo = new Map<string, { slug: string; city: string }>();

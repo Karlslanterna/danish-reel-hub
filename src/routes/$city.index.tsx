@@ -3,10 +3,30 @@ import { useEffect, useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
-import { FilterBar, GeoNotice, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
+import {
+  FilterBar,
+  GeoNotice,
+  useFilters,
+  useCinemaUrlSync,
+  haversineKm,
+  fmtDateLabel,
+} from "@/lib/filters";
 import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
-import { fetchCinemas, fetchMoviesAndShowtimesForCinemas, type Cinema, type Movie, type Showtime } from "@/lib/cinema-data";
-import { baseCityOf, cityMatchesSlug, cityOptionsFrom, citySlug, displayCityOf, type CityOption } from "@/lib/city-slug";
+import {
+  fetchCinemas,
+  fetchMoviesAndShowtimesForCinemas,
+  type Cinema,
+  type Movie,
+  type Showtime,
+} from "@/lib/cinema-data";
+import {
+  baseCityOf,
+  cityMatchesSlug,
+  cityOptionsFrom,
+  citySlug,
+  displayCityOf,
+  type CityOption,
+} from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { citySchemas } from "@/lib/jsonld";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -27,10 +47,17 @@ export const Route = createFileRoute("/$city/")({
     return { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities };
   },
   head: ({ loaderData }) => {
-    if (!loaderData) return { meta: [{ title: "Byen findes ikke — Lanterna" }, { name: "robots", content: "noindex" }] };
+    if (!loaderData)
+      return {
+        meta: [{ title: "Byen findes ikke — Lanterna" }, { name: "robots", content: "noindex" }],
+      };
     const href = canonicalUrl(`/${loaderData.canonicalSlug}`);
     const title = cityTitle(loaderData.cityName);
-    const description = cityDescription(loaderData.cityName, loaderData.cinemas.length, loaderData.movies.length);
+    const description = cityDescription(
+      loaderData.cityName,
+      loaderData.cinemas.length,
+      loaderData.movies.length,
+    );
     const hasScreenings = loaderData.showtimes.length > 0;
     return {
       meta: [
@@ -53,7 +80,10 @@ export const Route = createFileRoute("/$city/")({
       <SiteHeader />
       <div className="mx-auto max-w-2xl px-8 py-24 text-center">
         <h1 className="font-display text-4xl">Ingen biografer i denne by</h1>
-        <Link to="/" className="mt-6 inline-block text-sm text-primary underline-offset-4 hover:underline">
+        <Link
+          to="/"
+          className="mt-6 inline-block text-sm text-primary underline-offset-4 hover:underline"
+        >
           Tilbage
         </Link>
       </div>
@@ -61,33 +91,53 @@ export const Route = createFileRoute("/$city/")({
   ),
   errorComponent: ({ reset }) => (
     <div className="p-12">
-      <button onClick={reset} className="text-primary">Prøv igen</button>
+      <button onClick={reset} className="text-primary">
+        Prøv igen
+      </button>
     </div>
   ),
   component: CityPage,
 });
 
 function CityPage() {
-  const { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities } = Route.useLoaderData() as {
-    cityName: string;
-    canonicalSlug: string;
-    cinemas: Cinema[];
-    movies: Movie[];
-    showtimes: Showtime[];
-    otherCities: CityOption[];
-  };
+  const { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities } =
+    Route.useLoaderData() as {
+      cityName: string;
+      canonicalSlug: string;
+      cinemas: Cinema[];
+      movies: Movie[];
+      showtimes: Showtime[];
+      otherCities: CityOption[];
+    };
   const {
-    radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent,
-    selectedCity, setSelectedCity, selectedCinemaId, geoLoading,
+    radius,
+    userLoc,
+    selectedDate,
+    selectedGenre,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    selectedCity,
+    setSelectedCity,
+    selectedCinemaId,
+    geoLoading,
   } = useFilters();
-  useCinemaUrlSync(useMemo(() => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })), [cinemas]));
+  useCinemaUrlSync(
+    useMemo(
+      () => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
+      [cinemas],
+    ),
+  );
 
   // Keep the global filter state in sync with the city in the URL.
   useEffect(() => {
     if (selectedCity !== cityName) setSelectedCity(cityName);
   }, [cityName, selectedCity, setSelectedCity]);
 
-  const tagSel = { format: selectedFormat, language: selectedLanguage, event: selectedEvent };
+  const tagSel = useMemo(
+    () => ({ format: selectedFormat, language: selectedLanguage, event: selectedEvent }),
+    [selectedFormat, selectedLanguage, selectedEvent],
+  );
 
   const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
@@ -118,7 +168,16 @@ function CityPage() {
       (m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)),
     );
     return rankMoviesByScreenings(visible, matching);
-  }, [movies, showtimes, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, nearbyCinemaIds, cityCinemaIds, selectedCinemaId]);
+  }, [
+    movies,
+    showtimes,
+    selectedDate,
+    selectedGenre,
+    tagSel,
+    nearbyCinemaIds,
+    cityCinemaIds,
+    selectedCinemaId,
+  ]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -126,7 +185,10 @@ function CityPage() {
 
       <section className="border-b border-border/60">
         <div className="mx-auto max-w-[1400px] px-6 py-10 sm:px-8 sm:py-16">
-          <Link to="/" className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground">
+          <Link
+            to="/"
+            className="text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
+          >
             ← Forside
           </Link>
           <div className="mt-4">
@@ -152,7 +214,10 @@ function CityPage() {
               formats={tagOptions.formats}
               languages={tagOptions.languages}
               events={tagOptions.events}
-              cities={[{ value: cityName, count: cinemas.length }, ...otherCities.map((c) => ({ value: c.name, count: c.count }))]}
+              cities={[
+                { value: cityName, count: cinemas.length },
+                ...otherCities.map((c) => ({ value: c.name, count: c.count })),
+              ]}
               cinemas={cinemas
                 .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
                 .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
@@ -171,7 +236,9 @@ function CityPage() {
         {filtered.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-24 text-center">
             <p className="font-display text-xl text-foreground">Ingen film matcher</p>
-            <p className="mt-2 text-sm text-muted-foreground">Prøv en anden dato eller en større radius.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Prøv en anden dato eller en større radius.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -195,7 +262,9 @@ function CityPage() {
               >
                 <div className="font-display text-lg text-foreground">{c.name}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{c.address}</div>
-                <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{displayCityOf(c.city)}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  {displayCityOf(c.city)}
+                </div>
               </Link>
             ))}
           </div>

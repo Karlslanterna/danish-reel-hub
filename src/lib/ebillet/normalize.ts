@@ -16,10 +16,7 @@ import { ebilletBookingUrl, parseRuntimeMinutes } from "./api.server";
 import { copenhagenParts } from "@/lib/pipeline/localtime";
 import type { NormalizedScreening } from "@/lib/pipeline/types";
 import { extractTags } from "@/lib/showtime-tags";
-import {
-  ebilletDateTimeToUtcIso,
-  isPlausibleEbilletDateTime,
-} from "./showtime-validity";
+import { ebilletDateTimeToUtcIso, isPlausibleEbilletDateTime } from "./showtime-validity";
 
 export type EbilletMovieGroup = {
   /** Source-native movie ref: `base-<id>` or `movie-<id>`. */
@@ -50,7 +47,10 @@ export const screeningRefOf = (organizerId: number, showtimeId: number): string 
   `eb-${organizerId}-${showtimeId}`;
 
 const clean = (html: string | null | undefined): string =>
-  (html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  (html ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /** Instant for a showtime; eBillet emits Danish wall clock, sometimes offset-less. */
 export function ebilletStartsAt(dateTime: string): string {
@@ -100,7 +100,10 @@ export function buildMovieGroups(
       runtime: parseRuntimeMinutes(primary.length),
       year: Number.isFinite(parsedYear) && parsedYear > 1900 ? parsedYear : 0,
       genres: primary.genre
-        ? primary.genre.split(/[,/]/).map((s) => s.trim()).filter(Boolean)
+        ? primary.genre
+            .split(/[,/]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
         : [],
       director: primary.directors?.join(", ") ?? "",
       rating: primary.ageCensoring ?? "",
@@ -109,7 +112,24 @@ export function buildMovieGroups(
       trailerUrl: primary.trailer ?? null,
     });
   }
-  return groups.sort((a, b) => a.ref.localeCompare(b.ref));
+  const titlesByPoster = new Map<string, Set<string>>();
+  for (const group of groups) {
+    if (!group.posterUrl) continue;
+    const titles = titlesByPoster.get(group.posterUrl) ?? new Set<string>();
+    titles.add(group.title.trim().toLocaleLowerCase("da"));
+    titlesByPoster.set(group.posterUrl, titles);
+  }
+  const ambiguousPosters = new Set(
+    [...titlesByPoster].filter(([, titles]) => titles.size > 1).map(([url]) => url),
+  );
+
+  return groups
+    .map((group) =>
+      group.posterUrl && ambiguousPosters.has(group.posterUrl)
+        ? { ...group, posterUrl: null }
+        : group,
+    )
+    .sort((a, b) => a.ref.localeCompare(b.ref));
 }
 
 /** One row per physical screening — never grouped by date/hall. */

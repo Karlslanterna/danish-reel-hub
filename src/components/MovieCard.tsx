@@ -4,6 +4,7 @@ import { formatRuntime } from "@/lib/cinema-data";
 import { Poster } from "./Poster";
 
 export function MovieCard({ movie, citySlug }: { movie: Movie; citySlug?: string | null }) {
+  const facts = [formatRuntime(movie.runtime), movie.genre.join(", ")].filter(Boolean);
   const inner = (
     <>
       <Poster
@@ -15,11 +16,16 @@ export function MovieCard({ movie, citySlug }: { movie: Movie; citySlug?: string
         <h3 className="font-display text-base leading-snug text-foreground line-clamp-2 transition-colors group-hover:text-primary">
           {movie.title}
         </h3>
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{formatRuntime(movie.runtime)}</span>
-          <span className="text-foreground/20">·</span>
-          <span>{movie.genre.join(", ")}</span>
-        </div>
+        {facts.length > 0 && (
+          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            {facts.map((fact, index) => (
+              <span key={fact} className={index === facts.length - 1 ? "truncate" : undefined}>
+                {index > 0 && <span className="mr-2 text-foreground/20">·</span>}
+                {fact}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

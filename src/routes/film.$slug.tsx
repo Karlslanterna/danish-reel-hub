@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieDetail } from "@/components/MovieDetail";
 import {
@@ -14,21 +15,34 @@ import { canonicalUrl } from "@/lib/canonical";
 import { movieSchemas } from "@/lib/jsonld";
 import { movieTitle, movieDescription } from "@/lib/seo";
 import { citySlug } from "@/lib/city-slug";
+import { compactShowtimes, expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params }) => {
     const movie = await fetchMovieBySlug(params.slug);
     if (!movie) throw notFound();
     const [cinemas, showtimes] = await Promise.all([
-      fetchCinemasForMovie(movie.id),
-      fetchShowtimesForMovie(movie.id),
+      fetchCinemasForMovie(movie.sourceIds ?? movie.id),
+      fetchShowtimesForMovie(movie.sourceIds ?? movie.id),
     ]);
-    return { movie, cinemas, showtimes, cityOptions: cityOptionsFrom(cinemas) };
+    return {
+      movie,
+      cinemas,
+      showtimes: compactShowtimes(showtimes),
+      cityOptions: cityOptionsFrom(cinemas),
+    };
   },
   head: ({ params, loaderData }) => {
-    const href = canonicalUrl(`/film/${params.slug}`);
-    if (!loaderData) return { meta: [{ title: "Filmen findes ikke | Lanterna" }, { name: "robots", content: "noindex, follow" }] };
-    const { movie, cinemas, showtimes } = loaderData;
+    const href = canonicalUrl(`/film/${loaderData?.movie.slug ?? params.slug}`);
+    if (!loaderData)
+      return {
+        meta: [
+          { title: "Filmen findes ikke | Lanterna" },
+          { name: "robots", content: "noindex, follow" },
+        ],
+      };
+    const { movie, cinemas } = loaderData;
+    const showtimes = expandShowtimes(loaderData.showtimes);
     const hasScreenings = showtimes.length > 0;
     const cityCount = new Set(cinemas.map((c) => citySlug(c.city)).filter(Boolean)).size;
     const title = movieTitle(movie.title);
@@ -44,10 +58,12 @@ export const Route = createFileRoute("/film/$slug")({
         { property: "og:description", content: description },
         { property: "og:url", content: href },
         { property: "og:type", content: "video.movie" },
-        ...(image ? [
-          { property: "og:image", content: image },
-          { name: "twitter:image", content: image },
-        ] : []),
+        ...(image
+          ? [
+              { property: "og:image", content: image },
+              { name: "twitter:image", content: image },
+            ]
+          : []),
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
       ],
@@ -60,24 +76,39 @@ export const Route = createFileRoute("/film/$slug")({
       <SiteHeader />
       <div className="mx-auto max-w-2xl px-8 py-24 text-center">
         <h1 className="font-display text-4xl">Filmen findes ikke</h1>
-        <Link to="/" className="mt-6 inline-block text-sm text-primary underline-offset-4 hover:underline">Tilbage</Link>
+        <Link
+          to="/"
+          className="mt-6 inline-block text-sm text-primary underline-offset-4 hover:underline"
+        >
+          Tilbage
+        </Link>
       </div>
     </div>
   ),
   errorComponent: ({ reset }) => (
     <div className="p-12">
-      <button onClick={reset} className="text-primary">Prøv igen</button>
+      <button onClick={reset} className="text-primary">
+        Prøv igen
+      </button>
     </div>
   ),
   component: MoviePage,
 });
 
 function MoviePage() {
-  const { movie, cinemas, showtimes, cityOptions } = Route.useLoaderData() as {
+  const {
+    movie,
+    cinemas,
+    showtimes: compact,
+    cityOptions,
+  } = Route.useLoaderData() as {
     movie: Movie;
     cinemas: Cinema[];
-    showtimes: Showtime[];
+    showtimes: CompactShowtimes;
     cityOptions: CityOption[];
   };
-  return <MovieDetail movie={movie} cinemas={cinemas} showtimes={showtimes} cityOptions={cityOptions} />;
+  const showtimes: Showtime[] = useMemo(() => expandShowtimes(compact), [compact]);
+  return (
+    <MovieDetail movie={movie} cinemas={cinemas} showtimes={showtimes} cityOptions={cityOptions} />
+  );
 }

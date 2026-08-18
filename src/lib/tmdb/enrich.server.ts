@@ -89,13 +89,19 @@ function trailerUrl(details: TmdbMovieDetails): string | null {
 
 function buildUpdate(details: TmdbMovieDetails) {
   const director =
-    (details.credits?.crew ?? []).find((c) => (c.job ?? "").toLowerCase() === "director")?.name ?? null;
+    (details.credits?.crew ?? []).find((c) => (c.job ?? "").toLowerCase() === "director")?.name ??
+    null;
   const cast = (details.credits?.cast ?? [])
     .slice(0, 10)
-    .map((c) => ({ name: c.name, character: c.character ?? null, profile_path: c.profile_path ?? null }));
+    .map((c) => ({
+      name: c.name,
+      character: c.character ?? null,
+      profile_path: c.profile_path ?? null,
+    }));
 
   return {
     tmdb_id: details.id,
+    release_date: details.release_date || null,
     tmdb_runtime: details.runtime && details.runtime > 0 ? details.runtime : null,
     tmdb_overview: details.overview && details.overview.trim() ? details.overview.trim() : null,
     tmdb_genres: (details.genres ?? []).map((g) => g.name).filter(Boolean),
@@ -105,7 +111,9 @@ function buildUpdate(details: TmdbMovieDetails) {
     tmdb_cast: cast,
     tmdb_director: director,
     tmdb_vote_average:
-      typeof details.vote_average === "number" && details.vote_average > 0 ? details.vote_average : null,
+      typeof details.vote_average === "number" && details.vote_average > 0
+        ? details.vote_average
+        : null,
     tmdb_fetched_at: new Date().toISOString(),
     tmdb_status: "matched",
     tmdb_skip_reason: null,
@@ -128,7 +136,11 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
   };
 
   if (!isTmdbConfigured()) {
-    return { ...empty, disabled: true, errors: ["TMDb er ikke konfigureret (TMDB_API_KEY mangler)"] };
+    return {
+      ...empty,
+      disabled: true,
+      errors: ["TMDb er ikke konfigureret (TMDB_API_KEY mangler)"],
+    };
   }
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -137,7 +149,10 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
   try {
     work = await selectWork(supabaseAdmin, limit);
   } catch (err) {
-    return { ...empty, errors: [`TMDb udvælgelse: ${err instanceof Error ? err.message : String(err)}`] };
+    return {
+      ...empty,
+      errors: [`TMDb udvælgelse: ${err instanceof Error ? err.message : String(err)}`],
+    };
   }
 
   const summary: EnrichSummary = { ...empty, remaining: work.remaining };
@@ -152,7 +167,8 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
       if (!isNonFilmEvent(movie.title)) {
         for (const query of searchQueries(movie.title, movie.original_title)) {
           let candidates = (await searchMovies(query, year ?? undefined)) as MatchCandidate[];
-          if (candidates.length === 0 && year) candidates = (await searchMovies(query)) as MatchCandidate[];
+          if (candidates.length === 0 && year)
+            candidates = (await searchMovies(query)) as MatchCandidate[];
           const attempt = pickMatch(query, year, candidates);
           outcome = attempt;
           if (attempt.matched) break;
@@ -188,7 +204,10 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
         continue;
       }
 
-      const { error } = await supabaseAdmin.from("movies").update(buildUpdate(details)).eq("id", movie.id);
+      const { error } = await supabaseAdmin
+        .from("movies")
+        .update(buildUpdate(details))
+        .eq("id", movie.id);
       if (error) summary.errors.push(`TMDb gem "${movie.title}": ${error.message}`);
       else summary.matched++;
       summary.processed++;
@@ -198,7 +217,9 @@ export async function enrichBatch(limit = 20): Promise<EnrichSummary> {
         summary.disabled = true;
         break;
       }
-      summary.errors.push(`TMDb "${movie.title}": ${err instanceof Error ? err.message : String(err)}`);
+      summary.errors.push(
+        `TMDb "${movie.title}": ${err instanceof Error ? err.message : String(err)}`,
+      );
       summary.processed++;
     }
   }

@@ -15,3 +15,21 @@ export function toHttpsUrl(url: string | null | undefined): string | undefined {
   if (v.startsWith("http://")) return `https://${v.slice("http://".length)}`;
   return v;
 }
+
+/** Known eBillet placeholders are not film artwork and should never be rendered. */
+export function isPlaceholderPosterUrl(url: string | null | undefined): boolean {
+  const value = toHttpsUrl(url)?.toLowerCase();
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    if (parsed.hostname === "admin.ebillet.dk" && /^\/teamposters\/?$/u.test(parsed.pathname)) {
+      return true;
+    }
+    return (
+      parsed.hostname === "poster.ebillet.dk" &&
+      /^\/plakat\.(?:small|large|hd)\.jpg$/u.test(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+}

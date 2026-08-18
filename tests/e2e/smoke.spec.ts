@@ -27,6 +27,18 @@ test.describe("Public pages", () => {
     ).toBeVisible();
   });
 
+  test("1b. public catalog excludes obvious non-film programme shells", async ({ request }) => {
+    const response = await request.get("/");
+    expect(response.status(), "Homepage must return HTTP 200").toBe(200);
+    const html = (await response.text()).toLocaleLowerCase("da");
+    for (const forbidden of ["børnebiffen", "særvisning", "bestil bord og mad", "andre film"]) {
+      expect(
+        html,
+        `Homepage still exposes non-film/filter-noise label: ${forbidden}`,
+      ).not.toContain(forbidden);
+    }
+  });
+
   test("2. movie page loads", async ({ page, request }) => {
     const path = await firstPathFor(request, "/film/");
     await expectPageLoads(page, path, "Movie page");

@@ -9,7 +9,13 @@ type Props = {
   sizes?: string;
 };
 
-export function Poster({ movie, className = "", showTitle = true, priority = false, sizes }: Props) {
+export function Poster({
+  movie,
+  className = "",
+  showTitle = true,
+  priority = false,
+  sizes,
+}: Props) {
   const posterUrl = toHttpsUrl(movie.poster.url);
 
   if (!posterUrl) {
@@ -18,9 +24,11 @@ export function Poster({ movie, className = "", showTitle = true, priority = fal
         className={`relative aspect-[2/3] w-full overflow-hidden rounded-md border border-border/40 bg-card ${className}`}
       >
         <BrandedPlaceholder movie={movie} />
-        <div className="absolute right-3 top-3 rounded-sm border border-white/20 bg-black/20 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/90 backdrop-blur-sm">
-          {movie.rating}
-        </div>
+        {movie.rating.trim() && (
+          <div className="absolute right-3 top-3 rounded-sm border border-white/20 bg-black/20 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/90 backdrop-blur-sm">
+            {movie.rating}
+          </div>
+        )}
       </div>
     );
   }
@@ -54,14 +62,20 @@ export function Poster({ movie, className = "", showTitle = true, priority = fal
           <div className="font-display text-xl leading-tight text-white drop-shadow-md">
             {movie.title}
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/70">
-            {movie.director} · {movie.year}
-          </div>
+          {(movie.director.trim() || movie.year > 0) && (
+            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/70">
+              {[movie.director.trim(), movie.year > 0 ? String(movie.year) : ""]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          )}
         </div>
       )}
-      <div className="absolute right-3 top-3 rounded-sm border border-white/30 bg-black/30 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white backdrop-blur-sm">
-        {movie.rating}
-      </div>
+      {movie.rating.trim() && (
+        <div className="absolute right-3 top-3 rounded-sm border border-white/30 bg-black/30 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white backdrop-blur-sm">
+          {movie.rating}
+        </div>
+      )}
     </div>
   );
 }
@@ -84,9 +98,11 @@ function BrandedPlaceholder({ movie }: { movie: Movie }) {
         <div className="font-display text-base leading-snug text-foreground line-clamp-3">
           {movie.title}
         </div>
-        <div className="mt-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          {movie.year}
-        </div>
+        {movie.year > 0 && (
+          <div className="mt-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            {movie.year}
+          </div>
+        )}
       </div>
     </div>
   );

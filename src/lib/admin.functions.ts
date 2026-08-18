@@ -9,8 +9,14 @@ type AuthedContext = {
   supabase: {
     from: (table: string) => {
       select: (cols: string) => {
-        eq: (col: string, val: unknown) => {
-          eq: (col: string, val: unknown) => {
+        eq: (
+          col: string,
+          val: unknown,
+        ) => {
+          eq: (
+            col: string,
+            val: unknown,
+          ) => {
             maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
           };
         };
@@ -41,13 +47,10 @@ export const checkIsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => ({ isAdmin: await isAdmin(context) }));
 
-
 /** Create a new Kultunaut import job. Admin only. */
 export const adminCreateImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ xml: z.string().min(1).max(20_000_000) }).parse(input),
-  )
+  .validator((input) => z.object({ xml: z.string().min(1).max(20_000_000) }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { createImportJob } = await import("@/lib/kultunaut/pipeline.server");
@@ -57,7 +60,7 @@ export const adminCreateImportJob = createServerFn({ method: "POST" })
 /** Process one batch of an import job. Admin only. */
 export const adminProcessImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
+  .validator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { processJobBatch } = await import("@/lib/kultunaut/pipeline.server");
@@ -67,7 +70,7 @@ export const adminProcessImportJob = createServerFn({ method: "POST" })
 /** Read the current status of an import job. Admin only. */
 export const adminGetImportJobStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
+  .validator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { getJobStatus } = await import("@/lib/kultunaut/pipeline.server");
@@ -110,7 +113,7 @@ export const adminListImportJobs = createServerFn({ method: "GET" })
 /** Re-queue the data from a previous (failed) import job. Admin only. */
 export const adminRetryImportJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
+  .validator((input) => z.object({ jobId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

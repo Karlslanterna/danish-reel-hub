@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Plus, ChevronRight, ArrowLeft, X } from "lucide-react";
@@ -6,7 +14,7 @@ import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
 import { slugifyCity, baseCityOf } from "@/lib/city-slug";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { windowStart, windowEnd, windowBounds } from "@/lib/date-window";
+import { addCalendarDays, windowStart, windowEnd, windowBounds } from "@/lib/date-window";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -19,7 +27,8 @@ export const RADIUS_OPTIONS: Array<{ value: Radius; label: string }> = [
   { value: "all", label: "Hele Danmark" },
 ];
 
-export type GeoStatus = "idle" | "prompt" | "granted" | "denied" | "unavailable" | "timeout" | "unsupported";
+export type GeoStatus =
+  "idle" | "prompt" | "granted" | "denied" | "unavailable" | "timeout" | "unsupported";
 
 export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
@@ -31,15 +40,18 @@ export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; l
   return 2 * R * Math.asin(Math.sqrt(x));
 }
 
-const todayStr = () => new Date().toISOString().split("T")[0];
-const tomorrowStr = () => new Date(Date.now() + 86400000).toISOString().split("T")[0];
+const todayStr = () => windowStart();
+const tomorrowStr = () => addCalendarDays(windowStart(), 1);
 
 export function fmtDateLabel(date: string | null, lang: Lang = "da") {
   const en = lang === "en";
   if (!date) return en ? "Date" : "Dato";
   if (date === todayStr()) return en ? "Today" : "I dag";
   if (date === tomorrowStr()) return en ? "Tomorrow" : "I morgen";
-  return new Date(date + "T12:00:00").toLocaleDateString(en ? "en-GB" : "da-DK", { day: "numeric", month: "short" });
+  return new Date(date + "T12:00:00").toLocaleDateString(en ? "en-GB" : "da-DK", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 type Loc = { lat: number; lng: number };
@@ -114,12 +126,20 @@ function loadPersisted(): Persisted {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return EMPTY_PERSISTED;
     const p = JSON.parse(raw) as Partial<Persisted>;
-    const radius: Radius = p.radius === "all" || (typeof p.radius === "number" && [2, 5, 10, 25, 50].includes(p.radius)) ? (p.radius as Radius) : "all";
-    const userLoc = p.userLoc && typeof p.userLoc.lat === "number" && typeof p.userLoc.lng === "number" ? p.userLoc : null;
+    const radius: Radius =
+      p.radius === "all" || (typeof p.radius === "number" && [2, 5, 10, 25, 50].includes(p.radius))
+        ? (p.radius as Radius)
+        : "all";
+    const userLoc =
+      p.userLoc && typeof p.userLoc.lat === "number" && typeof p.userLoc.lng === "number"
+        ? p.userLoc
+        : null;
     let selectedDate = typeof p.selectedDate === "string" ? p.selectedDate : null;
-    const selectedGenre = typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
+    const selectedGenre =
+      typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
     // drop dates outside the visible window (past, or beyond +30 days)
-    if (selectedDate && (selectedDate < windowStart() || selectedDate > windowEnd())) selectedDate = null;
+    if (selectedDate && (selectedDate < windowStart() || selectedDate > windowEnd()))
+      selectedDate = null;
     return {
       radius,
       userLoc,
@@ -175,10 +195,36 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName }),
+        JSON.stringify({
+          radius,
+          userLoc,
+          selectedDate,
+          selectedGenre,
+          selectedFormat,
+          selectedLanguage,
+          selectedEvent,
+          selectedCity,
+          selectedCinemaId,
+          selectedCinemaSlug,
+          selectedCinemaName,
+        }),
       );
-    } catch { /* ignore */ }
-  }, [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName]);
+    } catch {
+      /* ignore */
+    }
+  }, [
+    radius,
+    userLoc,
+    selectedDate,
+    selectedGenre,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    selectedCity,
+    selectedCinemaId,
+    selectedCinemaSlug,
+    selectedCinemaName,
+  ]);
 
   // Watch for geolocation permission changes so a previously saved location is not used after the user revokes access.
   // Only surface a notice automatically when a location filter was actually active; otherwise wait for user interaction.
@@ -187,7 +233,19 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     let cleanup: (() => void) | undefined;
     const run = async () => {
       try {
-        const res = await (navigator as unknown as { permissions: { query: (o: unknown) => Promise<{ state: string; addEventListener: (type: string, fn: () => void) => void; removeEventListener: (type: string, fn: () => void) => void }> } }).permissions.query({ name: "geolocation" });
+        const res = await (
+          navigator as unknown as {
+            permissions: {
+              query: (
+                o: unknown,
+              ) => Promise<{
+                state: string;
+                addEventListener: (type: string, fn: () => void) => void;
+                removeEventListener: (type: string, fn: () => void) => void;
+              }>;
+            };
+          }
+        ).permissions.query({ name: "geolocation" });
         const onChange = () => {
           if (res.state === "denied") {
             setUserLoc(null);
@@ -198,7 +256,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         onChange();
         res.addEventListener("change", onChange);
         cleanup = () => res.removeEventListener("change", onChange);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     run();
     return () => cleanup?.();
@@ -211,37 +271,42 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // "Near me" and a specific cinema are mutually exclusive filters.
-  const setRadius = useCallback((r: Radius) => {
-    setRadiusState(r);
-    if (r !== "all") clearCinema();
-  }, [clearCinema]);
+  const setRadius = useCallback(
+    (r: Radius) => {
+      setRadiusState(r);
+      if (r !== "all") clearCinema();
+    },
+    [clearCinema],
+  );
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
   const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
   const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);
   const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
   const setSelectedEvent = useCallback((v: string | null) => setSelectedEventState(v), []);
   // Changing city drops a cinema that no longer belongs to the selected city.
-  const setSelectedCity = useCallback((v: string | null) => {
-    setSelectedCityState(v);
-    setSelectedCinemaIdState((prevId) => {
-      if (!prevId) return prevId;
+  const setSelectedCity = useCallback(
+    (v: string | null) => {
+      setSelectedCityState(v);
       clearCinema();
-      return null;
-    });
-  }, [clearCinema]);
+    },
+    [clearCinema],
+  );
 
   // Picking a cinema implies its city and turns off the distance filter.
-  const setSelectedCinema = useCallback((c: CinemaFilterOption | null) => {
-    if (!c) {
-      clearCinema();
-      return;
-    }
-    setSelectedCinemaIdState(c.id);
-    setSelectedCinemaSlugState(c.slug);
-    setSelectedCinemaNameState(c.name);
-    setSelectedCityState(baseCityOf(c.city));
-    setRadiusState("all");
-  }, [clearCinema]);
+  const setSelectedCinema = useCallback(
+    (c: CinemaFilterOption | null) => {
+      if (!c) {
+        clearCinema();
+        return;
+      }
+      setSelectedCinemaIdState(c.id);
+      setSelectedCinemaSlugState(c.slug);
+      setSelectedCinemaNameState(c.name);
+      setSelectedCityState(baseCityOf(c.city));
+      setRadiusState("all");
+    },
+    [clearCinema],
+  );
 
   const dismissGeo = useCallback(() => setGeoStatus("idle"), []);
 
@@ -253,14 +318,20 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     const run = async () => {
       try {
         if ("permissions" in navigator) {
-          const res = await (navigator as unknown as { permissions: { query: (o: unknown) => Promise<{ state: string }> } }).permissions.query({ name: "geolocation" });
+          const res = await (
+            navigator as unknown as {
+              permissions: { query: (o: unknown) => Promise<{ state: string }> };
+            }
+          ).permissions.query({ name: "geolocation" });
           if (res.state === "denied") {
             setGeoStatus("denied");
             setRadiusState("all");
             return;
           }
         }
-      } catch { /* fall through to getCurrentPosition */ }
+      } catch {
+        /* fall through to getCurrentPosition */
+      }
       setGeoLoading(true);
       setGeoStatus("prompt");
       navigator.geolocation.getCurrentPosition(
@@ -298,13 +369,57 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<FiltersState>(
     () => ({
-      radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
-      selectedCinemaId, selectedCinemaSlug, selectedCinemaName,
-      geoStatus, geoLoading,
-      setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
-      requestLocation, dismissGeo, clear,
+      radius,
+      userLoc,
+      selectedDate,
+      selectedGenre,
+      selectedFormat,
+      selectedLanguage,
+      selectedEvent,
+      selectedCity,
+      selectedCinemaId,
+      selectedCinemaSlug,
+      selectedCinemaName,
+      geoStatus,
+      geoLoading,
+      setRadius,
+      setSelectedDate,
+      setSelectedGenre,
+      setSelectedFormat,
+      setSelectedLanguage,
+      setSelectedEvent,
+      setSelectedCity,
+      setSelectedCinema,
+      requestLocation,
+      dismissGeo,
+      clear,
     }),
-    [radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity, selectedCinemaId, selectedCinemaSlug, selectedCinemaName, geoStatus, geoLoading, setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema, requestLocation, dismissGeo, clear],
+    [
+      radius,
+      userLoc,
+      selectedDate,
+      selectedGenre,
+      selectedFormat,
+      selectedLanguage,
+      selectedEvent,
+      selectedCity,
+      selectedCinemaId,
+      selectedCinemaSlug,
+      selectedCinemaName,
+      geoStatus,
+      geoLoading,
+      setRadius,
+      setSelectedDate,
+      setSelectedGenre,
+      setSelectedFormat,
+      setSelectedLanguage,
+      setSelectedEvent,
+      setSelectedCity,
+      setSelectedCinema,
+      requestLocation,
+      dismissGeo,
+      clear,
+    ],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;
@@ -348,12 +463,18 @@ export function GeoNotice({ className = "" }: { className?: string }) {
   if (geoStatus === "idle" || geoStatus === "granted" || geoStatus === "prompt") return null;
 
   const titleKey: Parameters<typeof t>[0] =
-    geoStatus === "denied" ? "geo.denied" :
-    geoStatus === "unsupported" ? "geo.unsupported" :
-    geoStatus === "timeout" ? "geo.timeout" : "geo.unavailable";
+    geoStatus === "denied"
+      ? "geo.denied"
+      : geoStatus === "unsupported"
+        ? "geo.unsupported"
+        : geoStatus === "timeout"
+          ? "geo.timeout"
+          : "geo.unavailable";
 
   const explainKey: Parameters<typeof t>[0] =
-    geoStatus === "denied" || geoStatus === "unsupported" ? "geo.explain" : "geo.explainNoConnection";
+    geoStatus === "denied" || geoStatus === "unsupported"
+      ? "geo.explain"
+      : "geo.explainNoConnection";
 
   const openCityFilter = () => {
     dismissGeo();
@@ -362,10 +483,23 @@ export function GeoNotice({ className = "" }: { className?: string }) {
   };
 
   return (
-    <div className={`rounded-md border border-border bg-card/80 p-3 text-sm ${className}`} role="status" aria-live="polite">
+    <div
+      className={`rounded-md border border-border bg-card/80 p-3 text-sm ${className}`}
+      role="status"
+      aria-live="polite"
+    >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 shrink-0 text-primary">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
             <circle cx="12" cy="10" r="3" />
             {geoStatus === "denied" && <line x1="2" y1="2" x2="22" y2="22" />}
@@ -432,19 +566,44 @@ export function FilterBar({
   cinemas?: CinemaFilterOption[];
 }) {
   const {
-    radius, userLoc, selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent, selectedCity,
-    selectedCinemaId, selectedCinemaName,
-    setRadius, setSelectedDate, setSelectedGenre, setSelectedFormat, setSelectedLanguage, setSelectedEvent, setSelectedCity, setSelectedCinema,
-    requestLocation, clear,
+    radius,
+    userLoc,
+    selectedDate,
+    selectedGenre,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    selectedCity,
+    selectedCinemaId,
+    selectedCinemaName,
+    setRadius,
+    setSelectedDate,
+    setSelectedGenre,
+    setSelectedFormat,
+    setSelectedLanguage,
+    setSelectedEvent,
+    setSelectedCity,
+    setSelectedCinema,
+    requestLocation,
+    clear,
   } = useFilters();
 
   const hasFilters = Boolean(
-    radius !== "all" || selectedDate || selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity || selectedCinemaId,
+    radius !== "all" ||
+    selectedDate ||
+    selectedGenre ||
+    selectedFormat ||
+    selectedLanguage ||
+    selectedEvent ||
+    selectedCity ||
+    selectedCinemaId,
   );
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [moreView, setMoreView] = useState<"menu" | "genres" | "formats" | "languages" | "events" | "cities" | "cinemas">("menu");
+  const [moreView, setMoreView] = useState<
+    "menu" | "genres" | "formats" | "languages" | "events" | "cities" | "cinemas"
+  >("menu");
   const [cinemaQuery, setCinemaQuery] = useState("");
   const { t, lang } = useLanguage();
 
@@ -464,7 +623,7 @@ export function FilterBar({
   const sortedGenres = useMemo(() => {
     if (!genres || genres.length === 0) return [];
     return Array.from(new Set(genres)).sort((a, b) => a.localeCompare(b, lang));
-  }, [genres]);
+  }, [genres, lang]);
 
   const sortedFormats = useMemo(() => sortTagOptions("formats", formats ?? []), [formats]);
   const sortedLanguages = useMemo(() => sortTagOptions("languages", languages ?? []), [languages]);
@@ -483,7 +642,9 @@ export function FilterBar({
   // Cinema options are constrained by the city selection (the caller has already
   // constrained the list by date / radius before passing it in).
   const cinemaOptions = useMemo(() => {
-    const list = (cinemas ?? []).filter((c) => !selectedCity || baseCityOf(c.city) === selectedCity);
+    const list = (cinemas ?? []).filter(
+      (c) => !selectedCity || baseCityOf(c.city) === selectedCity,
+    );
     return Array.from(new Map(list.map((c) => [c.id, c])).values()).sort((a, b) =>
       a.name.localeCompare(b.name, "da"),
     );
@@ -497,7 +658,14 @@ export function FilterBar({
     );
   }, [cinemaOptions, cinemaQuery]);
 
-  const hasMoreFilters = Boolean(selectedGenre || selectedFormat || selectedLanguage || selectedEvent || selectedCity || selectedCinemaId);
+  const hasMoreFilters = Boolean(
+    selectedGenre ||
+    selectedFormat ||
+    selectedLanguage ||
+    selectedEvent ||
+    selectedCity ||
+    selectedCinemaId,
+  );
 
   // City selection is part of the URL: picking a city moves the user to the
   // city-scoped version of the current page (and clearing it back to national).
@@ -555,7 +723,10 @@ export function FilterBar({
         <Popover
           open={radiusOpen}
           onOpenChange={(open) => {
-            if (!open) { setRadiusOpen(false); return; }
+            if (!open) {
+              setRadiusOpen(false);
+              return;
+            }
             if (!userLoc) requestLocation(() => setRadiusOpen(true));
             else setRadiusOpen(true);
           }}
@@ -569,7 +740,16 @@ export function FilterBar({
                   : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
               }`}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
               </svg>
@@ -585,9 +765,14 @@ export function FilterBar({
                   <button
                     key={String(opt.value)}
                     type="button"
-                    onClick={() => { setRadius(opt.value); setRadiusOpen(false); }}
+                    onClick={() => {
+                      setRadius(opt.value);
+                      setRadiusOpen(false);
+                    }}
                     className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${
-                      selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                      selected
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground hover:bg-secondary"
                     }`}
                   >
                     {label}
@@ -609,7 +794,16 @@ export function FilterBar({
                 : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
             }`}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
               <line x1="8" y1="2" x2="8" y2="6" />
@@ -622,14 +816,20 @@ export function FilterBar({
           <div className="flex flex-col gap-1">
             <button
               type="button"
-              onClick={() => { setSelectedDate(TODAY); setDateOpen(false); }}
+              onClick={() => {
+                setSelectedDate(TODAY);
+                setDateOpen(false);
+              }}
               className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TODAY ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
             >
               {t("filter.today")}
             </button>
             <button
               type="button"
-              onClick={() => { setSelectedDate(TOMORROW); setDateOpen(false); }}
+              onClick={() => {
+                setSelectedDate(TOMORROW);
+                setDateOpen(false);
+              }}
               className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TOMORROW ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
             >
               {t("filter.tomorrow")}
@@ -661,7 +861,10 @@ export function FilterBar({
             {selectedDate && (
               <button
                 type="button"
-                onClick={() => { setSelectedDate(null); setDateOpen(false); }}
+                onClick={() => {
+                  setSelectedDate(null);
+                  setDateOpen(false);
+                }}
                 className="rounded-md px-4 py-2 text-left text-xs uppercase tracking-[0.15em] text-muted-foreground hover:bg-secondary"
               >
                 {t("filter.clearDate")}
@@ -674,7 +877,6 @@ export function FilterBar({
       <Popover
         open={moreOpen}
         onOpenChange={(open) => {
-
           setMoreOpen(open);
           if (!open) setMoreView("menu");
         }}
@@ -696,16 +898,50 @@ export function FilterBar({
         <PopoverContent className="max-h-[70vh] w-56 overflow-y-auto p-2" align="start">
           {(() => {
             const groups = [
-              { key: "genres" as const, label: t("filter.genre"), pick: t("filter.pickGenre"), options: sortedGenres.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedGenre, set: setSelectedGenre },
-              { key: "formats" as const, label: t("filter.screening"), pick: t("filter.pickScreening"), options: sortedFormats.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedFormat, set: setSelectedFormat },
-              { key: "languages" as const, label: t("filter.language"), pick: t("filter.pickLanguage"), options: sortedLanguages.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedLanguage, set: setSelectedLanguage },
-              { key: "events" as const, label: t("filter.event"), pick: t("filter.pickEvent"), options: sortedEvents.map((o) => ({ value: o, label: o })), allLabel: undefined as string | undefined, value: selectedEvent, set: setSelectedEvent },
+              {
+                key: "genres" as const,
+                label: t("filter.genre"),
+                pick: t("filter.pickGenre"),
+                options: sortedGenres.map((o) => ({ value: o, label: o })),
+                allLabel: undefined as string | undefined,
+                value: selectedGenre,
+                set: setSelectedGenre,
+              },
+              {
+                key: "formats" as const,
+                label: t("filter.screening"),
+                pick: t("filter.pickScreening"),
+                options: sortedFormats.map((o) => ({ value: o, label: o })),
+                allLabel: undefined as string | undefined,
+                value: selectedFormat,
+                set: setSelectedFormat,
+              },
+              {
+                key: "languages" as const,
+                label: t("filter.language"),
+                pick: t("filter.pickLanguage"),
+                options: sortedLanguages.map((o) => ({ value: o, label: o })),
+                allLabel: undefined as string | undefined,
+                value: selectedLanguage,
+                set: setSelectedLanguage,
+              },
+              {
+                key: "events" as const,
+                label: t("filter.event"),
+                pick: t("filter.pickEvent"),
+                options: sortedEvents.map((o) => ({ value: o, label: o })),
+                allLabel: undefined as string | undefined,
+                value: selectedEvent,
+                set: setSelectedEvent,
+              },
             ].filter((g) => g.options.length > 0);
 
             if (moreView === "menu") {
               return (
                 <div className="flex flex-col gap-1">
-                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.more")}</div>
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    {t("filter.more")}
+                  </div>
                   {groups.map((g) => (
                     <button
                       key={g.key}
@@ -715,7 +951,11 @@ export function FilterBar({
                     >
                       <span>{g.label}</span>
                       <div className="flex items-center gap-2">
-                        {g.value && <span className="max-w-[80px] truncate text-xs text-primary">{g.value}</span>}
+                        {g.value && (
+                          <span className="max-w-[80px] truncate text-xs text-primary">
+                            {g.value}
+                          </span>
+                        )}
                         <ChevronRight size="14" className="text-muted-foreground" />
                       </div>
                     </button>
@@ -730,7 +970,11 @@ export function FilterBar({
                     >
                       <span>{t("filter.city")}</span>
                       <div className="flex items-center gap-2">
-                        {selectedCity && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCity}</span>}
+                        {selectedCity && (
+                          <span className="max-w-[80px] truncate text-xs text-primary">
+                            {selectedCity}
+                          </span>
+                        )}
                         <ChevronRight size="14" className="text-muted-foreground" />
                       </div>
                     </button>
@@ -743,14 +987,22 @@ export function FilterBar({
                     >
                       <span>{t("filter.cinema")}</span>
                       <div className="flex items-center gap-2">
-                        {selectedCinemaName && <span className="max-w-[80px] truncate text-xs text-primary">{selectedCinemaName}</span>}
+                        {selectedCinemaName && (
+                          <span className="max-w-[80px] truncate text-xs text-primary">
+                            {selectedCinemaName}
+                          </span>
+                        )}
                         <ChevronRight size="14" className="text-muted-foreground" />
                       </div>
                     </button>
                   )}
-                  {groups.length === 0 && (hideCity || !selectedCity) && (hideCinema || cinemaOptions.length === 0) && (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noMore")}</div>
-                  )}
+                  {groups.length === 0 &&
+                    (hideCity || !selectedCity) &&
+                    (hideCinema || cinemaOptions.length === 0) && (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        {t("filter.noMore")}
+                      </div>
+                    )}
                 </div>
               );
             }
@@ -766,12 +1018,16 @@ export function FilterBar({
                     <ArrowLeft size="12" />
                     {t("filter.back")}
                   </button>
-                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCity")}</div>
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    {t("filter.pickCity")}
+                  </div>
                   <button
                     type="button"
                     onClick={() => applyCity(null)}
                     className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                      !selectedCity ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                      !selectedCity
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground hover:bg-secondary"
                     }`}
                   >
                     {t("filter.allCities")}
@@ -784,7 +1040,9 @@ export function FilterBar({
                         type="button"
                         onClick={() => applyCity(selected ? null : c.value)}
                         className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                          selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                          selected
+                            ? "bg-primary text-primary-foreground"
+                            : "text-foreground hover:bg-secondary"
                         }`}
                       >
                         {c.value} ({c.count})
@@ -806,7 +1064,9 @@ export function FilterBar({
                     <ArrowLeft size="12" />
                     {t("filter.back")}
                   </button>
-                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{t("filter.pickCinema")}</div>
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    {t("filter.pickCinema")}
+                  </div>
                   <input
                     value={cinemaQuery}
                     onChange={(e) => setCinemaQuery(e.target.value)}
@@ -817,13 +1077,17 @@ export function FilterBar({
                     type="button"
                     onClick={() => applyCinema(null)}
                     className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                      !selectedCinemaId ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                      !selectedCinemaId
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground hover:bg-secondary"
                     }`}
                   >
                     {t("filter.allCinemas")}
                   </button>
                   {visibleCinemas.length === 0 && (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">{t("filter.noCinemas")}</div>
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      {t("filter.noCinemas")}
+                    </div>
                   )}
                   {visibleCinemas.map((c) => {
                     const selected = selectedCinemaId === c.id;
@@ -833,11 +1097,15 @@ export function FilterBar({
                         type="button"
                         onClick={() => applyCinema(selected ? null : c)}
                         className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                          selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                          selected
+                            ? "bg-primary text-primary-foreground"
+                            : "text-foreground hover:bg-secondary"
                         }`}
                       >
                         <span className="block truncate">{c.name}</span>
-                        <span className={`block truncate text-[11px] ${selected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                        <span
+                          className={`block truncate text-[11px] ${selected ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                        >
                           {baseCityOf(c.city)}
                         </span>
                       </button>
@@ -859,13 +1127,20 @@ export function FilterBar({
                   <ArrowLeft size="12" />
                   {t("filter.back")}
                 </button>
-                <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{active.pick}</div>
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  {active.pick}
+                </div>
                 {active.allLabel && (
                   <button
                     type="button"
-                    onClick={() => { active.set(null); setMoreOpen(false); }}
+                    onClick={() => {
+                      active.set(null);
+                      setMoreOpen(false);
+                    }}
                     className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                      !active.value ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                      !active.value
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground hover:bg-secondary"
                     }`}
                   >
                     {active.allLabel}
@@ -877,9 +1152,14 @@ export function FilterBar({
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => { active.set(selected ? null : opt.value); setMoreOpen(false); }}
+                      onClick={() => {
+                        active.set(selected ? null : opt.value);
+                        setMoreOpen(false);
+                      }}
                       className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                        selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+                        selected
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-secondary"
                       }`}
                     >
                       {opt.label}
@@ -890,7 +1170,6 @@ export function FilterBar({
             );
           })()}
         </PopoverContent>
-
       </Popover>
 
       {hasFilters && (

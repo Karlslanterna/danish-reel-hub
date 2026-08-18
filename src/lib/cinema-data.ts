@@ -1,8 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
-import { toHttpsUrl } from "@/lib/poster-url";
-import { DEFAULT_MOVIE_SORT, MOVIE_SORT_ORDERS, type MovieSortStrategy } from "@/lib/movie-sort";
+import { isPlaceholderPosterUrl, toHttpsUrl } from "@/lib/poster-url";
+import {
+  DEFAULT_MOVIE_SORT,
+  MOVIE_SORT_ORDERS,
+  sortConsolidatedMovies,
+  type MovieSortStrategy,
+} from "@/lib/movie-sort";
 import { windowStart, windowEnd } from "@/lib/date-window";
-import { isPublicMovieTitle, normalizePublicGenres } from "@/lib/public-movie";
+import {
+  isPublicMovieTitle,
+  normalizePublicGenres,
+  publicMovieDisplayTitle,
+  resolvePublicMovieYear,
+  suppressCollidingSourcePosters,
+} from "@/lib/public-movie";
 import {
   groupScreeningIndexForUi,
   groupScreeningsForUi,
@@ -11,6 +22,7 @@ import {
   type UiShowtime,
   type UiShowtimeIndexRow,
 } from "@/lib/screening-read-model";
+import { consolidatePublicMovies, remapShowtimesToMovies } from "@/lib/public-catalog";
 
 export type Poster = {
   a?: string;
@@ -43,6 +55,12 @@ export type Movie = {
   /** Upcoming physical screenings across all cinemas. */
   screeningCount?: number;
   nextScreeningDate?: string | null;
+  /** Used only to reject ambiguous source artwork at the public read boundary. */
+  tmdbId?: number | null;
+  posterSource?: "tmdb" | "source" | null;
+  /** All source rows represented by this public film card. */
+  sourceIds?: string[];
+  sourceSlugs?: string[];
 };
 
 export type Cinema = {
@@ -82,8 +100,11 @@ type MovieRow = {
   tmdb_cast?: unknown;
   tmdb_director?: string | null;
   tmdb_vote_average?: number | string | null;
+  tmdb_id?: number | null;
   screening_count?: number | string | null;
   next_screening_date?: string | null;
+  source?: string | null;
+  release_date?: string | null;
 };
 
 type CinemaRow = {
@@ -146,27 +167,38 @@ const nonEmpty = (v: string | null | undefined): string | undefined => {
  * field the source does have.
  */
 const mapMovie = (r: MovieRow): Movie => {
-  const sourcePoster = r.poster as Poster;
+  const sourcePoster = r.poster && typeof r.poster === "object" ? (r.poster as Poster) : {};
   const voteAverage =
     r.tmdb_vote_average === null || r.tmdb_vote_average === undefined
       ? null
       : Number(r.tmdb_vote_average);
   const rawGenres = r.tmdb_genres && r.tmdb_genres.length > 0 ? r.tmdb_genres : r.genre;
+  const tmdbPoster = nonEmpty(r.tmdb_poster_url);
+  const sourcePosterUrl = isPlaceholderPosterUrl(sourcePoster.url)
+    ? undefined
+    : nonEmpty(sourcePoster.url);
+  const publicYear = resolvePublicMovieYear({
+    id: r.id,
+    source: r.source,
+    year: r.year,
+    releaseDate: r.release_date,
+    tmdbId: r.tmdb_id,
+  });
 
   return {
     id: r.id,
     slug: r.slug,
-    title: r.title,
+    title: publicMovieDisplayTitle(r.title),
     originalTitle: r.original_title,
     runtime: r.tmdb_runtime && r.tmdb_runtime > 0 ? r.tmdb_runtime : r.runtime,
     genre: normalizePublicGenres(rawGenres),
-    year: r.year,
+    year: publicYear,
     director: nonEmpty(r.tmdb_director) ?? r.director,
     rating: r.rating,
     synopsis: nonEmpty(r.tmdb_overview) ?? r.synopsis,
     poster: {
       ...sourcePoster,
-      url: toHttpsUrl(nonEmpty(r.tmdb_poster_url) ?? sourcePoster?.url),
+      url: toHttpsUrl(tmdbPoster ?? sourcePosterUrl),
     },
     backdropUrl: toHttpsUrl(r.tmdb_backdrop_url) ?? null,
     trailerUrl: toHttpsUrl(r.tmdb_trailer_url) ?? null,
@@ -175,6 +207,8 @@ const mapMovie = (r: MovieRow): Movie => {
       Number.isFinite(voteAverage as number) && (voteAverage as number) > 0 ? voteAverage : null,
     screeningCount: Number(r.screening_count ?? 0) || 0,
     nextScreeningDate: r.next_screening_date ?? null,
+    tmdbId: r.tmdb_id ?? null,
+    posterSource: tmdbPoster ? "tmdb" : sourcePosterUrl ? "source" : null,
   };
 };
 
@@ -196,7 +230,8 @@ async function fetchPublicMovieIdSet(): Promise<Set<string>> {
   const { data, error } = await supabase
     .from("movies_ranked")
     .select("id,title,screening_count")
-    .gt("screening_count", 0);
+    .gt("screening_count", 0)
+    .lte("next_screening_date", windowEnd());
   if (error) throw error;
   const ids = new Set<string>();
   for (const row of data ?? []) {
@@ -212,15 +247,23 @@ async function fetchPublicMovieIdSet(): Promise<Set<string>> {
 export async function fetchMovies(
   strategy: MovieSortStrategy = DEFAULT_MOVIE_SORT,
 ): Promise<Movie[]> {
-  let query = supabase.from("movies_ranked").select("*").gt("screening_count", 0);
+  let query = supabase
+    .from("movies_ranked")
+    .select("*")
+    .gt("screening_count", 0)
+    .lte("next_screening_date", windowEnd());
   for (const o of MOVIE_SORT_ORDERS[strategy]) {
     query = query.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? [])
-    .map((r) => mapMovie(r as MovieRow))
-    .filter((movie) => isPublicMovieTitle(movie.title));
+  const visible = suppressCollidingSourcePosters(
+    (data ?? [])
+      .map((row) => row as MovieRow)
+      .filter((row) => isPublicMovieTitle(row.title))
+      .map(mapMovie),
+  );
+  return sortConsolidatedMovies(consolidatePublicMovies(visible).movies, strategy);
 }
 
 export async function fetchCinemas(): Promise<Cinema[]> {
@@ -230,11 +273,15 @@ export async function fetchCinemas(): Promise<Cinema[]> {
 }
 
 export async function fetchMovieBySlug(slug: string): Promise<Movie | null> {
+  const activeMovies = await fetchMovies();
+  const active = activeMovies.find((movie) => (movie.sourceSlugs ?? [movie.slug]).includes(slug));
+  if (active) return active;
+
   const { data, error } = await supabase.from("movies").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
-  if (!data) return null;
+  if (!data || !isPublicMovieTitle(data.title)) return null;
   const movie = mapMovie(data as MovieRow);
-  return isPublicMovieTitle(movie.title) ? movie : null;
+  return movie;
 }
 
 export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
@@ -243,21 +290,39 @@ export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
   return data ? mapCinema(data as CinemaRow) : null;
 }
 
-export async function fetchShowtimesForMovie(movieId: string): Promise<Showtime[]> {
+export async function fetchShowtimesForMovie(movieId: string | string[]): Promise<Showtime[]> {
   const bounds = screeningBounds();
-  const rows = await collectPages<ScreeningReadRow>((from, to) =>
-    supabase
+  const movieIds = Array.isArray(movieId) ? [...new Set(movieId)] : [movieId];
+  const rows = await collectPages<ScreeningReadRow>((from, to) => {
+    let query = supabase
       .from("screenings")
       .select(SCREENING_COLUMNS)
-      .eq("movie_id", movieId)
       .gte("starts_at", bounds.startsAfter)
       .gte("local_date", bounds.firstDate)
-      .lte("local_date", bounds.lastDate)
+      .lte("local_date", bounds.lastDate);
+    query =
+      movieIds.length === 1 ? query.eq("movie_id", movieIds[0]!) : query.in("movie_id", movieIds);
+    return query
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
-      .range(from, to),
-  );
-  return groupScreeningsForUi(rows);
+      .range(from, to);
+  });
+  const grouped = groupScreeningsForUi(rows);
+  if (movieIds.length === 1) return grouped;
+  const canonicalMovie: Movie = {
+    id: movieIds[0]!,
+    slug: "",
+    title: "",
+    runtime: 0,
+    genre: [],
+    year: 0,
+    director: "",
+    rating: "",
+    synopsis: "",
+    poster: {},
+    sourceIds: movieIds,
+  };
+  return remapShowtimesToMovies(grouped, [canonicalMovie]);
 }
 
 export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
@@ -278,28 +343,34 @@ export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
   const out: Movie[] = [];
   for (const row of rows) {
     if (!row.movies || seen.has(row.movie_id)) continue;
+    if (!isPublicMovieTitle(row.movies.title)) continue;
     const movie = mapMovie(row.movies);
-    if (!isPublicMovieTitle(movie.title)) continue;
     seen.add(row.movie_id);
     out.push(movie);
   }
-  return out.sort((a, b) => a.title.localeCompare(b.title, "da"));
+  const visible = suppressCollidingSourcePosters(out);
+  return consolidatePublicMovies(visible).movies.sort((a, b) =>
+    a.title.localeCompare(b.title, "da"),
+  );
 }
 
-export async function fetchCinemasForMovie(movieId: string): Promise<Cinema[]> {
+export async function fetchCinemasForMovie(movieId: string | string[]): Promise<Cinema[]> {
   const bounds = screeningBounds();
-  const rows = await collectPages<{ cinema_id: string; cinemas: CinemaRow | null }>((from, to) =>
-    supabase
+  const movieIds = Array.isArray(movieId) ? [...new Set(movieId)] : [movieId];
+  const rows = await collectPages<{ cinema_id: string; cinemas: CinemaRow | null }>((from, to) => {
+    let query = supabase
       .from("screenings")
       .select("cinema_id, cinemas(*)")
-      .eq("movie_id", movieId)
       .gte("starts_at", bounds.startsAfter)
       .gte("local_date", bounds.firstDate)
-      .lte("local_date", bounds.lastDate)
+      .lte("local_date", bounds.lastDate);
+    query =
+      movieIds.length === 1 ? query.eq("movie_id", movieIds[0]!) : query.in("movie_id", movieIds);
+    return query
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
-      .range(from, to),
-  );
+      .range(from, to);
+  });
   const seen = new Set<string>();
   const out: Cinema[] = [];
   for (const row of rows) {
@@ -311,12 +382,16 @@ export async function fetchCinemasForMovie(movieId: string): Promise<Cinema[]> {
 }
 
 export function formatRuntime(min: number) {
+  if (!Number.isFinite(min) || min <= 0) return "";
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return `${h}t ${m}m`;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}t` : `${h}t ${m}m`;
 }
 
-export async function fetchMovieCinemaPairs(): Promise<Array<{ movieId: string; cinemaId: string }>> {
+export async function fetchMovieCinemaPairs(): Promise<
+  Array<{ movieId: string; cinemaId: string }>
+> {
   const bounds = screeningBounds();
   const [rows, publicMovieIds] = await Promise.all([
     collectPages<{ movie_id: string; cinema_id: string }>((from, to) =>
@@ -430,5 +505,10 @@ export async function fetchMoviesAndShowtimesForCinemas(
       movies.push(mapMovie(row.movies));
     }
   }
-  return { movies, showtimes: groupScreeningsForUi(visibleRows) };
+  const visibleMovies = suppressCollidingSourcePosters(movies);
+  const consolidated = consolidatePublicMovies(visibleMovies).movies;
+  return {
+    movies: consolidated,
+    showtimes: remapShowtimesToMovies(groupScreeningsForUi(visibleRows), consolidated),
+  };
 }

@@ -50,3 +50,17 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: The dashboard used convenient existing endpoints instead of the production acceptance model.
 - Rule: Overall health includes every active importer, queue state, canonical upcoming screenings, and freshness thresholds.
 - Test: A stale or failed source makes the dashboard visibly require attention.
+
+## M-008 — Extracted Supabase method lost its client binding
+
+- What happened: The first production eBillet retry failed after promotion because an extracted `rpc` method lost the client's internal `this.rest` reference.
+- Why: A type cast changed a method call into a detached function call, which local type checking and pure unit tests could not detect.
+- Rule: Call SDK methods directly on their client object; never extract a stateful client method merely to satisfy a narrow type.
+- Test: Every importer change includes a real production invocation and confirmation that the durable queue advances.
+
+## M-009 — Successful retry retained an old error message
+
+- What happened: A retried import reached `completed` but still carried the error text from its earlier failed attempt.
+- Why: `completeRun` updated state and statistics without clearing `last_error`.
+- Rule: A successful terminal transition clears stale failure metadata atomically.
+- Test: Completed retry rows have `last_error IS NULL` after the production import.

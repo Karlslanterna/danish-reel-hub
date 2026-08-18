@@ -158,6 +158,7 @@ export async function completeRun(
       state: "completed",
       finished_at: new Date().toISOString(),
       lease_until: null,
+      last_error: null,
       stats: JSON.parse(JSON.stringify(stats)),
     })
     .eq("id", runId);

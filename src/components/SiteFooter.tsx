@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { baseCityOf, citySlug } from "@/lib/city-slug";
+import { publicSpecialEventOptions, specialEventDefinition } from "@/lib/special-events";
 
 export type FooterCinema = { slug: string; name: string; city: string };
 
@@ -8,7 +9,13 @@ export type FooterCinema = { slug: string; name: string; city: string };
  * pages. Rendered server-side from data the route already loaded, so the
  * links are in the initial HTML.
  */
-export function SiteFooter({ cinemas = [] }: { cinemas?: FooterCinema[] }) {
+export function SiteFooter({
+  cinemas = [],
+  specialEvents = [],
+}: {
+  cinemas?: FooterCinema[];
+  specialEvents?: string[];
+}) {
   const cityMap = new Map<string, { name: string; slug: string; count: number }>();
   for (const c of cinemas) {
     const name = baseCityOf(c.city);
@@ -31,6 +38,7 @@ export function SiteFooter({ cinemas = [] }: { cinemas?: FooterCinema[] }) {
         a.name.localeCompare(b.name, "da"),
     )
     .slice(0, 12);
+  const eventLinks = publicSpecialEventOptions(specialEvents).map(specialEventDefinition);
 
   return (
     <footer className="mt-16 border-t border-border/60 bg-background">
@@ -54,7 +62,10 @@ export function SiteFooter({ cinemas = [] }: { cinemas?: FooterCinema[] }) {
               ))}
               {cities.length === 0 && (
                 <li>
-                  <Link to="/biograf" className="text-sm text-muted-foreground hover:text-foreground">
+                  <Link
+                    to="/biograf"
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
                     Se alle byer og biografer
                   </Link>
                 </li>
@@ -63,7 +74,10 @@ export function SiteFooter({ cinemas = [] }: { cinemas?: FooterCinema[] }) {
           </nav>
 
           <nav aria-labelledby="footer-cinemas">
-            <h2 id="footer-cinemas" className="text-[10px] uppercase tracking-[0.25em] text-primary">
+            <h2
+              id="footer-cinemas"
+              className="text-[10px] uppercase tracking-[0.25em] text-primary"
+            >
               Populære biografer
             </h2>
             <ul className="mt-4 space-y-2">
@@ -80,7 +94,10 @@ export function SiteFooter({ cinemas = [] }: { cinemas?: FooterCinema[] }) {
               ))}
               {popularCinemas.length === 0 && (
                 <li>
-                  <Link to="/biograf" className="text-sm text-muted-foreground hover:text-foreground">
+                  <Link
+                    to="/biograf"
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
                     Se alle biografer
                   </Link>
                 </li>
@@ -103,6 +120,24 @@ export function SiteFooter({ cinemas = [] }: { cinemas?: FooterCinema[] }) {
                   Alle biografer
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/for-boern"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Film for børn
+                </Link>
+              </li>
+              {eventLinks.map((event) => (
+                <li key={event.tag}>
+                  <Link
+                    to={event.path}
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    {event.tag}
+                  </Link>
+                </li>
+              ))}
               <li>
                 <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
                   Forside

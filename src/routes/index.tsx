@@ -34,6 +34,8 @@ import {
   remapShowtimeIndexToMovies,
   type CompactShowtimeIndex,
 } from "@/lib/public-catalog";
+import { specialEventDefinition, type SpecialEventTag } from "@/lib/special-events";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 export type HomeCatalogData = {
   movies: Movie[];
@@ -112,9 +114,11 @@ function IndexPage() {
 export function HomePage({
   catalog,
   childrenOnly = false,
+  specialEvent,
 }: {
   catalog: HomeCatalogData;
   childrenOnly?: boolean;
+  specialEvent?: SpecialEventTag;
 }) {
   const queryClient = useQueryClient();
   const { movies, cinemas, showtimeIndex: compactIndex } = catalog;
@@ -136,10 +140,17 @@ export function HomePage({
   }, [showtimeIndex]);
   const catalogMovies = useMemo(
     () =>
-      childrenOnly
-        ? movies.filter((movie) => isMovieForChildren(movie, screeningsByMovie.get(movie.id) ?? []))
-        : movies,
-    [childrenOnly, movies, screeningsByMovie],
+      movies.filter((movie) => {
+        const screenings = screeningsByMovie.get(movie.id) ?? [];
+        if (childrenOnly && !isMovieForChildren(movie, screenings)) return false;
+        if (
+          specialEvent &&
+          !screenings.some((screening) => screening.events.includes(specialEvent))
+        )
+          return false;
+        return true;
+      }),
+    [childrenOnly, specialEvent, movies, screeningsByMovie],
   );
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -164,11 +175,16 @@ export function HomePage({
     ),
   );
   const tagSel = useMemo(
-    () => ({ format: selectedFormat, language: selectedLanguage, event: selectedEvent }),
-    [selectedFormat, selectedLanguage, selectedEvent],
+    () => ({
+      format: selectedFormat,
+      language: selectedLanguage,
+      event: specialEvent ?? selectedEvent,
+    }),
+    [selectedFormat, selectedLanguage, selectedEvent, specialEvent],
   );
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
+  const eventPage = specialEvent ? specialEventDefinition(specialEvent) : null;
 
   const allGenres = useMemo(() => catalogMovies.flatMap((m) => m.genre), [catalogMovies]);
   const tagOptions = useMemo(() => collectTagOptions(showtimeIndex), [showtimeIndex]);
@@ -331,6 +347,52 @@ export function HomePage({
     const noScreeningFilter = matchingMovieIds === null;
     return noScreeningFilter ? visible : rankMoviesByScreenings(visible, matchingScreenings);
   }, [query, catalogMovies, matchingMovieIds, selectedGenre, matchingScreenings]);
+
+  const lastZeroResult = useRef("");
+  useEffect(() => {
+    const hasConstraint = Boolean(
+      query.trim() ||
+      childrenOnly ||
+      specialEvent ||
+      activeCinemaIds ||
+      selectedDate ||
+      selectedTime ||
+      selectedGenre ||
+      hasTagSelection(tagSel),
+    );
+    if (!hasConstraint || filtered.length > 0) {
+      lastZeroResult.current = "";
+      return;
+    }
+    const signature = JSON.stringify([
+      query.trim().toLowerCase(),
+      childrenOnly,
+      specialEvent,
+      selectedDate,
+      selectedTime,
+      selectedGenre,
+      tagSel,
+      selectedCity,
+      selectedCinemaId,
+      radius,
+    ]);
+    if (lastZeroResult.current === signature) return;
+    lastZeroResult.current = signature;
+    trackAnalyticsEvent({ eventType: "zero_results" });
+  }, [
+    filtered.length,
+    query,
+    childrenOnly,
+    specialEvent,
+    activeCinemaIds,
+    selectedDate,
+    selectedTime,
+    selectedGenre,
+    tagSel,
+    selectedCity,
+    selectedCinemaId,
+    radius,
+  ]);
 
   const nearbyCinemaCount = nearbyCinemaIds?.size ?? null;
 
@@ -503,10 +565,10 @@ export function HomePage({
           <div className="flex items-end justify-between gap-6">
             <div className="max-w-2xl">
               <h1 className="font-hero text-3xl leading-[0.95] tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-                {childrenOnly ? t("home.childrenHero") : t("home.hero")}
+                {eventPage?.hero ?? (childrenOnly ? t("home.childrenHero") : t("home.hero"))}
               </h1>
               <p className="font-hero mt-2 max-w-md text-sm leading-relaxed text-muted-foreground sm:mt-4">
-                {childrenOnly ? t("home.childrenSub") : t("home.sub")}
+                {eventPage?.sub ?? (childrenOnly ? t("home.childrenSub") : t("home.sub"))}
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
@@ -528,6 +590,8 @@ export function HomePage({
             <FilterBar
               showChildrenFilter
               childrenOnly={childrenOnly}
+              fixedEvent={specialEvent}
+              eventRouteEnabled
               showTimeFilter
               genres={allGenres}
               formats={tagOptions.formats}
@@ -626,7 +690,7 @@ export function HomePage({
         </div>
       </section>
 
-      <SiteFooter cinemas={cinemas} />
+      <SiteFooter cinemas={cinemas} specialEvents={tagOptions.events} />
     </div>
   );
 }

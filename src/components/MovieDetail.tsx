@@ -10,6 +10,7 @@ import { useLanguage } from "@/lib/i18n";
 import { collectTagOptions, showtimeMatchesTags } from "@/lib/showtime-tags";
 import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 export type MovieDetailCity = { name: string; slug: string };
 
@@ -295,6 +296,13 @@ export function MovieDetail({
                               <a
                                 key={t + idx}
                                 href={url}
+                                onClick={() =>
+                                  trackAnalyticsEvent({
+                                    eventType: "ticket_click",
+                                    itemType: "movie",
+                                    itemId: movie.slug,
+                                  })
+                                }
                                 target="_blank"
                                 rel="noopener noreferrer nofollow sponsored"
                                 className="rounded-md bg-primary px-2.5 py-1.5 text-center text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"

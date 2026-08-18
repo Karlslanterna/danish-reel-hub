@@ -1,6 +1,7 @@
 import { canonicalUrl } from "./canonical";
 import { baseCityOf, displayCityOf, citySlug as citySlugOf } from "./city-slug";
 import type { Movie, Cinema, Showtime } from "./cinema-data";
+import type { SpecialEventDefinition } from "./special-events";
 
 const ld = (obj: unknown) => ({
   type: "application/ld+json" as const,
@@ -66,6 +67,37 @@ export function childrenMoviesSchemas(movies: Movie[]) {
     breadcrumbSchema([
       { name: "Forside", url: canonicalUrl("/") },
       { name: "For børn", url },
+    ]),
+  ];
+}
+
+export function specialMoviesSchemas(event: SpecialEventDefinition, movies: Movie[]) {
+  const url = canonicalUrl(event.path);
+  return [
+    ld({
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: event.hero,
+      description: event.description,
+      url,
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: movies.length,
+        itemListElement: movies.slice(0, 100).map((movie, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          item: {
+            "@type": "Movie",
+            name: movie.title,
+            url: canonicalUrl(`/film/${movie.slug}`),
+            image: movie.poster.url || undefined,
+          },
+        })),
+      },
+    }),
+    breadcrumbSchema([
+      { name: "Forside", url: canonicalUrl("/") },
+      { name: event.tag, url },
     ]),
   ];
 }

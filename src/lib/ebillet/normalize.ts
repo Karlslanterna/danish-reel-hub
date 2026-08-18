@@ -16,6 +16,7 @@ import { ebilletBookingUrl, parseRuntimeMinutes } from "./api.server";
 import { copenhagenParts } from "@/lib/pipeline/localtime";
 import type { NormalizedScreening } from "@/lib/pipeline/types";
 import { extractTags } from "@/lib/showtime-tags";
+import { applyCuratedProgrammeTags } from "@/lib/film-programmes";
 import { ebilletDateTimeToUtcIso, isPlausibleEbilletDateTime } from "./showtime-validity";
 
 export type EbilletMovieGroup = {
@@ -185,15 +186,19 @@ export function normalizeEbilletScreenings(
         : st.type != null
           ? typeName.get(String(st.type))
           : undefined;
-    const tags = extractTags(
-      base?.name,
-      movie.name,
-      movie.subName,
-      movie.originalName,
-      eventName,
-      st.movieBaseShowName,
-      st.info,
-      st.locationName,
+    const movieTitle = (base?.name ?? movie.name ?? "").trim();
+    const tags = applyCuratedProgrammeTags(
+      extractTags(
+        base?.name,
+        movie.name,
+        movie.subName,
+        movie.originalName,
+        eventName,
+        st.movieBaseShowName,
+        st.info,
+        st.locationName,
+      ),
+      movieTitle,
     );
     const formats: string[] = [movie.is3D || movie.dimension === "3" ? "3D" : "2D"];
     for (const format of tags.formats) if (!formats.includes(format)) formats.push(format);

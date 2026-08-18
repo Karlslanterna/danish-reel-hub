@@ -77,6 +77,7 @@ type FiltersState = {
   selectedFormat: string | null;
   selectedLanguage: string | null;
   selectedEvent: string | null;
+  childrenOnly: boolean;
   selectedCity: string | null;
   selectedCinemaId: string | null;
   selectedCinemaSlug: string | null;
@@ -90,6 +91,7 @@ type FiltersState = {
   setSelectedFormat: (v: string | null) => void;
   setSelectedLanguage: (v: string | null) => void;
   setSelectedEvent: (v: string | null) => void;
+  setChildrenOnly: (v: boolean) => void;
   setSelectedCity: (v: string | null) => void;
   setSelectedCinema: (c: CinemaFilterOption | null) => void;
   requestLocation: (onSuccess?: () => void) => void;
@@ -110,6 +112,7 @@ type Persisted = {
   selectedFormat: string | null;
   selectedLanguage: string | null;
   selectedEvent: string | null;
+  childrenOnly: boolean;
   selectedCity: string | null;
   selectedCinemaId: string | null;
   selectedCinemaSlug: string | null;
@@ -125,6 +128,7 @@ const EMPTY_PERSISTED: Persisted = {
   selectedFormat: null,
   selectedLanguage: null,
   selectedEvent: null,
+  childrenOnly: false,
   selectedCity: null,
   selectedCinemaId: null,
   selectedCinemaSlug: null,
@@ -166,6 +170,7 @@ function loadPersisted(): Persisted {
       selectedFormat: str(p.selectedFormat),
       selectedLanguage: str(p.selectedLanguage),
       selectedEvent: storedEvent && isSpecialEventTag(storedEvent) ? storedEvent : null,
+      childrenOnly: p.childrenOnly === true,
       selectedCity: str(p.selectedCity),
       selectedCinemaId: storedCinemaId ? canonicalCinemaId(storedCinemaId) : null,
       selectedCinemaSlug: str(p.selectedCinemaSlug),
@@ -185,12 +190,14 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [selectedFormat, setSelectedFormatState] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguageState] = useState<string | null>(null);
   const [selectedEvent, setSelectedEventState] = useState<string | null>(null);
+  const [childrenOnly, setChildrenOnlyState] = useState(false);
   const [selectedCity, setSelectedCityState] = useState<string | null>(null);
   const [selectedCinemaId, setSelectedCinemaIdState] = useState<string | null>(null);
   const [selectedCinemaSlug, setSelectedCinemaSlugState] = useState<string | null>(null);
   const [selectedCinemaName, setSelectedCinemaNameState] = useState<string | null>(null);
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoLoading, setGeoLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   // Hydrate from localStorage on client
   useEffect(() => {
@@ -203,15 +210,17 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedFormatState(p.selectedFormat);
     setSelectedLanguageState(p.selectedLanguage);
     setSelectedEventState(p.selectedEvent);
+    setChildrenOnlyState(p.childrenOnly);
     setSelectedCityState(p.selectedCity);
     setSelectedCinemaIdState(p.selectedCinemaId);
     setSelectedCinemaSlugState(p.selectedCinemaSlug);
     setSelectedCinemaNameState(p.selectedCinemaName);
+    setHydrated(true);
   }, []);
 
   // Persist
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !hydrated) return;
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
@@ -224,6 +233,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
           selectedFormat,
           selectedLanguage,
           selectedEvent,
+          childrenOnly,
           selectedCity,
           selectedCinemaId,
           selectedCinemaSlug,
@@ -242,10 +252,12 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     selectedFormat,
     selectedLanguage,
     selectedEvent,
+    childrenOnly,
     selectedCity,
     selectedCinemaId,
     selectedCinemaSlug,
     selectedCinemaName,
+    hydrated,
   ]);
 
   // Watch for geolocation permission changes so a previously saved location is not used after the user revokes access.
@@ -322,6 +334,10 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const setSelectedEvent = useCallback((v: string | null) => {
     setSelectedEventState(v);
     trackFilterChange("special_event", v, Boolean(v));
+  }, []);
+  const setChildrenOnly = useCallback((v: boolean) => {
+    setChildrenOnlyState(v);
+    trackFilterChange("children", v ? "true" : null, v);
   }, []);
   // Changing city drops a cinema that no longer belongs to the selected city.
   const setSelectedCity = useCallback(
@@ -406,6 +422,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedFormatState(null);
     setSelectedLanguageState(null);
     setSelectedEventState(null);
+    setChildrenOnlyState(false);
     setSelectedCityState(null);
     clearCinema();
     setGeoStatus("idle");
@@ -422,6 +439,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       selectedFormat,
       selectedLanguage,
       selectedEvent,
+      childrenOnly,
       selectedCity,
       selectedCinemaId,
       selectedCinemaSlug,
@@ -435,6 +453,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       setSelectedFormat,
       setSelectedLanguage,
       setSelectedEvent,
+      setChildrenOnly,
       setSelectedCity,
       setSelectedCinema,
       requestLocation,
@@ -450,6 +469,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       selectedFormat,
       selectedLanguage,
       selectedEvent,
+      childrenOnly,
       selectedCity,
       selectedCinemaId,
       selectedCinemaSlug,
@@ -463,6 +483,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       setSelectedFormat,
       setSelectedLanguage,
       setSelectedEvent,
+      setChildrenOnly,
       setSelectedCity,
       setSelectedCinema,
       requestLocation,
@@ -597,7 +618,10 @@ export function FilterBar({
   hideCinema = false,
   showChildrenFilter = false,
   childrenOnly = false,
+  childrenRouteEnabled = false,
   showTimeFilter = false,
+  availableDates,
+  availableTimes,
   genres,
   formats,
   languages,
@@ -613,7 +637,10 @@ export function FilterBar({
   hideCinema?: boolean;
   showChildrenFilter?: boolean;
   childrenOnly?: boolean;
+  childrenRouteEnabled?: boolean;
   showTimeFilter?: boolean;
+  availableDates?: string[];
+  availableTimes?: TimePeriod[];
   genres?: string[];
   formats?: string[];
   languages?: string[];
@@ -635,6 +662,7 @@ export function FilterBar({
     selectedFormat,
     selectedLanguage,
     selectedEvent,
+    childrenOnly: selectedChildrenOnly,
     selectedCity,
     selectedCinemaId,
     selectedCinemaName,
@@ -645,6 +673,7 @@ export function FilterBar({
     setSelectedFormat,
     setSelectedLanguage,
     setSelectedEvent,
+    setChildrenOnly,
     setSelectedCity,
     setSelectedCinema,
     requestLocation,
@@ -652,6 +681,7 @@ export function FilterBar({
   } = useFilters();
 
   const activeEvent = fixedEvent ?? selectedEvent;
+  const activeChildren = childrenOnly || selectedChildrenOnly;
   const hasFilters = Boolean(
     radius !== "all" ||
     selectedDate ||
@@ -660,6 +690,7 @@ export function FilterBar({
     selectedFormat ||
     selectedLanguage ||
     activeEvent ||
+    activeChildren ||
     selectedCity ||
     selectedCinemaId,
   );
@@ -687,18 +718,43 @@ export function FilterBar({
   const TOMORROW = tomorrowStr();
 
   const sortedGenres = useMemo(() => {
-    if (!genres || genres.length === 0) return [];
-    return Array.from(new Set(genres)).sort((a, b) => a.localeCompare(b, lang));
-  }, [genres, lang]);
+    if ((!genres || genres.length === 0) && !selectedGenre) return [];
+    return Array.from(new Set([...(genres ?? []), ...(selectedGenre ? [selectedGenre] : [])])).sort(
+      (a, b) => a.localeCompare(b, lang),
+    );
+  }, [genres, selectedGenre, lang]);
 
-  const sortedFormats = useMemo(() => sortTagOptions("formats", formats ?? []), [formats]);
-  const sortedLanguages = useMemo(() => sortTagOptions("languages", languages ?? []), [languages]);
+  const sortedFormats = useMemo(
+    () => sortTagOptions("formats", [...(formats ?? []), ...(selectedFormat ? [selectedFormat] : [])]),
+    [formats, selectedFormat],
+  );
+  const sortedLanguages = useMemo(
+    () =>
+      sortTagOptions("languages", [
+        ...(languages ?? []),
+        ...(selectedLanguage ? [selectedLanguage] : []),
+      ]),
+    [languages, selectedLanguage],
+  );
   // Never offer a dead-end arrangement. The active route is kept visible even
   // if its final screening has just expired, while overview pages only expose
   // choices backed by the current catalog.
   const sortedEvents = useMemo(
-    () => publicSpecialEventOptions([...(events ?? []), ...(fixedEvent ? [fixedEvent] : [])]),
-    [events, fixedEvent],
+    () =>
+      publicSpecialEventOptions([
+        ...(events ?? []),
+        ...(activeEvent ? [activeEvent] : []),
+      ]),
+    [events, activeEvent],
+  );
+
+  const visibleTimePeriods = useMemo(() => {
+    const values = availableTimes ?? (["morning", "afternoon", "evening", "late"] as TimePeriod[]);
+    return Array.from(new Set([...values, ...(selectedTime ? [selectedTime] : [])]));
+  }, [availableTimes, selectedTime]);
+  const availableDateSet = useMemo(
+    () => (availableDates ? new Set(availableDates) : null),
+    [availableDates],
   );
 
   const sortedCities = useMemo(
@@ -749,9 +805,9 @@ export function FilterBar({
       setSelectedEvent(null);
       navigate({ to: "/" });
     } else if (eventRouteEnabled && value && isSpecialEventTag(value)) {
-      setSelectedEvent(null);
-      if (value === fixedEvent) navigate({ to: "/" });
-      else navigate({ to: specialEventDefinition(value).path });
+      const next = value === activeEvent ? null : value;
+      setSelectedEvent(next);
+      navigate({ to: next ? specialEventDefinition(next).path : "/" });
     } else {
       setSelectedEvent(value);
     }
@@ -761,7 +817,39 @@ export function FilterBar({
 
   const clearAll = () => {
     clear();
-    if (fixedEvent) navigate({ to: "/" });
+    if (childrenOnly) {
+      const city = pathname.match(/^\/([^/]+)\/for-boern\/?$/)?.[1];
+      if (city) navigate({ to: "/$city", params: { city } });
+      else navigate({ to: "/" });
+    } else if (fixedEvent) navigate({ to: "/" });
+  };
+
+  const applyChildren = () => {
+    const next = !activeChildren;
+    setChildrenOnly(next);
+    if (!childrenRouteEnabled) return;
+    const childCity = pathname.match(/^\/([^/]+)\/for-boern\/?$/)?.[1];
+    if (!next && childCity) {
+      navigate({ to: "/$city", params: { city: childCity } });
+      return;
+    }
+    const candidateCity = pathname.match(/^\/([^/]+)\/?$/)?.[1];
+    const reserved = new Set([
+      "babybio",
+      "seniorbio",
+      "filmporten",
+      "biografklub-danmark",
+      "for-boern",
+      "film",
+      "biograf",
+      "admin",
+      "auth",
+    ]);
+    if (next && candidateCity && !reserved.has(candidateCity)) {
+      navigate({ to: "/$city/for-boern", params: { city: candidateCity } });
+      return;
+    }
+    navigate({ to: next ? "/for-boern" : "/" });
   };
 
   const applyCity = (cityName: string | null) => {
@@ -775,9 +863,13 @@ export function FilterBar({
       else navigate({ to: "/film/$slug", params: { slug: movie[1] } });
       return;
     }
+    if (/^\/[^/]+\/for-boern\/?$/.test(pathname)) {
+      if (slug) navigate({ to: "/$city/for-boern", params: { city: slug } });
+      else navigate({ to: "/for-boern" });
+      return;
+    }
     const isHomeOrCity = /^\/[^/]*$/.test(pathname);
     if (isHomeOrCity) {
-      if (childrenOnly) return;
       if (slug) navigate({ to: "/$city", params: { city: slug } });
       else navigate({ to: "/" });
     }
@@ -944,7 +1036,12 @@ export function FilterBar({
                 disabled={(date) => {
                   const check = new Date(date.getFullYear(), date.getMonth(), date.getDate());
                   const { from, to } = windowBounds();
-                  return check < from || check > to;
+                  const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                  return (
+                    check < from ||
+                    check > to ||
+                    Boolean(availableDateSet && !availableDateSet.has(key) && key !== selectedDate)
+                  );
                 }}
                 initialFocus
                 className="pointer-events-auto"
@@ -967,17 +1064,18 @@ export function FilterBar({
       </Popover>
 
       {showChildrenFilter && (
-        <Link
-          to={childrenOnly ? "/" : "/for-boern"}
-          aria-current={childrenOnly ? "page" : undefined}
+        <button
+          type="button"
+          onClick={applyChildren}
+          aria-pressed={activeChildren}
           className={`inline-flex h-9 items-center whitespace-nowrap rounded-full border px-3 text-xs uppercase tracking-[0.12em] transition-colors sm:px-4 sm:tracking-[0.15em] ${
-            childrenOnly
+            activeChildren
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
           }`}
         >
           {t("filter.children")}
-        </Link>
+        </button>
       )}
 
       {showTimeFilter && (
@@ -997,7 +1095,7 @@ export function FilterBar({
           </PopoverTrigger>
           <PopoverContent className="w-48 p-2" align="start">
             <div className="flex flex-col gap-1">
-              {([null, "morning", "afternoon", "evening", "late"] as const).map((period) => (
+              {([null, ...visibleTimePeriods] as const).map((period) => (
                 <button
                   key={period ?? "all"}
                   type="button"

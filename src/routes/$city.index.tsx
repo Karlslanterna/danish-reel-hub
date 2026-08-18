@@ -11,7 +11,7 @@ import {
   haversineKm,
   fmtDateLabel,
 } from "@/lib/filters";
-import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
+import { showtimeMatchesTags } from "@/lib/showtime-tags";
 import {
   fetchCinemas,
   fetchMoviesAndShowtimesForCinemas,
@@ -32,10 +32,13 @@ import { citySchemas } from "@/lib/jsonld";
 import { SiteFooter } from "@/components/SiteFooter";
 import { cityTitle, cityDescription } from "@/lib/seo";
 import { rankMoviesByScreenings } from "@/lib/movie-sort";
+import { showtimeMatchesTimePeriod } from "@/lib/time-filter";
+import { isMovieForChildren } from "@/lib/children-filter";
+import { buildFilterFacets } from "@/lib/filter-facets";
+import { useTrackZeroResults } from "@/lib/analytics";
 
-export const Route = createFileRoute("/$city/")({
-  loader: async ({ params }) => {
-    const slug = params.city.toLowerCase();
+export async function loadCityCatalog(cityParam: string) {
+    const slug = cityParam.toLowerCase();
     const all = await fetchCinemas();
     const cinemas = all.filter((c) => cityMatchesSlug(c.city, slug));
     if (cinemas.length === 0) throw notFound();
@@ -45,7 +48,12 @@ export const Route = createFileRoute("/$city/")({
     const canonicalSlug = citySlug(cinemas[0].city);
     const otherCities = cityOptionsFrom(all).filter((c) => c.slug !== canonicalSlug);
     return { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities };
-  },
+}
+
+export type CityCatalogData = Awaited<ReturnType<typeof loadCityCatalog>>;
+
+export const Route = createFileRoute("/$city/")({
+  loader: ({ params }) => loadCityCatalog(params.city),
   head: ({ loaderData }) => {
     if (!loaderData)
       return {
@@ -96,27 +104,32 @@ export const Route = createFileRoute("/$city/")({
       </button>
     </div>
   ),
-  component: CityPage,
+  component: CityRoutePage,
 });
 
-function CityPage() {
-  const { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities } =
-    Route.useLoaderData() as {
-      cityName: string;
-      canonicalSlug: string;
-      cinemas: Cinema[];
-      movies: Movie[];
-      showtimes: Showtime[];
-      otherCities: CityOption[];
-    };
+function CityRoutePage() {
+  return <CityPage data={Route.useLoaderData()} />;
+}
+
+export function CityPage({
+  data,
+  fixedChildrenOnly = false,
+}: {
+  data: CityCatalogData;
+  fixedChildrenOnly?: boolean;
+}) {
+  const { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities } = data;
   const {
     radius,
     userLoc,
     selectedDate,
+    selectedTime,
     selectedGenre,
     selectedFormat,
     selectedLanguage,
     selectedEvent,
+    childrenOnly,
+    setChildrenOnly,
     selectedCity,
     setSelectedCity,
     selectedCinemaId,
@@ -134,13 +147,17 @@ function CityPage() {
     if (selectedCity !== cityName) setSelectedCity(cityName);
   }, [cityName, selectedCity, setSelectedCity]);
 
+  useEffect(() => {
+    if (fixedChildrenOnly) setChildrenOnly(true);
+  }, [fixedChildrenOnly, setChildrenOnly]);
+
+  const activeChildrenOnly = fixedChildrenOnly || childrenOnly;
+
   const tagSel = useMemo(
     () => ({ format: selectedFormat, language: selectedLanguage, event: selectedEvent }),
     [selectedFormat, selectedLanguage, selectedEvent],
   );
 
-  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
-  const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
   const cityCinemaIds = useMemo(() => new Set(cinemas.map((c) => c.id)), [cinemas]);
 
   const nearbyCinemaIds = useMemo(() => {
@@ -153,6 +170,55 @@ function CityPage() {
     return ids;
   }, [radius, userLoc, cinemas]);
 
+  const selectedCinemaIds = useMemo(
+    () => (selectedCinemaId ? new Set([selectedCinemaId]) : null),
+    [selectedCinemaId],
+  );
+  const childMovieIds = useMemo(
+    () =>
+      activeChildrenOnly
+        ? new Set(
+            movies
+              .filter((movie) =>
+                isMovieForChildren(
+                  movie,
+                  showtimes.filter((showtime) => showtime.movieId === movie.id),
+                ),
+              )
+              .map((movie) => movie.id),
+          )
+        : null,
+    [activeChildrenOnly, movies, showtimes],
+  );
+  const facets = useMemo(
+    () =>
+      buildFilterFacets(showtimes, movies, {
+        baseCinemaIds: nearbyCinemaIds ?? cityCinemaIds,
+        cinemaIds: selectedCinemaIds,
+        baseMovieIds: childMovieIds,
+        date: selectedDate,
+        time: selectedTime,
+        genre: selectedGenre,
+        format: selectedFormat,
+        language: selectedLanguage,
+        event: selectedEvent,
+      }),
+    [
+      showtimes,
+      movies,
+      nearbyCinemaIds,
+      cityCinemaIds,
+      selectedCinemaIds,
+      childMovieIds,
+      selectedDate,
+      selectedTime,
+      selectedGenre,
+      selectedFormat,
+      selectedLanguage,
+      selectedEvent,
+    ],
+  );
+
   const filtered = useMemo(() => {
     const allowed = selectedCinemaId
       ? new Set([selectedCinemaId])
@@ -161,23 +227,56 @@ function CityPage() {
       (s) =>
         allowed.has(s.cinemaId) &&
         (!selectedDate || s.date === selectedDate) &&
+        (!selectedTime || showtimeMatchesTimePeriod(s.times, selectedTime)) &&
         showtimeMatchesTags(s, tagSel),
     );
     const movieIds = new Set(matching.map((s) => s.movieId));
     const visible = movies.filter(
-      (m) => movieIds.has(m.id) && (!selectedGenre || m.genre.includes(selectedGenre)),
+      (m) =>
+        movieIds.has(m.id) &&
+        (!selectedGenre || m.genre.includes(selectedGenre)) &&
+        (!childMovieIds || childMovieIds.has(m.id)),
     );
     return rankMoviesByScreenings(visible, matching);
   }, [
     movies,
     showtimes,
     selectedDate,
+    selectedTime,
     selectedGenre,
+    childMovieIds,
     tagSel,
     nearbyCinemaIds,
     cityCinemaIds,
     selectedCinemaId,
   ]);
+
+  useTrackZeroResults(
+    filtered.length,
+    Boolean(
+      selectedDate ||
+        selectedTime ||
+        selectedGenre ||
+        selectedFormat ||
+        selectedLanguage ||
+        selectedEvent ||
+        activeChildrenOnly ||
+        selectedCinemaId ||
+        (radius !== "all" && userLoc)
+    ),
+    [
+      canonicalSlug,
+      selectedDate,
+      selectedTime,
+      selectedGenre,
+      selectedFormat,
+      selectedLanguage,
+      selectedEvent,
+      activeChildrenOnly,
+      selectedCinemaId,
+      radius,
+    ],
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -196,7 +295,7 @@ function CityPage() {
           </div>
           <div className="mt-6 text-xs uppercase tracking-[0.25em] text-primary">By</div>
           <h1 className="mt-3 font-display text-5xl font-bold leading-[0.9] tracking-tight text-foreground sm:text-7xl">
-            Film i {cityName}
+            {activeChildrenOnly ? `Børnefilm i ${cityName}` : `Film i ${cityName}`}
           </h1>
           <p className="mt-5 text-sm text-muted-foreground">
             {cinemas.length} {cinemas.length === 1 ? "biograf" : "biografer"} · {movies.length} film
@@ -210,16 +309,22 @@ function CityPage() {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
             <FilterBar
-              genres={allGenres}
-              formats={tagOptions.formats}
-              languages={tagOptions.languages}
-              events={tagOptions.events}
+              showChildrenFilter
+              childrenOnly={fixedChildrenOnly}
+              childrenRouteEnabled
+              showTimeFilter
+              availableDates={facets.dates}
+              availableTimes={facets.times}
+              genres={facets.genres}
+              formats={facets.formats}
+              languages={facets.languages}
+              events={facets.events}
               cities={[
                 { value: cityName, count: cinemas.length },
                 ...otherCities.map((c) => ({ value: c.name, count: c.count })),
               ]}
               cinemas={cinemas
-                .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
+                .filter((c) => facets.cinemaIds.has(c.id))
                 .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city }))}
             />
           </div>

@@ -197,7 +197,7 @@ describe("eBillet normalization", () => {
     expect(screening?.events).toEqual(["Seniorbio"]);
   });
 
-  it("still resolves legacy numeric eBillet showtime type ids", () => {
+  it("does not trust programme words on a non-programme title", () => {
     const tagged: EbilletMoviesResponse = {
       organizers: payload.organizers,
       movieBases: [{ id: 32, name: "Klubfilm" }],
@@ -216,9 +216,28 @@ describe("eBillet normalization", () => {
       ],
     };
 
-    expect(normalizeEbilletScreenings(ORG, tagged, NOW)[0]?.events).toEqual([
-      "Biografklub Danmark",
-    ]);
+    expect(normalizeEbilletScreenings(ORG, tagged, NOW)[0]?.events).toEqual([]);
+  });
+
+  it("adds current official programme membership without relying on feed text", () => {
+    const tagged: EbilletMoviesResponse = {
+      organizers: payload.organizers,
+      movieBases: [{ id: 33, name: "The Invite" }],
+      movies: [{ id: 303, baseId: 33, name: "The Invite" }],
+      showtimeTypes: [],
+      showtimes: [
+        {
+          id: 63,
+          movieId: 303,
+          movieBaseId: 33,
+          locationId: 1,
+          organizerId: ORG,
+          dateTime: "2026-08-20T19:00:00",
+        },
+      ],
+    };
+
+    expect(normalizeEbilletScreenings(ORG, tagged, NOW)[0]?.events).toEqual(["Filmporten"]);
   });
 
   it("normalizes eBillet subtitle and original-version labels", () => {

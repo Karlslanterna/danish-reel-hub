@@ -6,7 +6,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, fmtDateLabel } from "@/lib/filters";
-import { collectTagOptions } from "@/lib/showtime-tags";
 import { cinemaProgramShowtimesByMovie, groupCinemaShowtimesByDate } from "@/lib/cinema-program";
 import {
   fetchCinemaBySlug,
@@ -22,6 +21,9 @@ import { cinemaSchemas } from "@/lib/jsonld";
 import { SiteFooter } from "@/components/SiteFooter";
 import { cinemaTitle, cinemaDescription } from "@/lib/seo";
 import { trackAnalyticsEvent } from "@/lib/analytics";
+import { isMovieForChildren } from "@/lib/children-filter";
+import { buildFilterFacets } from "@/lib/filter-facets";
+import { useTrackZeroResults } from "@/lib/analytics";
 
 export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
@@ -103,23 +105,84 @@ function CinemaPage() {
     movies: Movie[];
     showtimes: Showtime[];
   };
-  const { selectedDate, selectedGenre, selectedFormat, selectedLanguage, selectedEvent } =
-    useFilters();
-  const allGenres = useMemo(() => movies.flatMap((m) => m.genre), [movies]);
-  const tagOptions = useMemo(() => collectTagOptions(showtimes), [showtimes]);
+  const {
+    selectedDate,
+    selectedTime,
+    selectedGenre,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    childrenOnly,
+  } = useFilters();
   const tagSel = useMemo(
     () => ({ format: selectedFormat, language: selectedLanguage, event: selectedEvent }),
     [selectedFormat, selectedLanguage, selectedEvent],
   );
 
   const filteredMovies = useMemo(
-    () => (selectedGenre ? movies.filter((m) => m.genre.includes(selectedGenre)) : movies),
-    [movies, selectedGenre],
+    () =>
+      movies.filter(
+        (movie) =>
+          (!selectedGenre || movie.genre.includes(selectedGenre)) &&
+          (!childrenOnly ||
+            isMovieForChildren(
+              movie,
+              showtimes.filter((showtime) => showtime.movieId === movie.id),
+            )),
+      ),
+    [movies, showtimes, selectedGenre, childrenOnly],
+  );
+
+  const childMovieIds = useMemo(
+    () =>
+      childrenOnly
+        ? new Set(
+            movies
+              .filter((movie) =>
+                isMovieForChildren(
+                  movie,
+                  showtimes.filter((showtime) => showtime.movieId === movie.id),
+                ),
+              )
+              .map((movie) => movie.id),
+          )
+        : null,
+    [childrenOnly, movies, showtimes],
+  );
+  const facets = useMemo(
+    () =>
+      buildFilterFacets(showtimes, movies, {
+        baseCinemaIds: new Set([cinema.id]),
+        baseMovieIds: childMovieIds,
+        date: selectedDate,
+        time: selectedTime,
+        genre: selectedGenre,
+        format: selectedFormat,
+        language: selectedLanguage,
+        event: selectedEvent,
+      }),
+    [
+      showtimes,
+      movies,
+      cinema.id,
+      childMovieIds,
+      selectedDate,
+      selectedTime,
+      selectedGenre,
+      selectedFormat,
+      selectedLanguage,
+      selectedEvent,
+    ],
   );
 
   const showtimesByMovie = useMemo(
-    () => cinemaProgramShowtimesByMovie(showtimes, { date: selectedDate, ...tagSel }),
-    [showtimes, selectedDate, tagSel],
+    () =>
+      cinemaProgramShowtimesByMovie(showtimes, {
+        date: selectedDate,
+        time: selectedTime,
+        ...tagSel,
+      }),
+    [showtimes, selectedDate, selectedTime, tagSel],
   );
 
   const rows = rankMoviesByScreenings(filteredMovies, [...showtimesByMovie.values()].flat()).map(
@@ -127,6 +190,29 @@ function CinemaPage() {
   );
 
   const withShows = rows.filter((r) => r.shows.length > 0);
+
+  useTrackZeroResults(
+    withShows.length,
+    Boolean(
+      selectedDate ||
+        selectedTime ||
+        selectedGenre ||
+        selectedFormat ||
+        selectedLanguage ||
+        selectedEvent ||
+        childrenOnly
+    ),
+    [
+      cinema.slug,
+      selectedDate,
+      selectedTime,
+      selectedGenre,
+      selectedFormat,
+      selectedLanguage,
+      selectedEvent,
+      childrenOnly,
+    ],
+  );
 
   const cityLabel = cinema.city.replace(/^\s*\d{3,4}\s+/u, "").trim();
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -205,10 +291,14 @@ function CinemaPage() {
             hideRadius
             hideCity
             hideCinema
-            genres={allGenres}
-            formats={tagOptions.formats}
-            languages={tagOptions.languages}
-            events={tagOptions.events}
+            showChildrenFilter
+            showTimeFilter
+            availableDates={facets.dates}
+            availableTimes={facets.times}
+            genres={facets.genres}
+            formats={facets.formats}
+            languages={facets.languages}
+            events={facets.events}
           />
           <div className="ml-auto text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             {withShows.length} film

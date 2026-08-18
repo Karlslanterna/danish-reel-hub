@@ -10,6 +10,7 @@ import { windowStart, windowEnd } from "./date-window";
 import { fetchMovies, type Movie } from "./cinema-data";
 import { consolidatePublicCinemas } from "./cinema-catalog";
 import { SPECIAL_EVENTS } from "./special-events";
+import { isMovieForChildren } from "./children-filter";
 
 export type SitemapEntry = {
   loc: string;
@@ -34,6 +35,7 @@ type ScreeningRow = {
   cinema_id: string;
   updated_at: string | null;
   events: string[] | null;
+  languages: string[] | null;
 };
 
 async function loadUpcomingScreenings(): Promise<ScreeningRow[]> {
@@ -44,7 +46,7 @@ async function loadUpcomingScreenings(): Promise<ScreeningRow[]> {
   for (let page = 0; ; page++) {
     const { data, error } = await supabaseAdmin
       .from("screenings")
-      .select("movie_id, cinema_id, updated_at, events")
+      .select("movie_id, cinema_id, updated_at, events, languages")
       .gte("starts_at", now)
       .gte("local_date", windowStart())
       .lte("local_date", windowEnd())
@@ -93,8 +95,30 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
   const cinemaMod = new Map<string, string | undefined>();
   const cityMod = new Map<string, string | undefined>();
   const cityMovieMod = new Map<string, string | undefined>();
+  const cityChildMovies = new Map<string, Map<string, string | undefined>>();
   const specialMod = new Map<string, string | undefined>();
   let siteMod: string | undefined;
+
+  const screeningsByMovie = new Map<string, ScreeningRow[]>();
+  for (const screening of screenings) {
+    const rows = screeningsByMovie.get(screening.movie_id) ?? [];
+    rows.push(screening);
+    screeningsByMovie.set(screening.movie_id, rows);
+  }
+  const childMovieSourceIds = new Set<string>();
+  for (const movie of publicMovies) {
+    const sourceRows = (movie.sourceIds ?? [movie.id]).flatMap(
+      (id) => screeningsByMovie.get(id) ?? [],
+    );
+    if (
+      isMovieForChildren(
+        movie,
+        sourceRows.map((row) => ({ events: row.events ?? [], languages: row.languages ?? [] })),
+      )
+    ) {
+      for (const id of movie.sourceIds ?? [movie.id]) childMovieSourceIds.add(id);
+    }
+  }
 
   for (const s of screenings) {
     const mSlug = movieSlug.get(s.movie_id);
@@ -120,6 +144,11 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
     cityMod.set(city, newer(cityMod.get(city), mod));
     const key = `${city}/${mSlug}`;
     cityMovieMod.set(key, newer(cityMovieMod.get(key), mod));
+    if (childMovieSourceIds.has(s.movie_id)) {
+      const moviesForCity = cityChildMovies.get(city) ?? new Map<string, string | undefined>();
+      moviesForCity.set(mSlug, newer(moviesForCity.get(mSlug), mod));
+      cityChildMovies.set(city, moviesForCity);
+    }
   }
 
   const core: SitemapEntry[] = [
@@ -140,6 +169,15 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
         lastmod,
         changefreq: "daily" as const,
         priority: "0.9",
+      })),
+    ...[...cityChildMovies.entries()]
+      .filter(([, movies]) => movies.size >= 2)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([slug, movies]) => ({
+        loc: `${baseUrl}/${slug}/for-boern`,
+        lastmod: [...movies.values()].reduce<string | undefined>((latest, value) => newer(latest, value), undefined),
+        changefreq: "daily" as const,
+        priority: "0.8",
       })),
   ];
 

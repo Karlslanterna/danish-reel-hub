@@ -13,7 +13,7 @@ import {
   haversineKm,
   fmtDateLabel,
 } from "@/lib/filters";
-import { collectTagOptions, showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
+import { showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { rankMoviesByScreenings } from "@/lib/movie-sort";
 import {
   fetchMovies,
@@ -23,7 +23,7 @@ import {
   type Cinema,
 } from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
-import { slugifyCity } from "@/lib/city-slug";
+import { citySlug, slugifyCity } from "@/lib/city-slug";
 import { homeSchemas } from "@/lib/jsonld";
 import { useLanguage } from "@/lib/i18n";
 import { isMovieForChildren } from "@/lib/children-filter";
@@ -34,8 +34,13 @@ import {
   remapShowtimeIndexToMovies,
   type CompactShowtimeIndex,
 } from "@/lib/public-catalog";
-import { specialEventDefinition, type SpecialEventTag } from "@/lib/special-events";
+import {
+  isSpecialEventTag,
+  specialEventDefinition,
+  type SpecialEventTag,
+} from "@/lib/special-events";
 import { trackAnalyticsEvent } from "@/lib/analytics";
+import { buildFilterFacets } from "@/lib/filter-facets";
 
 export type HomeCatalogData = {
   movies: Movie[];
@@ -131,6 +136,34 @@ export function HomePage({
     queryClient.setQueryData(HOME_CATALOG_QUERY_KEY, catalog);
   }, [catalog, queryClient]);
   const showtimeIndex = useMemo(() => expandShowtimeIndex(compactIndex), [compactIndex]);
+  const {
+    radius,
+    userLoc,
+    selectedDate,
+    selectedTime,
+    selectedGenre,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    childrenOnly: selectedChildrenOnly,
+    selectedCity,
+    selectedCinemaId,
+    geoLoading,
+    setSelectedEvent,
+    setChildrenOnly,
+  } = useFilters();
+  const activeChildrenOnly = childrenOnly || selectedChildrenOnly;
+  const activeSpecialEvent =
+    specialEvent ?? (selectedEvent && isSpecialEventTag(selectedEvent) ? selectedEvent : undefined);
+
+  useEffect(() => {
+    if (childrenOnly) setChildrenOnly(true);
+  }, [childrenOnly, setChildrenOnly]);
+
+  useEffect(() => {
+    if (specialEvent) setSelectedEvent(specialEvent);
+  }, [specialEvent, setSelectedEvent]);
+
   const screeningsByMovie = useMemo(() => {
     const map = new Map<string, typeof showtimeIndex>();
     for (const screening of showtimeIndex) {
@@ -144,32 +177,14 @@ export function HomePage({
     () =>
       movies.filter((movie) => {
         const screenings = screeningsByMovie.get(movie.id) ?? [];
-        if (childrenOnly && !isMovieForChildren(movie, screenings)) return false;
-        if (
-          specialEvent &&
-          !screenings.some((screening) => screening.events.includes(specialEvent))
-        )
-          return false;
+        if (activeChildrenOnly && !isMovieForChildren(movie, screenings)) return false;
         return true;
       }),
-    [childrenOnly, specialEvent, movies, screeningsByMovie],
+    [activeChildrenOnly, movies, screeningsByMovie],
   );
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const {
-    radius,
-    userLoc,
-    selectedDate,
-    selectedTime,
-    selectedGenre,
-    selectedFormat,
-    selectedLanguage,
-    selectedEvent,
-    selectedCity,
-    selectedCinemaId,
-    geoLoading,
-  } = useFilters();
   useCinemaUrlSync(
     useMemo(
       () => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
@@ -180,16 +195,14 @@ export function HomePage({
     () => ({
       format: selectedFormat,
       language: selectedLanguage,
-      event: specialEvent ?? selectedEvent,
+      event: activeSpecialEvent,
     }),
-    [selectedFormat, selectedLanguage, selectedEvent, specialEvent],
+    [selectedFormat, selectedLanguage, activeSpecialEvent],
   );
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
-  const eventPage = specialEvent ? specialEventDefinition(specialEvent) : null;
+  const eventPage = activeSpecialEvent ? specialEventDefinition(activeSpecialEvent) : null;
 
-  const allGenres = useMemo(() => catalogMovies.flatMap((m) => m.genre), [catalogMovies]);
-  const tagOptions = useMemo(() => collectTagOptions(showtimeIndex), [showtimeIndex]);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -235,6 +248,45 @@ export function HomePage({
     () => (selectedCinemaId ? new Set([selectedCinemaId]) : (nearbyCinemaIds ?? cityCinemaIds)),
     [selectedCinemaId, nearbyCinemaIds, cityCinemaIds],
   );
+
+  const selectedCinemaIds = useMemo(
+    () => (selectedCinemaId ? new Set([selectedCinemaId]) : null),
+    [selectedCinemaId],
+  );
+  const baseMovieIds = useMemo(
+    () => (activeChildrenOnly ? new Set(catalogMovies.map((movie) => movie.id)) : null),
+    [activeChildrenOnly, catalogMovies],
+  );
+  const facets = useMemo(
+    () =>
+      buildFilterFacets(showtimeIndex, movies, {
+        baseCinemaIds: nearbyCinemaIds ?? cityCinemaIds,
+        cinemaIds: selectedCinemaIds,
+        baseMovieIds,
+        date: selectedDate,
+        time: selectedTime,
+        genre: selectedGenre,
+        format: selectedFormat,
+        language: selectedLanguage,
+        event: activeSpecialEvent,
+      }),
+    [
+      showtimeIndex,
+      movies,
+      nearbyCinemaIds,
+      cityCinemaIds,
+      selectedCinemaIds,
+      baseMovieIds,
+      selectedDate,
+      selectedTime,
+      selectedGenre,
+      selectedFormat,
+      selectedLanguage,
+      activeSpecialEvent,
+    ],
+  );
+  const allGenres = facets.genres;
+  const tagOptions = facets;
 
   const cities = useMemo(() => {
     const map = new Map<string, { count: number; raws: string[] }>();
@@ -354,8 +406,8 @@ export function HomePage({
   useEffect(() => {
     const hasConstraint = Boolean(
       query.trim() ||
-      childrenOnly ||
-      specialEvent ||
+      activeChildrenOnly ||
+      activeSpecialEvent ||
       activeCinemaIds ||
       selectedDate ||
       selectedTime ||
@@ -368,8 +420,8 @@ export function HomePage({
     }
     const signature = JSON.stringify([
       query.trim().toLowerCase(),
-      childrenOnly,
-      specialEvent,
+      activeChildrenOnly,
+      activeSpecialEvent,
       selectedDate,
       selectedTime,
       selectedGenre,
@@ -384,8 +436,8 @@ export function HomePage({
   }, [
     filtered.length,
     query,
-    childrenOnly,
-    specialEvent,
+    activeChildrenOnly,
+    activeSpecialEvent,
     activeCinemaIds,
     selectedDate,
     selectedTime,
@@ -408,10 +460,26 @@ export function HomePage({
   const cinemaOptions = useMemo(
     () =>
       cinemas
-        .filter((c) => !nearbyCinemaIds || nearbyCinemaIds.has(c.id))
+        .filter((c) => facets.cinemaIds.has(c.id))
         .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
-    [cinemas, nearbyCinemaIds],
+    [cinemas, facets.cinemaIds],
   );
+
+  const childrenCitySlugs = useMemo(() => {
+    if (!activeChildrenOnly) return [];
+    const childIds = new Set(catalogMovies.map((movie) => movie.id));
+    const cityByCinema = new Map(cinemas.map((cinema) => [cinema.id, citySlug(cinema.city)]));
+    const moviesByCity = new Map<string, Set<string>>();
+    for (const screening of showtimeIndex) {
+      if (!childIds.has(screening.movieId)) continue;
+      const city = cityByCinema.get(screening.cinemaId);
+      if (!city) continue;
+      const ids = moviesByCity.get(city) ?? new Set<string>();
+      ids.add(screening.movieId);
+      moviesByCity.set(city, ids);
+    }
+    return [...moviesByCity].filter(([, ids]) => ids.size >= 2).map(([city]) => city);
+  }, [activeChildrenOnly, catalogMovies, cinemas, showtimeIndex]);
 
   useEffect(() => {
     setActive(0);
@@ -567,10 +635,12 @@ export function HomePage({
           <div className="flex items-end justify-between gap-6">
             <div className="max-w-2xl">
               <h1 className="font-hero text-3xl leading-[0.95] tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-                {eventPage?.hero ?? (childrenOnly ? t("home.childrenHero") : t("home.hero"))}
+                {eventPage?.hero ??
+                  (activeChildrenOnly ? t("home.childrenHero") : t("home.hero"))}
               </h1>
               <p className="font-hero mt-2 max-w-md text-sm leading-relaxed text-muted-foreground sm:mt-4">
-                {eventPage?.sub ?? (childrenOnly ? t("home.childrenSub") : t("home.sub"))}
+                {eventPage?.sub ??
+                  (activeChildrenOnly ? t("home.childrenSub") : t("home.sub"))}
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
@@ -592,9 +662,12 @@ export function HomePage({
             <FilterBar
               showChildrenFilter
               childrenOnly={childrenOnly}
+              childrenRouteEnabled
               fixedEvent={specialEvent}
               eventRouteEnabled
               showTimeFilter
+              availableDates={facets.dates}
+              availableTimes={facets.times}
               genres={allGenres}
               formats={tagOptions.formats}
               languages={tagOptions.languages}
@@ -692,7 +765,11 @@ export function HomePage({
         </div>
       </section>
 
-      <SiteFooter cinemas={cinemas} specialEvents={tagOptions.events} />
+      <SiteFooter
+        cinemas={cinemas}
+        specialEvents={tagOptions.events}
+        childrenCitySlugs={childrenCitySlugs}
+      />
     </div>
   );
 }

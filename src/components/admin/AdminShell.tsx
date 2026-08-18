@@ -1,7 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, Database, Settings2, Menu, UserRound, BarChart3, Ticket } from "lucide-react";
+import {
+  LayoutDashboard,
+  Database,
+  Settings2,
+  Menu,
+  UserRound,
+  BarChart3,
+  SlidersHorizontal,
+  SearchCheck,
+  ShieldCheck,
+} from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -16,9 +26,15 @@ import { supabase } from "@/integrations/supabase/client";
 
 type NavItem = {
   label: string;
-  to?: "/admin" | "/admin/pipeline" | "/admin/analytics" | "/admin/ebillet";
+  to:
+    | "/admin"
+    | "/admin/data"
+    | "/admin/quality"
+    | "/admin/filters"
+    | "/admin/analytics"
+    | "/admin/seo"
+    | "/admin/advanced";
   icon: typeof LayoutDashboard;
-  soon?: boolean;
   match: (path: string) => boolean;
 };
 
@@ -30,28 +46,44 @@ const NAV: NavItem[] = [
     match: (p) => p === "/admin" || p === "/admin/",
   },
   {
-    label: "Data Pipeline",
-    to: "/admin/pipeline",
+    label: "Data & importer",
+    to: "/admin/data",
     icon: Database,
-    match: (p) => p.startsWith("/admin/pipeline") || p.startsWith("/admin/import"),
+    match: (p) => p.startsWith("/admin/data"),
   },
   {
-    label: "eBillet-sync",
-    to: "/admin/ebillet",
-    icon: Ticket,
-    match: (p) => p.startsWith("/admin/ebillet"),
+    label: "Datakvalitet",
+    to: "/admin/quality",
+    icon: ShieldCheck,
+    match: (p) => p.startsWith("/admin/quality"),
   },
   {
-    label: "Analytics",
+    label: "Filtre & mærkninger",
+    to: "/admin/filters",
+    icon: SlidersHorizontal,
+    match: (p) => p.startsWith("/admin/filters"),
+  },
+  {
+    label: "Besøg & klik",
     to: "/admin/analytics",
     icon: BarChart3,
     match: (p) => p.startsWith("/admin/analytics"),
   },
   {
-    label: "Systemindstillinger",
+    label: "Google & SEO",
+    to: "/admin/seo",
+    icon: SearchCheck,
+    match: (p) => p.startsWith("/admin/seo"),
+  },
+  {
+    label: "Avanceret",
+    to: "/admin/advanced",
     icon: Settings2,
-    soon: true,
-    match: () => false,
+    match: (p) =>
+      p.startsWith("/admin/advanced") ||
+      p.startsWith("/admin/pipeline") ||
+      p.startsWith("/admin/ebillet") ||
+      p.startsWith("/admin/import"),
   },
 ];
 
@@ -63,21 +95,6 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
       {NAV.map((item) => {
         const Icon = item.icon;
         const active = item.match(pathname);
-        if (!item.to) {
-          return (
-            <div
-              key={item.label}
-              aria-disabled
-              className="flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground/50"
-            >
-              <span className="flex min-w-0 items-center gap-3">
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </span>
-              <span className="shrink-0 text-[10px] uppercase tracking-wider">Kommer snart</span>
-            </div>
-          );
-        }
         return (
           <Link
             key={item.label}

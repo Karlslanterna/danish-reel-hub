@@ -258,6 +258,11 @@ const addUnique = (target: string[], values: string[]) => {
   for (const value of values) if (value && !target.includes(value)) target.push(value);
 };
 
+const tagSignature = (row: { formats: string[]; languages: string[]; events: string[] }) =>
+  [row.formats, row.languages, row.events]
+    .map((values) => [...values].sort().join("\u001f"))
+    .join("\u001e");
+
 /** Remap and re-group full showtimes after duplicate movie records are collapsed. */
 export function remapShowtimesToMovies(showtimes: Showtime[], movies: Movie[]): Showtime[] {
   const movieMap = movieMapFrom(movies);
@@ -271,7 +276,7 @@ export function remapShowtimesToMovies(showtimes: Showtime[], movies: Movie[]): 
   for (const showtime of showtimes) {
     const movieId = movieMap.get(showtime.movieId);
     if (!movieId) continue;
-    const key = `${movieId}|${showtime.cinemaId}|${showtime.date}|${showtime.hall}`;
+    const key = `${movieId}|${showtime.cinemaId}|${showtime.date}|${showtime.hall}|${tagSignature(showtime)}`;
     const group = groups.get(key) ?? {
       ...showtime,
       movieId,
@@ -303,7 +308,7 @@ export function remapShowtimesToMovies(showtimes: Showtime[], movies: Movie[]): 
   return sortShowtimes(result);
 }
 
-/** Remap the lightweight homepage index and union its screening tags. */
+/** Remap the lightweight homepage index without merging distinct tag sets. */
 export function remapShowtimeIndexToMovies(
   rows: ShowtimeIndexRow[],
   movies: Movie[],
@@ -313,7 +318,7 @@ export function remapShowtimeIndexToMovies(
   for (const row of rows) {
     const movieId = movieMap.get(row.movieId);
     if (!movieId) continue;
-    const key = `${movieId}|${row.cinemaId}|${row.date}`;
+    const key = `${movieId}|${row.cinemaId}|${row.date}|${tagSignature(row)}`;
     const group = groups.get(key) ?? {
       ...row,
       movieId,

@@ -28,9 +28,9 @@ describe("groupScreeningsForUi", () => {
         local_time: "18:00:00",
         hall: "Sal 1",
         ticket_url: "https://tickets/early",
-        formats: ["2D", "Atmos"],
-        languages: [],
-        events: ["Premiere"],
+        formats: ["2D"],
+        languages: ["Dansk tekst"],
+        events: [],
       },
     ]);
 
@@ -44,9 +44,9 @@ describe("groupScreeningsForUi", () => {
       ticketUrls: ["https://tickets/early", "https://tickets/late"],
       bookingUrl: "https://tickets/early",
     });
-    expect(grouped[0].formats).toEqual(expect.arrayContaining(["2D", "Atmos"]));
+    expect(grouped[0].formats).toEqual(["2D"]);
     expect(grouped[0].languages).toContain("Dansk tekst");
-    expect(grouped[0].events).toContain("Premiere");
+    expect(grouped[0].events).toEqual([]);
   });
 
   it("repairs old Lanterna eBillet URLs without touching other ticket providers", () => {
@@ -85,7 +85,7 @@ describe("groupScreeningsForUi", () => {
 });
 
 describe("groupScreeningIndexForUi", () => {
-  it("collapses physical screenings to one movie/cinema/date row and unions tags", () => {
+  it("keeps different screening tags separate within the same movie/cinema/date", () => {
     const grouped = groupScreeningIndexForUi([
       {
         movie_id: "m1",
@@ -112,10 +112,19 @@ describe("groupScreeningIndexForUi", () => {
         movieId: "m1",
         cinemaId: "c1",
         date: "2026-08-20",
-        times: ["18:00", "20:30"],
-        formats: ["2D", "Atmos"],
-        languages: ["Dansk tekst"],
+        times: ["18:00"],
+        formats: ["2D"],
+        languages: [],
         events: ["Premiere"],
+      },
+      {
+        movieId: "m1",
+        cinemaId: "c1",
+        date: "2026-08-20",
+        times: ["20:30"],
+        formats: ["Atmos"],
+        languages: ["Dansk tekst"],
+        events: [],
       },
     ]);
   });

@@ -52,6 +52,22 @@ describe("cinema programme filtering", () => {
 
     expect(result.get("movie-1")?.map((entry) => entry.date)).toEqual(["2026-08-24"]);
   });
+
+  it("does not leak ordinary times from a tag-specific screening", () => {
+    const result = cinemaProgramShowtimesByMovie(
+      [
+        showtime({ times: ["12:00"], ticketUrls: ["baby"], events: ["Babybio"] }),
+        showtime({ times: ["15:30"], ticketUrls: ["ordinary"], events: [] }),
+      ],
+      { date: null, time: "afternoon", format: null, language: null, event: "Babybio" },
+    );
+
+    expect(result.get("movie-1")?.[0]).toMatchObject({
+      times: ["12:00"],
+      ticketUrls: ["baby"],
+      events: ["Babybio"],
+    });
+  });
 });
 
 describe("cinema programme date groups", () => {

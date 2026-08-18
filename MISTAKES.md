@@ -64,3 +64,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: `completeRun` updated state and statistics without clearing `last_error`.
 - Rule: A successful terminal transition clears stale failure metadata atomically.
 - Test: Completed retry rows have `last_error IS NULL` after the production import.
+
+## M-010 — Grouped times inherited another screening's tags
+
+- What happened: Combining `Babybio` with a time filter at Empire also exposed ordinary screenings later the same day.
+- Why: The read model unioned events, formats, and languages across every time in one movie/cinema/date/hall group before filtering.
+- Rule: Keep physical screenings separated by their complete tag signature until every active filter has matched; merge only after filtering.
+- Test: A regression test pairs a tagged noon screening with an untagged afternoon screening and requires only the tagged ticket to survive.

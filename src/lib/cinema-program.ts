@@ -32,7 +32,52 @@ export function cinemaProgramShowtimesByMovie(
     byMovie.set(showtime.movieId, movieShowtimes);
   }
 
+  // Tag-specific groups must stay separate while matching, but the programme
+  // can safely combine them again after filtering to avoid duplicate rows.
+  for (const [movieId, movieShowtimes] of byMovie) {
+    byMovie.set(movieId, mergeFilteredShowtimes(movieShowtimes));
+  }
+
   return byMovie;
+}
+
+function mergeFilteredShowtimes(showtimes: Showtime[]): Showtime[] {
+  type Group = Showtime & { slots: Map<string, string | null> };
+  const groups = new Map<string, Group>();
+  for (const showtime of showtimes) {
+    const key = `${showtime.movieId}|${showtime.cinemaId}|${showtime.date}|${showtime.hall}`;
+    const group = groups.get(key) ?? {
+      ...showtime,
+      times: [],
+      ticketUrls: [],
+      formats: [],
+      languages: [],
+      events: [],
+      slots: new Map<string, string | null>(),
+    };
+    showtime.times.forEach((time, index) => {
+      const incoming = showtime.ticketUrls?.[index] || showtime.bookingUrl || null;
+      const current = group.slots.get(time);
+      if (!group.slots.has(time) || (!current && incoming)) group.slots.set(time, incoming);
+    });
+    for (const format of showtime.formats)
+      if (!group.formats.includes(format)) group.formats.push(format);
+    for (const language of showtime.languages)
+      if (!group.languages.includes(language)) group.languages.push(language);
+    for (const event of showtime.events)
+      if (!group.events.includes(event)) group.events.push(event);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].map(({ slots, ...group }) => {
+    const ordered = [...slots].sort(([a], [b]) => timeKey(a) - timeKey(b));
+    return {
+      ...group,
+      times: ordered.map(([time]) => time),
+      ticketUrls: ordered.map(([, url]) => url ?? ""),
+      bookingUrl: ordered.find(([, url]) => url)?.[1] ?? null,
+    };
+  });
 }
 
 /** Keep dates explicit when several programme days are visible at once. */

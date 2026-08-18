@@ -197,7 +197,7 @@ describe("public catalog consolidation", () => {
       bookingUrl: null,
       ticketUrls: [""],
       formats: ["2D"],
-      languages: [],
+      languages: ["Danske undertekster"],
       events: [],
     };
     const remapped = remapShowtimesToMovies(
@@ -223,7 +223,7 @@ describe("public catalog consolidation", () => {
     });
   });
 
-  it("remaps and unions homepage-index tags", () => {
+  it("remaps homepage-index rows without cross-matching distinct tag sets", () => {
     const [canonical] = consolidatePublicMovies([
       movie({ id: "a", slug: "film-a", title: "Film", year: 2026 }),
       movie({ id: "b", slug: "film-b", title: "Film", year: 2026 }),
@@ -256,8 +256,17 @@ describe("public catalog consolidation", () => {
         movieId: canonical!.id,
         cinemaId: "c",
         date: "2026-08-20",
-        times: ["18:00", "20:00"],
+        times: ["18:00"],
         formats: ["2D"],
+        languages: [],
+        events: [],
+      },
+      {
+        movieId: canonical!.id,
+        cinemaId: "c",
+        date: "2026-08-20",
+        times: ["20:00"],
+        formats: [],
         languages: ["Dansk tale"],
         events: [],
       },

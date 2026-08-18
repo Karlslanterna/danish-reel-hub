@@ -7,12 +7,11 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { useLanguage } from "@/lib/i18n";
-import { showtimeMatchesTags } from "@/lib/showtime-tags";
 import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
 import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
-import { filterShowtimeTimesByPeriod } from "@/lib/time-filter";
 import { buildFilterFacets } from "@/lib/filter-facets";
+import { cinemaProgramShowtimesByMovie } from "@/lib/cinema-program";
 
 export type MovieDetailCity = { name: string; slug: string };
 
@@ -89,13 +88,13 @@ export function MovieDetail({
     event: selectedEvent,
   });
 
-  const filteredShowtimes = showtimes.flatMap((showtime) => {
-    if (selectedDate && showtime.date !== selectedDate) return [];
-    if (!showtimeMatchesTags(showtime, tagSel)) return [];
-    if (!selectedTime) return [showtime];
-    const visible = filterShowtimeTimesByPeriod(showtime, selectedTime);
-    return visible ? [visible] : [];
-  });
+  const filteredShowtimes = [
+    ...cinemaProgramShowtimesByMovie(showtimes, {
+      date: selectedDate,
+      time: selectedTime,
+      ...tagSel,
+    }).values(),
+  ].flat();
 
   const byCinema = filteredCinemas
     .map((c) => ({ cinema: c, days: filteredShowtimes.filter((s) => s.cinemaId === c.id) }))
@@ -105,12 +104,12 @@ export function MovieDetail({
     byCinema.length,
     Boolean(
       selectedDate ||
-        selectedTime ||
-        selectedFormat ||
-        selectedLanguage ||
-        selectedEvent ||
-        selectedCinemaId ||
-        hasGeo
+      selectedTime ||
+      selectedFormat ||
+      selectedLanguage ||
+      selectedEvent ||
+      selectedCinemaId ||
+      hasGeo,
     ),
     [
       movie.slug,
@@ -256,12 +255,14 @@ export function MovieDetail({
             languages={facets.languages}
             events={facets.events}
             cities={cityFilterOptions}
-            cinemas={geoCinemas.filter((c) => facets.cinemaIds.has(c.id)).map((c) => ({
-              id: c.id,
-              slug: c.slug,
-              name: c.name,
-              city: c.city,
-            }))}
+            cinemas={geoCinemas
+              .filter((c) => facets.cinemaIds.has(c.id))
+              .map((c) => ({
+                id: c.id,
+                slug: c.slug,
+                name: c.name,
+                city: c.city,
+              }))}
           />
         </div>
 

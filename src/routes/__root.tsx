@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -18,6 +19,7 @@ import {
 import { FiltersProvider } from "../lib/filters";
 import { LanguageProvider } from "../lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 function NotFoundComponent() {
   return (
@@ -85,7 +87,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Lanterna — Find film og spilletider i Danmark" },
-      { name: "description", content: "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg." },
+      {
+        name: "description",
+        content:
+          "Opdag film, se spilletider og find din nærmeste biograf i København, Aarhus, Odense og Aalborg.",
+      },
       { name: "application-name", content: "Lanterna" },
       { name: "theme-color", content: "#f5c445" },
       { property: "og:type", content: "website" },
@@ -100,7 +106,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Josefin+Sans:wght@400;500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Josefin+Sans:wght@400;500;600;700&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -129,6 +138,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   useEffect(() => {
     initClientErrorMonitor();
@@ -140,6 +150,11 @@ function RootComponent() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (pathname.startsWith("/admin") || pathname.startsWith("/api/")) return;
+    trackAnalyticsEvent({ eventType: "page_view", path: pathname });
+  }, [pathname]);
 
   return (
     <QueryClientProvider client={queryClient}>

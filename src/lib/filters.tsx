@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Plus, ChevronRight, ArrowLeft, Clock3, X } from "lucide-react";
+import { Plus, ChevronRight, ArrowLeft, Clock3 } from "lucide-react";
 import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
 import { slugifyCity, baseCityOf } from "@/lib/city-slug";
@@ -17,6 +17,13 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { addCalendarDays, windowStart, windowEnd, windowBounds } from "@/lib/date-window";
 import { canonicalCinemaId } from "@/lib/cinema-catalog";
 import type { TimePeriod } from "@/lib/time-filter";
+import {
+  isSpecialEventTag,
+  publicSpecialEventOptions,
+  specialEventDefinition,
+  type SpecialEventTag,
+} from "@/lib/special-events";
+import { trackFilterChange } from "@/lib/analytics";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -145,6 +152,7 @@ function loadPersisted(): Persisted {
     let selectedDate = typeof p.selectedDate === "string" ? p.selectedDate : null;
     const selectedGenre =
       typeof p.selectedGenre === "string" && p.selectedGenre.length > 0 ? p.selectedGenre : null;
+    const storedEvent = str(p.selectedEvent);
     const storedCinemaId = str(p.selectedCinemaId);
     // drop dates outside the visible window (past, or beyond +30 days)
     if (selectedDate && (selectedDate < windowStart() || selectedDate > windowEnd()))
@@ -157,7 +165,7 @@ function loadPersisted(): Persisted {
       selectedGenre,
       selectedFormat: str(p.selectedFormat),
       selectedLanguage: str(p.selectedLanguage),
-      selectedEvent: str(p.selectedEvent),
+      selectedEvent: storedEvent && isSpecialEventTag(storedEvent) ? storedEvent : null,
       selectedCity: str(p.selectedCity),
       selectedCinemaId: storedCinemaId ? canonicalCinemaId(storedCinemaId) : null,
       selectedCinemaSlug: str(p.selectedCinemaSlug),
@@ -287,20 +295,40 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     (r: Radius) => {
       setRadiusState(r);
       if (r !== "all") clearCinema();
+      trackFilterChange("radius", String(r), r !== "all");
     },
     [clearCinema],
   );
-  const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
-  const setSelectedTime = useCallback((v: TimePeriod | null) => setSelectedTimeState(v), []);
-  const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
-  const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);
-  const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
-  const setSelectedEvent = useCallback((v: string | null) => setSelectedEventState(v), []);
+  const setSelectedDate = useCallback((d: string | null) => {
+    setSelectedDateState(d);
+    trackFilterChange("date", d, Boolean(d));
+  }, []);
+  const setSelectedTime = useCallback((v: TimePeriod | null) => {
+    setSelectedTimeState(v);
+    trackFilterChange("time", v, Boolean(v));
+  }, []);
+  const setSelectedGenre = useCallback((g: string | null) => {
+    setSelectedGenreState(g);
+    trackFilterChange("genre", g, Boolean(g));
+  }, []);
+  const setSelectedFormat = useCallback((v: string | null) => {
+    setSelectedFormatState(v);
+    trackFilterChange("format", v, Boolean(v));
+  }, []);
+  const setSelectedLanguage = useCallback((v: string | null) => {
+    setSelectedLanguageState(v);
+    trackFilterChange("language", v, Boolean(v));
+  }, []);
+  const setSelectedEvent = useCallback((v: string | null) => {
+    setSelectedEventState(v);
+    trackFilterChange("special_event", v, Boolean(v));
+  }, []);
   // Changing city drops a cinema that no longer belongs to the selected city.
   const setSelectedCity = useCallback(
     (v: string | null) => {
       setSelectedCityState(v);
       clearCinema();
+      trackFilterChange("city", v, Boolean(v));
     },
     [clearCinema],
   );
@@ -310,6 +338,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     (c: CinemaFilterOption | null) => {
       if (!c) {
         clearCinema();
+        trackFilterChange("cinema", null, false);
         return;
       }
       setSelectedCinemaIdState(c.id);
@@ -317,6 +346,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       setSelectedCinemaNameState(c.name);
       setSelectedCityState(baseCityOf(c.city));
       setRadiusState("all");
+      trackFilterChange("cinema", c.slug, true);
     },
     [clearCinema],
   );
@@ -379,6 +409,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setSelectedCityState(null);
     clearCinema();
     setGeoStatus("idle");
+    trackFilterChange("all", null, false);
   }, [clearCinema]);
 
   const value = useMemo<FiltersState>(
@@ -573,6 +604,8 @@ export function FilterBar({
   events,
   cities,
   cinemas,
+  fixedEvent,
+  eventRouteEnabled = false,
 }: {
   className?: string;
   hideRadius?: boolean;
@@ -588,6 +621,10 @@ export function FilterBar({
   cities?: Array<{ value: string; count: number }>;
   /** Cinemas that are still valid given the page's other active filters (date, radius, …). */
   cinemas?: CinemaFilterOption[];
+  /** Route-backed event on the four dedicated SEO landing pages. */
+  fixedEvent?: SpecialEventTag;
+  /** On national overview pages, special-event choices use their canonical URL. */
+  eventRouteEnabled?: boolean;
 }) {
   const {
     radius,
@@ -614,6 +651,7 @@ export function FilterBar({
     clear,
   } = useFilters();
 
+  const activeEvent = fixedEvent ?? selectedEvent;
   const hasFilters = Boolean(
     radius !== "all" ||
     selectedDate ||
@@ -621,7 +659,7 @@ export function FilterBar({
     selectedGenre ||
     selectedFormat ||
     selectedLanguage ||
-    selectedEvent ||
+    activeEvent ||
     selectedCity ||
     selectedCinemaId,
   );
@@ -655,7 +693,10 @@ export function FilterBar({
 
   const sortedFormats = useMemo(() => sortTagOptions("formats", formats ?? []), [formats]);
   const sortedLanguages = useMemo(() => sortTagOptions("languages", languages ?? []), [languages]);
-  const sortedEvents = useMemo(() => sortTagOptions("events", events ?? []), [events]);
+  const sortedEvents = useMemo(
+    () => publicSpecialEventOptions([...(events ?? []), ...(fixedEvent ? [fixedEvent] : [])]),
+    [events, fixedEvent],
+  );
 
   const sortedCities = useMemo(
     () =>
@@ -690,7 +731,7 @@ export function FilterBar({
     selectedGenre ||
     selectedFormat ||
     selectedLanguage ||
-    selectedEvent ||
+    activeEvent ||
     selectedCity ||
     selectedCinemaId,
   );
@@ -699,6 +740,26 @@ export function FilterBar({
   // city-scoped version of the current page (and clearing it back to national).
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const applyEvent = (value: string | null) => {
+    if (eventRouteEnabled && !value) {
+      setSelectedEvent(null);
+      navigate({ to: "/" });
+    } else if (eventRouteEnabled && value && isSpecialEventTag(value)) {
+      setSelectedEvent(null);
+      if (value === fixedEvent) navigate({ to: "/" });
+      else navigate({ to: specialEventDefinition(value).path });
+    } else {
+      setSelectedEvent(value);
+    }
+    setMoreOpen(false);
+    setMoreView("menu");
+  };
+
+  const clearAll = () => {
+    clear();
+    if (fixedEvent) navigate({ to: "/" });
+  };
 
   const applyCity = (cityName: string | null) => {
     setSelectedCity(cityName);
@@ -739,11 +800,10 @@ export function FilterBar({
         <button
           type="button"
           onClick={() => applyCinema(null)}
-          className="inline-flex h-9 max-w-[190px] items-center gap-2 rounded-full border border-primary bg-primary px-3 text-xs uppercase tracking-[0.12em] text-primary-foreground transition-colors hover:bg-primary/90 sm:px-4 sm:tracking-[0.15em]"
+          className="inline-flex h-9 max-w-[190px] items-center rounded-full border border-primary bg-primary px-3 text-xs uppercase tracking-[0.12em] text-primary-foreground transition-colors hover:bg-primary/90 sm:px-4 sm:tracking-[0.15em]"
           title={selectedCinemaName}
         >
           <span className="truncate">{selectedCinemaName}</span>
-          <span aria-hidden>×</span>
         </button>
       )}
 
@@ -795,7 +855,7 @@ export function FilterBar({
                     key={String(opt.value)}
                     type="button"
                     onClick={() => {
-                      setRadius(opt.value);
+                      setRadius(selected && opt.value !== "all" ? "all" : opt.value);
                       setRadiusOpen(false);
                     }}
                     className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${
@@ -846,7 +906,7 @@ export function FilterBar({
             <button
               type="button"
               onClick={() => {
-                setSelectedDate(TODAY);
+                setSelectedDate(selectedDate === TODAY ? null : TODAY);
                 setDateOpen(false);
               }}
               className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TODAY ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
@@ -856,7 +916,7 @@ export function FilterBar({
             <button
               type="button"
               onClick={() => {
-                setSelectedDate(TOMORROW);
+                setSelectedDate(selectedDate === TOMORROW ? null : TOMORROW);
                 setDateOpen(false);
               }}
               className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${selectedDate === TOMORROW ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"}`}
@@ -873,8 +933,8 @@ export function FilterBar({
                     const m = String(date.getMonth() + 1).padStart(2, "0");
                     const d = String(date.getDate()).padStart(2, "0");
                     setSelectedDate(`${y}-${m}-${d}`);
-                    setDateOpen(false);
-                  }
+                  } else setSelectedDate(null);
+                  setDateOpen(false);
                 }}
                 startMonth={windowBounds().from}
                 endMonth={windowBounds().to}
@@ -939,7 +999,7 @@ export function FilterBar({
                   key={period ?? "all"}
                   type="button"
                   onClick={() => {
-                    setSelectedTime(period);
+                    setSelectedTime(period && selectedTime === period ? null : period);
                     setTimeOpen(false);
                   }}
                   className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${
@@ -1013,8 +1073,8 @@ export function FilterBar({
                 pick: t("filter.pickEvent"),
                 options: sortedEvents.map((o) => ({ value: o, label: o })),
                 allLabel: undefined as string | undefined,
-                value: selectedEvent,
-                set: setSelectedEvent,
+                value: activeEvent,
+                set: applyEvent,
               },
             ].filter((g) => g.options.length > 0);
 
@@ -1257,10 +1317,9 @@ export function FilterBar({
       {hasFilters && (
         <button
           type="button"
-          onClick={clear}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card/40 px-3 text-xs uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground sm:tracking-[0.15em]"
+          onClick={clearAll}
+          className="inline-flex h-9 items-center rounded-full border border-border bg-card/40 px-3 text-xs uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground sm:tracking-[0.15em]"
         >
-          <X size="12" strokeWidth={2.5} />
           {t("home.clearFilters")}
         </button>
       )}

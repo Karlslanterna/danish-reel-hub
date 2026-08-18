@@ -26,6 +26,7 @@ export const Route = createFileRoute("/for-boern")({
       meta: [
         { title },
         { name: "description", content: description },
+        ...(movies.length === 0 ? [{ name: "robots", content: "noindex, follow" }] : []),
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:url", content: url },

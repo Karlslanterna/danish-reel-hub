@@ -21,6 +21,7 @@ import { baseCityOf, citySlug } from "@/lib/city-slug";
 import { cinemaSchemas } from "@/lib/jsonld";
 import { SiteFooter } from "@/components/SiteFooter";
 import { cinemaTitle, cinemaDescription } from "@/lib/seo";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 export const Route = createFileRoute("/biograf/$slug")({
   loader: async ({ params }) => {
@@ -339,6 +340,13 @@ function MovieRow({
                           data-testid="cinema-showtime"
                           data-showtime-time={time}
                           href={url}
+                          onClick={() =>
+                            trackAnalyticsEvent({
+                              eventType: "ticket_click",
+                              itemType: "movie",
+                              itemId: movie.slug,
+                            })
+                          }
                           target="_blank"
                           rel="noopener noreferrer nofollow sponsored"
                           className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium tabular-nums text-primary-foreground transition-colors hover:bg-primary/90"

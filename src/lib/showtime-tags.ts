@@ -36,7 +36,10 @@ const LANGUAGE_RULES: Rule[] = [
     re: /\bdansk(e)?\s*(tekst\w*|undertekst\w*)\b|\bda\.?\s*tekst\w*\b|\bdk\.?\s*tekst\w*\b|\bsubtitled[-_ ]?da\b/,
     label: "Danske undertekster",
   },
-  { re: /\bengelsk(e)?\s*(tekst\w*|undertekst\w*)\b|\ben\.?\s*tekst\w*\b/, label: "Engelske undertekster" },
+  {
+    re: /\bengelsk(e)?\s*(tekst\w*|undertekst\w*)\b|\ben\.?\s*tekst\w*\b/,
+    label: "Engelske undertekster",
+  },
   {
     re: /\borg\.?\s*version\b|\borg\.?\s*tale\b|\boriginal\s*version\b|\boriginalversion\b|\boriginal\s*tale\b|\bov\b/,
     label: "Originalversion",
@@ -48,6 +51,8 @@ const LANGUAGE_RULES: Rule[] = [
 const EVENT_RULES: Rule[] = [
   { re: /\bbaby\s?bio\b|\bbabybiograf\b/, label: "Babybio" },
   { re: /\bsenior\s?bio\b|\bseniorbiograf\b/, label: "Seniorbio" },
+  { re: /\bfilm\s?porten\b/, label: "Filmporten" },
+  { re: /\bbiografklub(?:ben)?\s*danmark\b|\bbiografklub\s+dk\b/, label: "Biografklub Danmark" },
   { re: /\bformiddags\s?bio\b|\bmorgen\s?bio\b/, label: "Formiddagsbio" },
   { re: /\bopen[-\s]?air\b|\bfriluftsbio\b|\bdrive[-\s]?in\b/, label: "Open Air" },
   { re: /\bopera\b/, label: "Opera" },
@@ -64,12 +69,7 @@ const EVENT_RULES: Rule[] = [
   { re: /\bpremiere\s?fest\b|\bgallapremiere\b|\bgalla\b/, label: "Galla" },
 ];
 
-const norm = (raw: string) =>
-  raw
-    .toLowerCase()
-    .replace(/[._]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+const norm = (raw: string) => raw.toLowerCase().replace(/[._]/g, " ").replace(/\s+/g, " ").trim();
 
 const matchAll = (rules: Rule[], text: string): string[] => {
   const t = norm(text);
@@ -112,7 +112,13 @@ export function mergeTags(a: ShowtimeTags, b: ShowtimeTags): ShowtimeTags {
 /** Sort order used for filter option lists (stable + user friendly). */
 const ORDER: Record<string, string[]> = {
   formats: ["2D", "3D", "IMAX", "4DX", "Dolby Cinema"],
-  languages: ["Originalversion", "Dansk tale", "Danske undertekster", "Engelsk tale", "Engelske undertekster"],
+  languages: [
+    "Originalversion",
+    "Dansk tale",
+    "Danske undertekster",
+    "Engelsk tale",
+    "Engelske undertekster",
+  ],
   events: EVENT_RULES.map((r) => r.label),
 };
 

@@ -9,6 +9,7 @@ import { citySlug } from "./city-slug";
 import { windowStart, windowEnd } from "./date-window";
 import { fetchMovies, type Movie } from "./cinema-data";
 import { consolidatePublicCinemas } from "./cinema-catalog";
+import { SPECIAL_EVENTS } from "./special-events";
 
 export type SitemapEntry = {
   loc: string;
@@ -32,6 +33,7 @@ type ScreeningRow = {
   movie_id: string;
   cinema_id: string;
   updated_at: string | null;
+  events: string[] | null;
 };
 
 async function loadUpcomingScreenings(): Promise<ScreeningRow[]> {
@@ -42,7 +44,7 @@ async function loadUpcomingScreenings(): Promise<ScreeningRow[]> {
   for (let page = 0; ; page++) {
     const { data, error } = await supabaseAdmin
       .from("screenings")
-      .select("movie_id, cinema_id, updated_at")
+      .select("movie_id, cinema_id, updated_at, events")
       .gte("starts_at", now)
       .gte("local_date", windowStart())
       .lte("local_date", windowEnd())
@@ -91,6 +93,7 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
   const cinemaMod = new Map<string, string | undefined>();
   const cityMod = new Map<string, string | undefined>();
   const cityMovieMod = new Map<string, string | undefined>();
+  const specialMod = new Map<string, string | undefined>();
   let siteMod: string | undefined;
 
   for (const s of screenings) {
@@ -105,6 +108,11 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
 
     const cinema = cinemaInfo.get(s.cinema_id);
     movieMod.set(mSlug, newer(movieMod.get(mSlug), mod));
+    for (const event of SPECIAL_EVENTS) {
+      if ((s.events ?? []).includes(event.tag)) {
+        specialMod.set(event.tag, newer(specialMod.get(event.tag), mod));
+      }
+    }
     if (cinema) cinemaMod.set(cinema.slug, newer(cinemaMod.get(cinema.slug), mod));
     if (!cinema?.city) continue;
     const city = citySlug(cinema.city);
@@ -119,6 +127,12 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
     { loc: `${baseUrl}/for-boern`, lastmod: siteMod, changefreq: "daily", priority: "0.9" },
     { loc: `${baseUrl}/film`, lastmod: siteMod, changefreq: "daily", priority: "0.8" },
     { loc: `${baseUrl}/biograf`, lastmod: siteMod, changefreq: "daily", priority: "0.8" },
+    ...SPECIAL_EVENTS.filter((event) => specialMod.has(event.tag)).map((event) => ({
+      loc: `${baseUrl}${event.path}`,
+      lastmod: specialMod.get(event.tag),
+      changefreq: "daily" as const,
+      priority: "0.8",
+    })),
     ...[...cityMod.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([slug, lastmod]) => ({

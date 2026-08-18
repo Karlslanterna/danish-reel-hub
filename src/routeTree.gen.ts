@@ -13,9 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CityRouteImport } from './routes/$city'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BabybioRouteImport } from './routes/babybio'
+import { Route as BiografklubDanmarkRouteImport } from './routes/biografklub-danmark'
+import { Route as FilmportenRouteImport } from './routes/filmporten'
 import { Route as ForBoernRouteImport } from './routes/for-boern'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SeniorbioRouteImport } from './routes/seniorbio'
 import { Route as SitemapCinemasDotxmlRouteImport } from './routes/sitemap-cinemas[.]xml'
 import { Route as SitemapCityMoviesDotxmlRouteImport } from './routes/sitemap-city-movies[.]xml'
 import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]xml'
@@ -38,6 +42,7 @@ import { Route as AuthenticatedAdminDeniedRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminEbilletRouteImport } from './routes/_authenticated/admin.ebillet'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
 import { Route as AuthenticatedAdminPipelineRouteImport } from './routes/_authenticated/admin.pipeline'
+import { Route as ApiPublicAnalyticsRouteImport } from './routes/api/public/analytics'
 import { Route as ApiPublicEbilletSyncRouteImport } from './routes/api/public/ebillet-sync'
 import { Route as ApiPublicImportHealthRouteImport } from './routes/api/public/import-health'
 import { Route as ApiPublicKultunautImportRouteImport } from './routes/api/public/kultunaut-import'
@@ -65,6 +70,21 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BabybioRoute = BabybioRouteImport.update({
+  id: '/babybio',
+  path: '/babybio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BiografklubDanmarkRoute = BiografklubDanmarkRouteImport.update({
+  id: '/biografklub-danmark',
+  path: '/biografklub-danmark',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilmportenRoute = FilmportenRouteImport.update({
+  id: '/filmporten',
+  path: '/filmporten',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForBoernRoute = ForBoernRouteImport.update({
   id: '/for-boern',
   path: '/for-boern',
@@ -78,6 +98,11 @@ const McpRoute = McpRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeniorbioRoute = SeniorbioRouteImport.update({
+  id: '/seniorbio',
+  path: '/seniorbio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapCinemasDotxmlRoute = SitemapCinemasDotxmlRouteImport.update({
@@ -198,6 +223,11 @@ const AuthenticatedAdminPipelineRoute =
     path: '/admin/pipeline',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicAnalyticsRoute = ApiPublicAnalyticsRouteImport.update({
+  id: '/api/public/analytics',
+  path: '/api/public/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicEbilletSyncRoute = ApiPublicEbilletSyncRouteImport.update({
   id: '/api/public/ebillet-sync',
   path: '/api/public/ebillet-sync',
@@ -242,9 +272,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$city': typeof CityRouteWithChildren
   '/auth': typeof AuthRoute
+  '/babybio': typeof BabybioRoute
+  '/biografklub-danmark': typeof BiografklubDanmarkRoute
+  '/filmporten': typeof FilmportenRoute
   '/for-boern': typeof ForBoernRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/seniorbio': typeof SeniorbioRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
@@ -266,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/api/public/analytics': typeof ApiPublicAnalyticsRoute
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
@@ -278,9 +313,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/babybio': typeof BabybioRoute
+  '/biografklub-danmark': typeof BiografklubDanmarkRoute
+  '/filmporten': typeof FilmportenRoute
   '/for-boern': typeof ForBoernRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/seniorbio': typeof SeniorbioRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
@@ -302,6 +341,7 @@ export interface FileRoutesByTo {
   '/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/api/public/analytics': typeof ApiPublicAnalyticsRoute
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
@@ -317,9 +357,13 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/$city': typeof CityRouteWithChildren
   '/auth': typeof AuthRoute
+  '/babybio': typeof BabybioRoute
+  '/biografklub-danmark': typeof BiografklubDanmarkRoute
+  '/filmporten': typeof FilmportenRoute
   '/for-boern': typeof ForBoernRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/seniorbio': typeof SeniorbioRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
@@ -341,6 +385,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/ebillet': typeof AuthenticatedAdminEbilletRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/pipeline': typeof AuthenticatedAdminPipelineRoute
+  '/api/public/analytics': typeof ApiPublicAnalyticsRoute
   '/api/public/ebillet-sync': typeof ApiPublicEbilletSyncRoute
   '/api/public/import-health': typeof ApiPublicImportHealthRoute
   '/api/public/kultunaut-import': typeof ApiPublicKultunautImportRouteWithChildren
@@ -356,9 +401,13 @@ export interface FileRouteTypes {
     | '/'
     | '/$city'
     | '/auth'
+    | '/babybio'
+    | '/biografklub-danmark'
+    | '/filmporten'
     | '/for-boern'
     | '/mcp'
     | '/reset-password'
+    | '/seniorbio'
     | '/sitemap-cinemas.xml'
     | '/sitemap-city-movies.xml'
     | '/sitemap-core.xml'
@@ -380,6 +429,7 @@ export interface FileRouteTypes {
     | '/admin/ebillet'
     | '/admin/import'
     | '/admin/pipeline'
+    | '/api/public/analytics'
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
@@ -392,9 +442,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/babybio'
+    | '/biografklub-danmark'
+    | '/filmporten'
     | '/for-boern'
     | '/mcp'
     | '/reset-password'
+    | '/seniorbio'
     | '/sitemap-cinemas.xml'
     | '/sitemap-city-movies.xml'
     | '/sitemap-core.xml'
@@ -416,6 +470,7 @@ export interface FileRouteTypes {
     | '/admin/ebillet'
     | '/admin/import'
     | '/admin/pipeline'
+    | '/api/public/analytics'
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
@@ -430,9 +485,13 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/$city'
     | '/auth'
+    | '/babybio'
+    | '/biografklub-danmark'
+    | '/filmporten'
     | '/for-boern'
     | '/mcp'
     | '/reset-password'
+    | '/seniorbio'
     | '/sitemap-cinemas.xml'
     | '/sitemap-city-movies.xml'
     | '/sitemap-core.xml'
@@ -454,6 +513,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/ebillet'
     | '/_authenticated/admin/import'
     | '/_authenticated/admin/pipeline'
+    | '/api/public/analytics'
     | '/api/public/ebillet-sync'
     | '/api/public/import-health'
     | '/api/public/kultunaut-import'
@@ -469,9 +529,13 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   CityRoute: typeof CityRouteWithChildren
   AuthRoute: typeof AuthRoute
+  BabybioRoute: typeof BabybioRoute
+  BiografklubDanmarkRoute: typeof BiografklubDanmarkRoute
+  FilmportenRoute: typeof FilmportenRoute
   ForBoernRoute: typeof ForBoernRoute
   McpRoute: typeof McpRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SeniorbioRoute: typeof SeniorbioRoute
   SitemapCinemasDotxmlRoute: typeof SitemapCinemasDotxmlRoute
   SitemapCityMoviesDotxmlRoute: typeof SitemapCityMoviesDotxmlRoute
   SitemapCoreDotxmlRoute: typeof SitemapCoreDotxmlRoute
@@ -486,6 +550,7 @@ export interface RootRouteChildren {
   FilmIndexRoute: typeof FilmIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicAnalyticsRoute: typeof ApiPublicAnalyticsRoute
   ApiPublicEbilletSyncRoute: typeof ApiPublicEbilletSyncRoute
   ApiPublicImportHealthRoute: typeof ApiPublicImportHealthRoute
   ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
@@ -522,6 +587,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/babybio': {
+      id: '/babybio'
+      path: '/babybio'
+      fullPath: '/babybio'
+      preLoaderRoute: typeof BabybioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/biografklub-danmark': {
+      id: '/biografklub-danmark'
+      path: '/biografklub-danmark'
+      fullPath: '/biografklub-danmark'
+      preLoaderRoute: typeof BiografklubDanmarkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/filmporten': {
+      id: '/filmporten'
+      path: '/filmporten'
+      fullPath: '/filmporten'
+      preLoaderRoute: typeof FilmportenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/for-boern': {
       id: '/for-boern'
       path: '/for-boern'
@@ -541,6 +627,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/seniorbio': {
+      id: '/seniorbio'
+      path: '/seniorbio'
+      fullPath: '/seniorbio'
+      preLoaderRoute: typeof SeniorbioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap-cinemas.xml': {
@@ -697,6 +790,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPipelineRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/analytics': {
+      id: '/api/public/analytics'
+      path: '/api/public/analytics'
+      fullPath: '/api/public/analytics'
+      preLoaderRoute: typeof ApiPublicAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ebillet-sync': {
       id: '/api/public/ebillet-sync'
       path: '/api/public/ebillet-sync'
@@ -805,9 +905,13 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   CityRoute: CityRouteWithChildren,
   AuthRoute: AuthRoute,
+  BabybioRoute: BabybioRoute,
+  BiografklubDanmarkRoute: BiografklubDanmarkRoute,
+  FilmportenRoute: FilmportenRoute,
   ForBoernRoute: ForBoernRoute,
   McpRoute: McpRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SeniorbioRoute: SeniorbioRoute,
   SitemapCinemasDotxmlRoute: SitemapCinemasDotxmlRoute,
   SitemapCityMoviesDotxmlRoute: SitemapCityMoviesDotxmlRoute,
   SitemapCoreDotxmlRoute: SitemapCoreDotxmlRoute,
@@ -823,6 +927,7 @@ const rootRouteChildren: RootRouteChildren = {
   FilmIndexRoute: FilmIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicAnalyticsRoute: ApiPublicAnalyticsRoute,
   ApiPublicEbilletSyncRoute: ApiPublicEbilletSyncRoute,
   ApiPublicImportHealthRoute: ApiPublicImportHealthRoute,
   ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,

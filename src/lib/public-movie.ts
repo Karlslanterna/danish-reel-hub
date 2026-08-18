@@ -29,10 +29,6 @@ const NON_FILM_PATTERNS: RegExp[] = [
   /^film titel ikke valgt(?:\b|$)/,
   /^lokalt arrangement(?:\b|$)/,
   /^pressevisning(?:\b|$)/,
-  /^børnebiffen(?:\b|$)/,
-  /^bornebiffen(?:\b|$)/,
-  /^sommerbørnebiffen(?:\b|$)/,
-  /^sommerbornebiffen(?:\b|$)/,
   /^bamsebio(?:\b|$)/,
   /^børnefilmklub(?:\b|$)/,
   /^bornefilmklub(?:\b|$)/,
@@ -174,9 +170,14 @@ export function normalizePublicGenres(values: string[] | null | undefined): stri
 type PosterBearingMovie = {
   title: string;
   tmdbId?: number | null;
-  posterSource?: "tmdb" | "source" | null;
-  poster: { url?: string };
+  posterSource?: "tmdb" | "source" | "programme" | null;
+  poster: { url?: string; alt?: string; fit?: "cover" | "contain" };
 };
+
+export const BORNEBIFFEN_POSTER_URL = "/posters/bornebiffen-cinemateket.png";
+
+const isBornebiffenTitle = (title: string): boolean =>
+  /^(?:sommer)?(?:børnebiffen|bornebiffen)(?:\b|$)/u.test(fold(title));
 
 /**
  * Some source feeds reuse a programme graphic as the poster for many unrelated
@@ -209,4 +210,25 @@ export function suppressCollidingSourcePosters<T extends PosterBearingMovie>(mov
       ? { ...movie, poster: { ...movie.poster, url: undefined } }
       : movie,
   );
+}
+
+/**
+ * Apply safe, local artwork only after ambiguous source posters are removed.
+ * Børnebiffen packages legitimately share one programme identity, while an
+ * eBillet image shared with an unrelated film must still be rejected first.
+ */
+export function preparePublicMoviePosters<T extends PosterBearingMovie>(movies: T[]): T[] {
+  return suppressCollidingSourcePosters(movies).map((movie) => {
+    if (movie.poster.url?.trim() || !isBornebiffenTitle(movie.title)) return movie;
+    return {
+      ...movie,
+      poster: {
+        ...movie.poster,
+        url: BORNEBIFFEN_POSTER_URL,
+        alt: movie.poster.alt ?? "Cinemateket – Det Danske Filminstitut",
+        fit: "contain",
+      },
+      posterSource: "programme",
+    };
+  });
 }

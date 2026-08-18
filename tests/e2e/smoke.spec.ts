@@ -31,7 +31,7 @@ test.describe("Public pages", () => {
     const response = await request.get("/");
     expect(response.status(), "Homepage must return HTTP 200").toBe(200);
     const html = (await response.text()).toLocaleLowerCase("da");
-    for (const forbidden of ["børnebiffen", "særvisning", "bestil bord og mad", "andre film"]) {
+    for (const forbidden of ["særvisning", "bestil bord og mad", "andre film"]) {
       expect(
         html,
         `Homepage still exposes non-film/filter-noise label: ${forbidden}`,
@@ -127,10 +127,18 @@ test.describe("Public pages", () => {
       timeout: 30_000,
     });
     expect(response, `eBillet returned no response for ${bookingUrl}`).not.toBeNull();
-    expect(response!.status(), `eBillet returned HTTP ${response!.status()} for ${bookingUrl}`).toBeLessThan(400);
+    expect(
+      response!.status(),
+      `eBillet returned HTTP ${response!.status()} for ${bookingUrl}`,
+    ).toBeLessThan(400);
 
     await page.waitForTimeout(2_000);
-    const body = ((await page.locator("body").innerText().catch(() => "")) ?? "").toLowerCase();
+    const body = (
+      (await page
+        .locator("body")
+        .innerText()
+        .catch(() => "")) ?? ""
+    ).toLowerCase();
     expect(
       body,
       `eBillet rendered its generic error page for the live Lanterna link ${bookingUrl}`,

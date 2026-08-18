@@ -74,7 +74,7 @@ const normalizePresentationTitle = (value) =>
     .trim();
 
 const GENERIC_EVENT_TITLE =
-  /^(særvisning|saervisning|børnebiffen|bornebiffen|babybio|seniorbio|strikkebio|formiddagsbio|filmklub|specialvisning|event)(\b|\s*[-:])/i;
+  /^(særvisning|saervisning|babybio|seniorbio|strikkebio|formiddagsbio|filmklub|specialvisning|event)(\b|\s*[-:])/i;
 const NON_FILM_TITLE =
   /^(opera|ballet|teater|koncert|stand[ -]?up|live event|foredrag)(\b|\s*[-:])/i;
 

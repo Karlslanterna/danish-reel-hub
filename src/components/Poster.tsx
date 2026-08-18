@@ -54,7 +54,9 @@ export function Poster({
         decoding={priority ? "sync" : "async"}
         {...(priority ? { fetchPriority: "high" as const } : { fetchPriority: "low" as const })}
         {...(sizes ? { sizes } : {})}
-        className="absolute inset-0 h-full w-full object-cover"
+        className={`absolute inset-0 h-full w-full bg-black ${
+          movie.poster.fit === "contain" ? "object-contain" : "object-cover"
+        }`}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
       {showTitle && (

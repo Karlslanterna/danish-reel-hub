@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PUBLIC_SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/public-config";
 
 /**
  * POST /api/public/tmdb-enrich
@@ -12,9 +13,15 @@ export const Route = createFileRoute("/api/public/tmdb-enrich")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const anonKey = process.env.SUPABASE_ANON_KEY;
         const provided = request.headers.get("apikey");
-        if (!anonKey || provided !== anonKey) {
+        const acceptedKeys = new Set(
+          [
+            process.env.SUPABASE_ANON_KEY,
+            process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+          ].filter(Boolean),
+        );
+        if (!provided || !acceptedKeys.has(provided)) {
           return new Response("Unauthorized", { status: 401 });
         }
         const url = new URL(request.url);
@@ -22,10 +29,16 @@ export const Route = createFileRoute("/api/public/tmdb-enrich")({
           Math.max(Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 1),
           100,
         );
-        const retrySkipped = url.searchParams.get("retry_skipped") === "1";
+        const rawRetrySkippedBefore = url.searchParams.get("retry_skipped_before");
+        const retrySkippedBefore = rawRetrySkippedBefore ? new Date(rawRetrySkippedBefore) : null;
+        if (retrySkippedBefore && !Number.isFinite(retrySkippedBefore.getTime())) {
+          return new Response("Invalid retry_skipped_before timestamp", { status: 400 });
+        }
         try {
           const { enrichBatch } = await import("@/lib/tmdb/enrich.server");
-          const summary = await enrichBatch(limit, { retrySkipped });
+          const summary = await enrichBatch(limit, {
+            retrySkippedBefore: retrySkippedBefore?.toISOString() ?? null,
+          });
           return Response.json({ ok: true, ...summary });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";

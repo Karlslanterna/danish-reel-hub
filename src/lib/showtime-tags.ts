@@ -49,8 +49,11 @@ const LANGUAGE_RULES: Rule[] = [
 
 /** Special screenings / events — "Arrangement". */
 const EVENT_RULES: Rule[] = [
-  { re: /\bbaby\s?bio\b|\bbabybiograf\b/, label: "Babybio" },
-  { re: /\bsenior\s?bio\b|\bseniorbiograf\b/, label: "Seniorbio" },
+  { re: /\bbaby\s?bio\b|\bbabybiograf\b|\bbarsels?\s?bio\b/, label: "Babybio" },
+  {
+    re: /\bsenior\s?bio\b|\bseniorbiograf\b|\bseniorfilm\b|\bfaglige\s+seniorer\b|\berindrings\s?bio\b/,
+    label: "Seniorbio",
+  },
   { re: /\bfilm\s?porten\b/, label: "Filmporten" },
   { re: /\bbiografklub(?:ben)?\s*danmark\b|\bbiografklub\s+dk\b/, label: "Biografklub Danmark" },
   { re: /\bformiddags\s?bio\b|\bmorgen\s?bio\b/, label: "Formiddagsbio" },

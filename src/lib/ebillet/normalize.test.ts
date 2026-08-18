@@ -185,7 +185,7 @@ describe("eBillet normalization", () => {
           locationId: 1,
           locationName: "Sal 1",
           organizerId: ORG,
-          type: 4,
+          type: { id: 4, name: "Senior Bio" },
           dateTime: "2026-08-20T15:00:00",
         },
       ],
@@ -195,6 +195,30 @@ describe("eBillet normalization", () => {
     expect(screening?.formats).toEqual(["2D"]);
     expect(screening?.languages).toEqual(["Dansk tale"]);
     expect(screening?.events).toEqual(["Seniorbio"]);
+  });
+
+  it("still resolves legacy numeric eBillet showtime type ids", () => {
+    const tagged: EbilletMoviesResponse = {
+      organizers: payload.organizers,
+      movieBases: [{ id: 32, name: "Klubfilm" }],
+      movies: [{ id: 302, baseId: 32, name: "Klubfilm" }],
+      showtimeTypes: [{ id: 44, name: "Biografklub Danmark" }],
+      showtimes: [
+        {
+          id: 62,
+          movieId: 302,
+          movieBaseId: 32,
+          locationId: 1,
+          organizerId: ORG,
+          type: 44,
+          dateTime: "2026-08-20T19:00:00",
+        },
+      ],
+    };
+
+    expect(normalizeEbilletScreenings(ORG, tagged, NOW)[0]?.events).toEqual([
+      "Biografklub Danmark",
+    ]);
   });
 
   it("normalizes eBillet subtitle and original-version labels", () => {

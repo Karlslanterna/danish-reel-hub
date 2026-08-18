@@ -29,22 +29,61 @@ export type EbilletOrganizer = {
 export type EbilletPosters = { small?: string | null; large?: string | null; hd?: string | null };
 export type EbilletMovieBase = { id: number; name: string; posters?: EbilletPosters | null };
 export type EbilletMovie = {
-  id: number; baseId: number; type?: string | null; name: string; subName?: string | null;
-  originalName?: string | null; description?: string | null; shortDescription?: string | null;
-  posters?: EbilletPosters | null; trailer?: string | null; genre?: string | null;
-  length?: string | null; openingDate?: string | null; ageCensoring?: string | null;
-  dimension?: string | null; is3D?: boolean | null; isAtmos?: boolean | null; directors?: string[] | null;
+  id: number;
+  baseId: number;
+  type?: string | null;
+  name: string;
+  subName?: string | null;
+  originalName?: string | null;
+  description?: string | null;
+  shortDescription?: string | null;
+  posters?: EbilletPosters | null;
+  trailer?: string | null;
+  genre?: string | null;
+  length?: string | null;
+  openingDate?: string | null;
+  ageCensoring?: string | null;
+  dimension?: string | null;
+  is3D?: boolean | null;
+  isAtmos?: boolean | null;
+  directors?: string[] | null;
+};
+export type EbilletShowtimeType = {
+  id?: number | string | null;
+  name?: string | null;
 };
 export type EbilletShowtime = {
-  id: number; movieId: number; movieBaseId: number; locationId: number; locationName?: string | null;
-  type?: number | string | null; dateTime: string; freeSeats?: number | null; organizerId: number;
-  minPrice?: string | number | null; maxPrice?: string | number | null; buyInfo?: { enabled?: boolean } | null;
+  id: number;
+  movieId: number;
+  movieBaseId: number;
+  locationId: number;
+  locationName?: string | null;
+  // The live API currently embeds `{ id, name }`, while older fixtures and
+  // payloads may contain only the id. Support both shapes explicitly.
+  type?: number | string | EbilletShowtimeType | null;
+  movieBaseShowName?: string | null;
+  info?: string | null;
+  dateTime: string;
+  freeSeats?: number | null;
+  organizerId: number;
+  minPrice?: string | number | null;
+  maxPrice?: string | number | null;
+  buyInfo?: { enabled?: boolean } | null;
 };
 export type EbilletMoviesResponse = {
-  organizers: EbilletOrganizer[]; movieBases: EbilletMovieBase[]; movies: EbilletMovie[];
-  showtimes: EbilletShowtime[]; showtimeTypes: Array<{ id: number; name: string }>;
+  organizers: EbilletOrganizer[];
+  movieBases: EbilletMovieBase[];
+  movies: EbilletMovie[];
+  showtimes: EbilletShowtime[];
+  showtimeTypes: Array<{ id: number; name: string }>;
 };
-const EMPTY: EbilletMoviesResponse = { organizers: [], movieBases: [], movies: [], showtimes: [], showtimeTypes: [] };
+const EMPTY: EbilletMoviesResponse = {
+  organizers: [],
+  movieBases: [],
+  movies: [],
+  showtimes: [],
+  showtimeTypes: [],
+};
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -73,8 +112,11 @@ export async function fetchOrganizerPayload(
       if (!res.ok) throw new Error(`eBillet HTTP ${res.status}`);
       const json = (await res.json()) as Partial<EbilletMoviesResponse>;
       return {
-        organizers: json.organizers ?? [], movieBases: json.movieBases ?? [], movies: json.movies ?? [],
-        showtimes: json.showtimes ?? [], showtimeTypes: json.showtimeTypes ?? [],
+        organizers: json.organizers ?? [],
+        movieBases: json.movieBases ?? [],
+        movies: json.movies ?? [],
+        showtimes: json.showtimes ?? [],
+        showtimeTypes: json.showtimeTypes ?? [],
       };
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -91,7 +133,11 @@ export async function fetchOrganizerPayload(
  * Use the generic flow.ebillet.dk host rather than cinema-specific branded
  * hosts so links remain portable when opened directly from Lanterna.
  */
-export function ebilletBookingUrl(organizerId: number, movieId: number, showtimeId: number): string {
+export function ebilletBookingUrl(
+  organizerId: number,
+  movieId: number,
+  showtimeId: number,
+): string {
   return `https://flow.ebillet.dk/billetter/${movieId}/${showtimeId}?org=${organizerId}`;
 }
 

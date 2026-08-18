@@ -39,19 +39,17 @@ export async function promoteCinema(input: {
   // Manual corrections are durable source-ref rules, not edits to generated
   // rows. Reapply them after every promotion so the next import cannot erase
   // an administrator's reviewed correction.
-  const overrideRpc = supabaseAdmin.rpc as unknown as (
-    name: string,
-    args: Record<string, string>,
-  ) => Promise<{ error: { code?: string; message: string } | null }>;
-  const { error: overrideError } = await overrideRpc("apply_screening_event_overrides", {
-    p_source: input.source,
-    p_cinema_id: input.cinemaId,
-  });
-  if (
-    overrideError &&
-    overrideError.code !== "42883" &&
-    overrideError.code !== "PGRST202"
-  ) {
+  // Keep the method call bound to the Supabase client. Calling an extracted
+  // `rpc` function loses the client's internal `this.rest` reference in the
+  // production runtime.
+  const { error: overrideError } = await supabaseAdmin.rpc(
+    "apply_screening_event_overrides" as never,
+    {
+      p_source: input.source,
+      p_cinema_id: input.cinemaId,
+    } as never,
+  );
+  if (overrideError && overrideError.code !== "42883" && overrideError.code !== "PGRST202") {
     throw new Error(`screening override application failed: ${overrideError.message}`);
   }
 

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CityRouteImport } from './routes/$city'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ForBoernRouteImport } from './routes/for-boern'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SitemapCinemasDotxmlRouteImport } from './routes/sitemap-cinemas[.]xml'
@@ -62,6 +63,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForBoernRoute = ForBoernRouteImport.update({
+  id: '/for-boern',
+  path: '/for-boern',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$city': typeof CityRouteWithChildren
   '/auth': typeof AuthRoute
+  '/for-boern': typeof ForBoernRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
@@ -271,6 +278,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/for-boern': typeof ForBoernRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
@@ -309,6 +317,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/$city': typeof CityRouteWithChildren
   '/auth': typeof AuthRoute
+  '/for-boern': typeof ForBoernRoute
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
@@ -347,6 +356,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$city'
     | '/auth'
+    | '/for-boern'
     | '/mcp'
     | '/reset-password'
     | '/sitemap-cinemas.xml'
@@ -382,6 +392,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/for-boern'
     | '/mcp'
     | '/reset-password'
     | '/sitemap-cinemas.xml'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/$city'
     | '/auth'
+    | '/for-boern'
     | '/mcp'
     | '/reset-password'
     | '/sitemap-cinemas.xml'
@@ -457,6 +469,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   CityRoute: typeof CityRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ForBoernRoute: typeof ForBoernRoute
   McpRoute: typeof McpRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapCinemasDotxmlRoute: typeof SitemapCinemasDotxmlRoute
@@ -507,6 +520,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/for-boern': {
+      id: '/for-boern'
+      path: '/for-boern'
+      fullPath: '/for-boern'
+      preLoaderRoute: typeof ForBoernRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -785,6 +805,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   CityRoute: CityRouteWithChildren,
   AuthRoute: AuthRoute,
+  ForBoernRoute: ForBoernRoute,
   McpRoute: McpRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapCinemasDotxmlRoute: SitemapCinemasDotxmlRoute,

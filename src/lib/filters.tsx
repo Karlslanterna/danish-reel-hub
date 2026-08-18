@@ -9,13 +9,14 @@ import {
 } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Plus, ChevronRight, ArrowLeft, X } from "lucide-react";
+import { Plus, ChevronRight, ArrowLeft, Clock3, X } from "lucide-react";
 import { useLanguage, type Lang } from "@/lib/i18n";
 import { sortTagOptions } from "@/lib/showtime-tags";
 import { slugifyCity, baseCityOf } from "@/lib/city-slug";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { addCalendarDays, windowStart, windowEnd, windowBounds } from "@/lib/date-window";
 import { canonicalCinemaId } from "@/lib/cinema-catalog";
+import type { TimePeriod } from "@/lib/time-filter";
 
 export type Radius = 2 | 5 | 10 | 25 | 50 | "all";
 
@@ -64,6 +65,7 @@ type FiltersState = {
   radius: Radius;
   userLoc: Loc | null;
   selectedDate: string | null;
+  selectedTime: TimePeriod | null;
   selectedGenre: string | null;
   selectedFormat: string | null;
   selectedLanguage: string | null;
@@ -76,6 +78,7 @@ type FiltersState = {
   geoLoading: boolean;
   setRadius: (r: Radius) => void;
   setSelectedDate: (d: string | null) => void;
+  setSelectedTime: (v: TimePeriod | null) => void;
   setSelectedGenre: (g: string | null) => void;
   setSelectedFormat: (v: string | null) => void;
   setSelectedLanguage: (v: string | null) => void;
@@ -95,6 +98,7 @@ type Persisted = {
   radius: Radius;
   userLoc: Loc | null;
   selectedDate: string | null;
+  selectedTime: TimePeriod | null;
   selectedGenre: string | null;
   selectedFormat: string | null;
   selectedLanguage: string | null;
@@ -109,6 +113,7 @@ const EMPTY_PERSISTED: Persisted = {
   radius: "all",
   userLoc: null,
   selectedDate: null,
+  selectedTime: null,
   selectedGenre: null,
   selectedFormat: null,
   selectedLanguage: null,
@@ -120,6 +125,8 @@ const EMPTY_PERSISTED: Persisted = {
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
+const timePeriod = (v: unknown): TimePeriod | null =>
+  v === "morning" || v === "afternoon" || v === "evening" || v === "late" ? v : null;
 
 function loadPersisted(): Persisted {
   if (typeof window === "undefined") return EMPTY_PERSISTED;
@@ -146,6 +153,7 @@ function loadPersisted(): Persisted {
       radius,
       userLoc,
       selectedDate,
+      selectedTime: timePeriod(p.selectedTime),
       selectedGenre,
       selectedFormat: str(p.selectedFormat),
       selectedLanguage: str(p.selectedLanguage),
@@ -164,6 +172,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [radius, setRadiusState] = useState<Radius>("all");
   const [userLoc, setUserLoc] = useState<Loc | null>(null);
   const [selectedDate, setSelectedDateState] = useState<string | null>(null);
+  const [selectedTime, setSelectedTimeState] = useState<TimePeriod | null>(null);
   const [selectedGenre, setSelectedGenreState] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormatState] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguageState] = useState<string | null>(null);
@@ -181,6 +190,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setRadiusState(p.radius);
     setUserLoc(p.userLoc);
     setSelectedDateState(p.selectedDate);
+    setSelectedTimeState(p.selectedTime);
     setSelectedGenreState(p.selectedGenre);
     setSelectedFormatState(p.selectedFormat);
     setSelectedLanguageState(p.selectedLanguage);
@@ -201,6 +211,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
           radius,
           userLoc,
           selectedDate,
+          selectedTime,
           selectedGenre,
           selectedFormat,
           selectedLanguage,
@@ -218,6 +229,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     radius,
     userLoc,
     selectedDate,
+    selectedTime,
     selectedGenre,
     selectedFormat,
     selectedLanguage,
@@ -279,6 +291,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     [clearCinema],
   );
   const setSelectedDate = useCallback((d: string | null) => setSelectedDateState(d), []);
+  const setSelectedTime = useCallback((v: TimePeriod | null) => setSelectedTimeState(v), []);
   const setSelectedGenre = useCallback((g: string | null) => setSelectedGenreState(g), []);
   const setSelectedFormat = useCallback((v: string | null) => setSelectedFormatState(v), []);
   const setSelectedLanguage = useCallback((v: string | null) => setSelectedLanguageState(v), []);
@@ -358,6 +371,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => {
     setRadiusState("all");
     setSelectedDateState(null);
+    setSelectedTimeState(null);
     setSelectedGenreState(null);
     setSelectedFormatState(null);
     setSelectedLanguageState(null);
@@ -372,6 +386,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       radius,
       userLoc,
       selectedDate,
+      selectedTime,
       selectedGenre,
       selectedFormat,
       selectedLanguage,
@@ -384,6 +399,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       geoLoading,
       setRadius,
       setSelectedDate,
+      setSelectedTime,
       setSelectedGenre,
       setSelectedFormat,
       setSelectedLanguage,
@@ -398,6 +414,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       radius,
       userLoc,
       selectedDate,
+      selectedTime,
       selectedGenre,
       selectedFormat,
       selectedLanguage,
@@ -410,6 +427,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       geoLoading,
       setRadius,
       setSelectedDate,
+      setSelectedTime,
       setSelectedGenre,
       setSelectedFormat,
       setSelectedLanguage,
@@ -546,6 +564,9 @@ export function FilterBar({
   hideRadius = false,
   hideCity = false,
   hideCinema = false,
+  showChildrenFilter = false,
+  childrenOnly = false,
+  showTimeFilter = false,
   genres,
   formats,
   languages,
@@ -557,6 +578,9 @@ export function FilterBar({
   hideRadius?: boolean;
   hideCity?: boolean;
   hideCinema?: boolean;
+  showChildrenFilter?: boolean;
+  childrenOnly?: boolean;
+  showTimeFilter?: boolean;
   genres?: string[];
   formats?: string[];
   languages?: string[];
@@ -569,6 +593,7 @@ export function FilterBar({
     radius,
     userLoc,
     selectedDate,
+    selectedTime,
     selectedGenre,
     selectedFormat,
     selectedLanguage,
@@ -578,6 +603,7 @@ export function FilterBar({
     selectedCinemaName,
     setRadius,
     setSelectedDate,
+    setSelectedTime,
     setSelectedGenre,
     setSelectedFormat,
     setSelectedLanguage,
@@ -591,6 +617,7 @@ export function FilterBar({
   const hasFilters = Boolean(
     radius !== "all" ||
     selectedDate ||
+    (showTimeFilter && selectedTime) ||
     selectedGenre ||
     selectedFormat ||
     selectedLanguage ||
@@ -600,6 +627,7 @@ export function FilterBar({
   );
   const [radiusOpen, setRadiusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [timeOpen, setTimeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreView, setMoreView] = useState<
     "menu" | "genres" | "formats" | "languages" | "events" | "cities" | "cinemas"
@@ -685,6 +713,7 @@ export function FilterBar({
     }
     const isHomeOrCity = /^\/[^/]*$/.test(pathname);
     if (isHomeOrCity) {
+      if (childrenOnly) return;
       if (slug) navigate({ to: "/$city", params: { city: slug } });
       else navigate({ to: "/" });
     }
@@ -705,12 +734,12 @@ export function FilterBar({
   };
 
   return (
-    <div className={`flex flex-wrap items-center gap-3 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-2 sm:gap-3 ${className}`}>
       {selectedCinemaId && selectedCinemaName && (
         <button
           type="button"
           onClick={() => applyCinema(null)}
-          className="inline-flex max-w-[190px] items-center gap-2 rounded-full border border-primary bg-primary px-4 py-1.5 text-xs uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
+          className="inline-flex h-9 max-w-[190px] items-center gap-2 rounded-full border border-primary bg-primary px-3 text-xs uppercase tracking-[0.12em] text-primary-foreground transition-colors hover:bg-primary/90 sm:px-4 sm:tracking-[0.15em]"
           title={selectedCinemaName}
         >
           <span className="truncate">{selectedCinemaName}</span>
@@ -734,7 +763,7 @@ export function FilterBar({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
+              className={`inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-xs uppercase tracking-[0.12em] transition-colors sm:px-4 sm:tracking-[0.15em] ${
                 radius !== "all"
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
@@ -788,7 +817,7 @@ export function FilterBar({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.15em] transition-colors ${
+            className={`inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-xs uppercase tracking-[0.12em] transition-colors sm:px-4 sm:tracking-[0.15em] ${
               selectedDate
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
@@ -874,6 +903,59 @@ export function FilterBar({
         </PopoverContent>
       </Popover>
 
+      {showChildrenFilter && (
+        <Link
+          to={childrenOnly ? "/" : "/for-boern"}
+          aria-current={childrenOnly ? "page" : undefined}
+          className={`inline-flex h-9 items-center whitespace-nowrap rounded-full border px-3 text-xs uppercase tracking-[0.12em] transition-colors sm:px-4 sm:tracking-[0.15em] ${
+            childrenOnly
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+          }`}
+        >
+          {t("filter.children")}
+        </Link>
+      )}
+
+      {showTimeFilter && (
+        <Popover open={timeOpen} onOpenChange={setTimeOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={`inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-xs uppercase tracking-[0.12em] transition-colors sm:px-4 sm:tracking-[0.15em] ${
+                selectedTime
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
+              }`}
+            >
+              <Clock3 size="14" aria-hidden />
+              {selectedTime ? t(`filter.time.${selectedTime}`) : t("filter.time")}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2" align="start">
+            <div className="flex flex-col gap-1">
+              {([null, "morning", "afternoon", "evening", "late"] as const).map((period) => (
+                <button
+                  key={period ?? "all"}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTime(period);
+                    setTimeOpen(false);
+                  }}
+                  className={`rounded-md px-4 py-2 text-left text-sm transition-colors ${
+                    selectedTime === period
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {period ? t(`filter.time.${period}`) : t("filter.time.all")}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+
       <Popover
         open={moreOpen}
         onOpenChange={(open) => {
@@ -886,7 +968,7 @@ export function FilterBar({
             type="button"
             data-more-filters-trigger
             aria-label={t("filter.more")}
-            className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border transition-colors ${
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
               hasMoreFilters
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card/40 text-muted-foreground hover:border-primary/60 hover:text-foreground"
@@ -1176,7 +1258,7 @@ export function FilterBar({
         <button
           type="button"
           onClick={clear}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card/40 px-3 text-xs uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground sm:tracking-[0.15em]"
         >
           <X size="12" strokeWidth={2.5} />
           {t("home.clearFilters")}

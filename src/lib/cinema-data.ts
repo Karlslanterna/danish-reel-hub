@@ -466,7 +466,7 @@ export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
     collectPages<ScreeningIndexReadRow>((from, to) =>
       supabase
         .from("screenings")
-        .select("movie_id, cinema_id, local_date, formats, languages, events")
+        .select("movie_id, cinema_id, local_date, local_time, formats, languages, events")
         .gte("starts_at", bounds.startsAfter)
         .gte("local_date", bounds.firstDate)
         .lte("local_date", bounds.lastDate)

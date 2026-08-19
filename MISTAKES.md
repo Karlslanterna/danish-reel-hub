@@ -71,3 +71,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: The read model unioned events, formats, and languages across every time in one movie/cinema/date/hall group before filtering.
 - Rule: Keep physical screenings separated by their complete tag signature until every active filter has matched; merge only after filtering.
 - Test: A regression test pairs a tagged noon screening with an untagged afternoon screening and requires only the tagged ticket to survive.
+
+## M-011 — Persisted filter relabelled an explicit landing route
+
+- What happened: Navigating from Babybio to `/for-boern` correctly kept both filters, but the children landing page still displayed the Babybio hero.
+- Why: Hero copy was chosen from persisted filter state before explicit route context.
+- Rule: An explicit curated landing route owns its title and description; persisted filters may narrow results but never relabel the route.
+- Test: Production smoke navigation verifies `/for-boern` keeps its children hero while combined filters remain active.

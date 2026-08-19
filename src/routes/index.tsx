@@ -202,6 +202,11 @@ export function HomePage({
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
   const eventPage = activeSpecialEvent ? specialEventDefinition(activeSpecialEvent) : null;
+  // The explicit landing route owns its hero copy. Persisted filters may
+  // narrow that landing page, but must not relabel `/for-boern` as Babybio (or
+  // relabel an explicit special-event route as the generic children page).
+  const showChildrenHero = childrenOnly || (!eventPage && activeChildrenOnly);
+  const heroEventPage = childrenOnly ? null : eventPage;
 
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -635,12 +640,11 @@ export function HomePage({
           <div className="flex items-end justify-between gap-6">
             <div className="max-w-2xl">
               <h1 className="font-hero text-3xl leading-[0.95] tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-                {eventPage?.hero ??
-                  (activeChildrenOnly ? t("home.childrenHero") : t("home.hero"))}
+                {heroEventPage?.hero ??
+                  (showChildrenHero ? t("home.childrenHero") : t("home.hero"))}
               </h1>
               <p className="font-hero mt-2 max-w-md text-sm leading-relaxed text-muted-foreground sm:mt-4">
-                {eventPage?.sub ??
-                  (activeChildrenOnly ? t("home.childrenSub") : t("home.sub"))}
+                {heroEventPage?.sub ?? (showChildrenHero ? t("home.childrenSub") : t("home.sub"))}
               </p>
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">

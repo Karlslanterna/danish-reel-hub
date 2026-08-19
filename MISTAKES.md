@@ -106,3 +106,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: A production-state audit was used as a pre-merge code gate even though a pull request cannot alter production before merge and Lovable deployment.
 - Rule: PR-local tests and builds are blocking before merge. Checks against the currently deployed site remain visible but advisory on pull requests; after Lovable deployment, a manually triggered CI run makes the same production checks blocking.
 - Test: A pull request with a known live-only finding completes its code checks and records an advisory warning, while a manual workflow run still fails until the deployed site passes the production audit.
+
+## M-016 — Smoke test timed out while installing Chromium
+
+- What happened: GitHub cancelled the production smoke job after 15 minutes before any Lanterna test ran because `playwright install --with-deps` stalled while reading the runner's Ubuntu package mirror.
+- Why: The workflow installed Chromium and operating-system dependencies from apt on every run instead of using a deterministic browser environment.
+- Rule: Run browser CI in the official Playwright container pinned to the exact `@playwright/test` version in `package.json`; do not add a separate apt/browser installation step.
+- Test: The smoke job starts Playwright directly, reaches the actual Lanterna tests, and completes within its timeout.

@@ -101,6 +101,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [verify, parity, catalog-audit]
+    # Pin this tag to the exact @playwright/test version in package.json. The
+    # image already contains Chromium and its OS dependencies, so CI does not
+    # depend on a fresh apt installation from the runner's Ubuntu mirror.
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
     env:
       SMOKE_BASE_URL: https://lanterna.dk
     steps:
@@ -115,9 +120,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
 
       - name: Run smoke tests against production
         run: npm run test:smoke

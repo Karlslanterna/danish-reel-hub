@@ -18,6 +18,7 @@ Read `FILTER_PRINCIPLES.md` and `MISTAKES.md` before changing filters, imports, 
 - If local GitHub tooling is unavailable, verify the connected GitHub integration's repository permission and use its direct branch/commit/PR workflow. Stop only when neither the direct integration nor an authenticated local path can publish safely.
 - Never push directly to `main`. Merge only after required checks against the PR code pass and the PR scope matches the reviewed local diff.
 - Checks that read the already deployed `lanterna.dk` are advisory during a pull request because they cannot observe the proposed code. They must stay visible, but must never create a circular gate that prevents the fix from reaching production.
+- Run Playwright CI jobs in the official Playwright container pinned to the repository's exact `@playwright/test` version. Do not reinstall browsers and OS packages through the runner's apt mirrors on every run.
 - After merge, deploy the frontend through Lovable's **Update** publish flow. Deploy Supabase migrations/functions separately through Lovable, then manually run the GitHub CI workflow. In that post-deploy run, production audit and smoke jobs are blocking and must pass.
 - A task is complete only when the states are reported separately: implemented, locally verified, published in a PR, merged, deployed, and production-verified.
 

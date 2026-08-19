@@ -18,21 +18,29 @@ import { displayCityOf, type CityOption } from "@/lib/city-slug";
 import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
 import { buildFilterFacets } from "@/lib/filter-facets";
 import { cinemaProgramShowtimesByMovie } from "@/lib/cinema-program";
+import { expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
 
 export type MovieDetailCity = { name: string; slug: string };
+export type MovieDetailProgramme = {
+  cinemas: Cinema[];
+  showtimes: CompactShowtimes;
+  cityOptions: CityOption[];
+};
 
 export function MovieDetail({
   movie,
-  cinemas: cinemasShowing,
-  showtimes,
+  cinemas: initialCinemas,
+  showtimes: initialShowtimes,
   city,
   cityOptions,
+  programme,
 }: {
   movie: Movie;
   cinemas: Cinema[];
   showtimes: Showtime[];
   city?: MovieDetailCity;
   cityOptions?: CityOption[];
+  programme?: Promise<MovieDetailProgramme>;
 }) {
   const {
     radius,
@@ -49,31 +57,49 @@ export function MovieDetail({
     clear,
   } = useFilters();
   const { lang } = useLanguage();
-  useCinemaUrlSync(cinemasShowing);
+  const [cinemasShowing, setCinemasShowing] = useState(initialCinemas);
+  const [currentCityOptions, setCurrentCityOptions] = useState(cityOptions ?? []);
   const [visibleCinemaCount, setVisibleCinemaCount] = useState(24);
-  const [programmeShowtimes, setProgrammeShowtimes] = useState(showtimes);
+  const [programmeShowtimes, setProgrammeShowtimes] = useState(initialShowtimes);
+  const [programmeLoading, setProgrammeLoading] = useState(Boolean(programme));
   const [ticketLinksReady, setTicketLinksReady] = useState(false);
+  useCinemaUrlSync(cinemasShowing);
 
   useEffect(() => {
     setVisibleCinemaCount(24);
-    setProgrammeShowtimes(showtimes);
+    setCinemasShowing(initialCinemas);
+    setCurrentCityOptions(cityOptions ?? []);
+    setProgrammeShowtimes(initialShowtimes);
+    setProgrammeLoading(Boolean(programme));
     setTicketLinksReady(false);
 
     let active = true;
-    void fetchTicketedShowtimesForMovie(movie.sourceIds ?? movie.id)
-      .then((ticketedShowtimes) => {
+    void (async () => {
+      try {
+        if (programme) {
+          const loaded = await programme;
+          if (!active) return;
+          setCinemasShowing(loaded.cinemas);
+          setCurrentCityOptions(loaded.cityOptions);
+          setProgrammeShowtimes(expandShowtimes(loaded.showtimes));
+          setProgrammeLoading(false);
+        }
+
+        const ticketedShowtimes = await fetchTicketedShowtimesForMovie(movie.sourceIds ?? movie.id);
         if (!active) return;
         setProgrammeShowtimes(ticketedShowtimes);
         setTicketLinksReady(true);
-      })
-      .catch(() => {
-        if (active) setTicketLinksReady(false);
-      });
+      } catch {
+        if (!active) return;
+        setProgrammeLoading(false);
+        setTicketLinksReady(false);
+      }
+    })();
 
     return () => {
       active = false;
     };
-  }, [movie.id, movie.sourceIds, showtimes]);
+  }, [cityOptions, initialCinemas, initialShowtimes, movie.id, movie.sourceIds, programme]);
 
   // City is routing context: when this page is city-scoped, keep the global
   // (persisted) city filter in sync so the selection carries across the site.
@@ -138,7 +164,7 @@ export function MovieDetail({
   const visibleByCinema = byCinema.slice(0, visibleCinemaCount);
 
   useTrackZeroResults(
-    byCinema.length,
+    programmeLoading ? 1 : byCinema.length,
     Boolean(
       selectedDate ||
       selectedTime ||
@@ -160,7 +186,7 @@ export function MovieDetail({
     ],
   );
 
-  const cityFilterOptions = (cityOptions ?? []).map((c) => ({
+  const cityFilterOptions = currentCityOptions.map((c) => ({
     value: c.name,
     count: c.count,
   }));
@@ -267,9 +293,11 @@ export function MovieDetail({
 
           {city && (
             <p className="mt-5 max-w-3xl text-sm leading-relaxed text-foreground/90 sm:text-base">
-              {cinemasShowing.length > 0
-                ? `${movie.title} spiller i ${city.name} i ${cinemasShowing.length} ${cinemasShowing.length === 1 ? "biograf" : "biografer"}. Herunder finder du alle aktuelle spilletider i ${city.name} og kan købe billetter direkte.`
-                : `${movie.title} har ingen aktuelle spilletider i ${city.name} lige nu. Se filmens spilletider i resten af landet på den landsdækkende filmside.`}
+              {programmeLoading
+                ? `Henter aktuelle spilletider i ${city.name}…`
+                : cinemasShowing.length > 0
+                  ? `${movie.title} spiller i ${city.name} i ${cinemasShowing.length} ${cinemasShowing.length === 1 ? "biograf" : "biografer"}. Herunder finder du alle aktuelle spilletider i ${city.name} og kan købe billetter direkte.`
+                  : `${movie.title} har ingen aktuelle spilletider i ${city.name} lige nu. Se filmens spilletider i resten af landet på den landsdækkende filmside.`}
             </p>
           )}
 
@@ -308,13 +336,27 @@ export function MovieDetail({
             Spilletider{city ? ` i ${city.name}` : ""}
           </h2>
           <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            {byCinema.length} biografer{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
-            {hasGeo ? ` · inden for ${radius} km` : ""}
-            {!ticketLinksReady ? " · billetlinks indlæses" : ""}
+            {programmeLoading ? (
+              "Program indlæses"
+            ) : (
+              <>
+                {byCinema.length} biografer
+                {selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
+                {hasGeo ? ` · inden for ${radius} km` : ""}
+                {!ticketLinksReady ? " · billetlinks indlæses" : ""}
+              </>
+            )}
           </div>
         </div>
 
-        {byCinema.length === 0 ? (
+        {programmeLoading ? (
+          <div
+            role="status"
+            className="rounded-md border border-border bg-card/30 px-5 py-10 text-center text-sm text-muted-foreground"
+          >
+            Henter spilletider…
+          </div>
+        ) : byCinema.length === 0 ? (
           <div className="rounded-md border border-dashed border-border py-12 text-center">
             <p className="font-display text-lg text-foreground">
               {city
@@ -429,7 +471,7 @@ export function MovieDetail({
         )}
       </section>
 
-      {(cityOptions?.length ?? 0) > 0 && (
+      {currentCityOptions.length > 0 && (
         <section className="mx-auto max-w-[1400px] px-4 pb-4 sm:px-6 md:px-8">
           <h2 className="font-display text-lg tracking-tight sm:text-xl">
             {movie.title} i andre byer
@@ -446,7 +488,7 @@ export function MovieDetail({
                 </Link>
               </li>
             )}
-            {(cityOptions ?? [])
+            {currentCityOptions
               .filter((c) => c.slug !== city?.slug)
               .map((c) => (
                 <li key={c.slug}>

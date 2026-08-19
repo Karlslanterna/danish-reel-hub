@@ -2,15 +2,20 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieDetail } from "@/components/MovieDetail";
-import { fetchMovieBySlug, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
+import {
+  fetchMovieBySlug,
+  fetchMovieProgramme,
+  type Movie,
+  type Cinema,
+  type Showtime,
+} from "@/lib/cinema-data";
 import { cityOptionsFrom, type CityOption } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { movieSchemas } from "@/lib/jsonld";
 import { movieTitle, movieDescription } from "@/lib/seo";
 import { citySlug } from "@/lib/city-slug";
-import { expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
+import { compactShowtimes, expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
 import { findCachedHomeMovie } from "@/lib/home-catalog-cache";
-import { getPublicMovieProgramme } from "@/lib/movie-programme.functions";
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params, context }) => {
@@ -18,12 +23,11 @@ export const Route = createFileRoute("/film/$slug")({
       findCachedHomeMovie(context.queryClient, params.slug) ??
       (await fetchMovieBySlug(params.slug));
     if (!movie) throw notFound();
-    const movieIds = Array.isArray(movie.sourceIds) ? movie.sourceIds : [movie.id];
-    const { cinemas, showtimes } = await getPublicMovieProgramme({ data: { movieIds } });
+    const { cinemas, showtimes } = await fetchMovieProgramme(movie.sourceIds ?? movie.id);
     return {
       movie,
       cinemas,
-      showtimes,
+      showtimes: compactShowtimes(showtimes),
       cityOptions: cityOptionsFrom(cinemas),
     };
   },

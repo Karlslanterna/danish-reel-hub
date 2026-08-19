@@ -18,14 +18,6 @@ export function homeSchemas() {
       name: "Lanterna",
       alternateName: ["Lanterna.dk"],
       url: site,
-      potentialAction: {
-        "@type": "SearchAction",
-        target: {
-          "@type": "EntryPoint",
-          urlTemplate: `${site}?q={search_term_string}`,
-        },
-        "query-input": "required name=search_term_string",
-      },
     }),
     ld({
       "@context": "https://schema.org",
@@ -119,14 +111,20 @@ function breadcrumbSchema(items: { name: string; url: string }[]) {
   });
 }
 
-export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtime[]) {
+export function movieSchemas(
+  movie: Movie,
+  cinemas: Cinema[],
+  showtimes: Showtime[],
+  options?: { path?: string; breadcrumbs?: Array<{ name: string; url: string }> },
+) {
   const cinemaById = new Map(cinemas.map((c) => [c.id, c] as const));
+  const movieUrl = canonicalUrl(options?.path ?? `/film/${movie.slug}`);
 
   const movieObj: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Movie",
     name: movie.title,
-    url: canonicalUrl(`/film/${movie.slug}`),
+    url: movieUrl,
     description: movie.synopsis || undefined,
   };
   if (movie.poster?.url) movieObj.image = movie.poster.url;
@@ -177,10 +175,12 @@ export function movieSchemas(movie: Movie, cinemas: Cinema[], showtimes: Showtim
     });
   }
 
-  const crumbs = breadcrumbSchema([
-    { name: "Forside", url: canonicalUrl("/") },
-    { name: movie.title, url: canonicalUrl(`/film/${movie.slug}`) },
-  ]);
+  const crumbs = breadcrumbSchema(
+    options?.breadcrumbs ?? [
+      { name: "Forside", url: canonicalUrl("/") },
+      { name: movie.title, url: movieUrl },
+    ],
+  );
 
   // Search engines only need a representative set. Serializing thousands of
   // near-identical ScreeningEvent scripts made popular film pages megabytes

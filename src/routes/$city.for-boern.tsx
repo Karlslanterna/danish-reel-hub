@@ -2,14 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { canonicalUrl } from "@/lib/canonical";
 import { isMovieForChildren } from "@/lib/children-filter";
 import { childrenMoviesSchemas } from "@/lib/jsonld";
+import { expandShowtimeIndex } from "@/lib/public-catalog";
 import { CityPage, loadCityCatalog } from "./$city.index";
 
 export const Route = createFileRoute("/$city/for-boern")({
   loader: ({ params }) => loadCityCatalog(params.city),
   head: ({ loaderData }) => {
     if (!loaderData) return { meta: [{ name: "robots", content: "noindex, follow" }] };
-    const screeningsByMovie = new Map<string, typeof loaderData.showtimes>();
-    for (const screening of loaderData.showtimes) {
+    const showtimes = expandShowtimeIndex(loaderData.showtimes);
+    const screeningsByMovie = new Map<string, typeof showtimes>();
+    for (const screening of showtimes) {
       const rows = screeningsByMovie.get(screening.movieId) ?? [];
       rows.push(screening);
       screeningsByMovie.set(screening.movieId, rows);

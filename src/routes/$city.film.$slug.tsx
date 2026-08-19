@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
-import { MovieDetail } from "@/components/MovieDetail";
+import { DeferredMovieDetail } from "@/components/DeferredMovieDetail";
 import { useFilters } from "@/lib/filters";
 import {
   fetchMovieBySlug,
@@ -26,9 +26,9 @@ import { findCachedHomeMovie } from "@/lib/home-catalog-cache";
 export const Route = createFileRoute("/$city/film/$slug")({
   loader: async ({ params, context }) => {
     const slug = params.city.toLowerCase();
-    const movie =
-      findCachedHomeMovie(context.queryClient, params.slug) ??
-      (await fetchMovieBySlug(params.slug));
+    const cachedMovie = findCachedHomeMovie(context.queryClient, params.slug);
+    const details = fetchMovieBySlug(params.slug);
+    const movie = cachedMovie ?? (await details);
     if (!movie) throw notFound();
     const { cinemas: allCinemas, showtimes } = await fetchMovieProgramme(
       movie.sourceIds ?? movie.id,
@@ -45,6 +45,7 @@ export const Route = createFileRoute("/$city/film/$slug")({
       if (!match) throw notFound();
       return {
         movie,
+        details: cachedMovie ? details : Promise.resolve(movie),
         cinemas: [],
         showtimes: compactShowtimes([]),
         cityName: baseCityOf(match.city),
@@ -60,6 +61,7 @@ export const Route = createFileRoute("/$city/film/$slug")({
     const cinemaIds = new Set(cinemas.map((c) => c.id));
     return {
       movie,
+      details: cachedMovie ? details : Promise.resolve(movie),
       cinemas,
       showtimes: compactShowtimes(showtimes.filter((s) => cinemaIds.has(s.cinemaId))),
       cityName,
@@ -107,7 +109,21 @@ export const Route = createFileRoute("/$city/film/$slug")({
         { name: "twitter:description", content: description },
       ],
       links: [{ rel: "canonical", href: canonical }],
-      scripts: movieSchemas(movie, cinemas, showtimes),
+      scripts: movieSchemas(
+        movie,
+        cinemas,
+        showtimes,
+        hasScreenings
+          ? {
+              path: `/${canonicalSlug}/film/${movie.slug}`,
+              breadcrumbs: [
+                { name: "Forside", url: canonicalUrl("/") },
+                { name: cityName, url: canonicalUrl(`/${canonicalSlug}`) },
+                { name: `${movie.title} i ${cityName}`, url: selfHref },
+              ],
+            }
+          : undefined,
+      ),
     };
   },
   notFoundComponent: () => (
@@ -137,6 +153,7 @@ export const Route = createFileRoute("/$city/film/$slug")({
 function CityMoviePage() {
   const {
     movie,
+    details,
     cinemas,
     showtimes: compact,
     cityName,
@@ -144,6 +161,7 @@ function CityMoviePage() {
     cityOptions,
   } = Route.useLoaderData() as {
     movie: Movie;
+    details: Promise<Movie | null>;
     cinemas: Cinema[];
     showtimes: CompactShowtimes;
     cityName: string;
@@ -158,8 +176,9 @@ function CityMoviePage() {
   }, [cityName, selectedCity, setSelectedCity]);
 
   return (
-    <MovieDetail
+    <DeferredMovieDetail
       movie={movie}
+      details={details}
       cinemas={cinemas}
       showtimes={showtimes}
       city={{ name: cityName, slug: canonicalSlug }}

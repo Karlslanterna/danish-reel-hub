@@ -82,13 +82,30 @@ jobs:
           node-version: 22
 
       - name: Audit every active movie and filter value
+        id: catalog
+        # A pull request cannot change the already deployed lanterna.dk. Keep
+        # the live finding visible, but let PR-local tests decide whether the
+        # proposed code is mergeable. Manual post-deploy runs remain blocking.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: node scripts/audit-public-catalog.mjs
+
+      - name: Explain production-only finding
+        if: steps.catalog.outcome == 'failure' && github.event_name == 'pull_request'
+        run: |
+          echo "::warning::The production catalog audit found an issue on the currently deployed lanterna.dk. It is advisory on pull requests and blocking on manual post-deploy runs."
+          echo "### Production catalog finding" >> "$GITHUB_STEP_SUMMARY"
+          echo "The audit found an issue on the currently deployed **lanterna.dk**. This is advisory here because a pull request cannot change production before merge and Lovable deployment. Run this workflow manually after deployment; the same audit is then blocking." >> "$GITHUB_STEP_SUMMARY"
 
   smoke:
     name: Production smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [verify, parity, catalog-audit]
+    # Pin this tag to the exact @playwright/test version in package.json. The
+    # image already contains Chromium and its OS dependencies, so CI does not
+    # depend on a fresh apt installation from the runner's Ubuntu mirror.
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
     env:
       SMOKE_BASE_URL: https://lanterna.dk
     steps:
@@ -104,17 +121,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
       - name: Run smoke tests against production
+        id: smoke
+        # The PR cannot change the already deployed site. Keep live failures
+        # visible before merge; manual post-deploy runs remain blocking.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: npm run test:smoke
 
       - name: Upload Playwright report on failure
-        if: failure()
+        if: steps.smoke.outcome == 'failure'
         uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Explain production-only smoke findings
+        if: steps.smoke.outcome == 'failure' && github.event_name == 'pull_request'
+        run: |
+          echo "::warning::The smoke tests found issues on the currently deployed lanterna.dk. They are advisory on pull requests and blocking on manual post-deploy runs."
+          echo "### Production smoke findings" >> "$GITHUB_STEP_SUMMARY"
+          echo "The smoke tests found issues on the currently deployed **lanterna.dk**. This is advisory here because a pull request cannot change production before merge and Lovable deployment. The Playwright report is attached. Run this workflow manually after deployment; the same tests are then blocking." >> "$GITHUB_STEP_SUMMARY"

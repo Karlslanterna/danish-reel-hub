@@ -109,6 +109,41 @@ function withNoindexHeader(response: Response, pathname: string): Response {
   });
 }
 
+const PRIVATE_PAGE_PREFIXES = [
+  "/admin",
+  "/auth",
+  "/reset-password",
+  "/api/",
+  "/mcp",
+  "/.mcp/",
+  "/.lovable/",
+  "/.well-known/",
+];
+
+/**
+ * Public SSR pages are identical for every visitor; filters and language are
+ * applied in the browser. Let the edge reuse a completed render briefly so a
+ * crawler or campaign spike does not repeat the full catalogue query for each
+ * request. Auth/admin/API responses and anything setting a cookie stay private.
+ */
+function withPublicPageCache(response: Response, request: Request): Response {
+  if (request.method !== "GET" && request.method !== "HEAD") return response;
+  if (response.status !== 200 || response.headers.has("set-cookie")) return response;
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html")) return response;
+
+  const pathname = new URL(request.url).pathname;
+  if (PRIVATE_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "public, max-age=0, s-maxage=300, stale-while-revalidate=60");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const pathname = new URL(request.url).pathname;
@@ -116,7 +151,10 @@ export default {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       const normalized = await normalizeCatastrophicSsrResponse(response, request);
-      return withGlobalSecurityHeaders(withNoindexHeader(normalized, pathname), request);
+      return withGlobalSecurityHeaders(
+        withNoindexHeader(withPublicPageCache(normalized, request), pathname),
+        request,
+      );
     } catch (error) {
       console.error("[server:fetch]", { route: pathname, method: request.method }, error);
       return withGlobalSecurityHeaders(

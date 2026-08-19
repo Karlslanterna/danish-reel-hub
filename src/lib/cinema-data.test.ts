@@ -4,6 +4,91 @@ import {
   groupScreeningsForUi,
   normalizeTicketUrl,
 } from "./screening-read-model";
+import { compactMovieForListing, mapShowtimeIndexGroups, type Movie } from "./cinema-data";
+
+describe("compactMovieForListing", () => {
+  it("keeps card and canonical identity fields while dropping detail-only payload", () => {
+    const movie: Movie = {
+      id: "canonical",
+      slug: "min-film",
+      title: "Min film",
+      runtime: 110,
+      genre: ["Drama"],
+      year: 2026,
+      director: "Instruktør",
+      rating: "11",
+      synopsis: "En meget lang beskrivelse",
+      poster: { url: "https://example.com/poster.jpg" },
+      backdropUrl: "https://example.com/backdrop.jpg",
+      trailerUrl: "https://example.com/trailer",
+      cast: [{ name: "Skuespiller" }],
+      sourceIds: ["source-a", "source-b"],
+      sourceSlugs: ["min-film", "min-film-alias"],
+    };
+
+    expect(compactMovieForListing(movie)).toEqual({
+      id: "canonical",
+      slug: "min-film",
+      title: "Min film",
+      runtime: 110,
+      genre: ["Drama"],
+      year: 2026,
+      director: "Instruktør",
+      rating: "11",
+      synopsis: "",
+      poster: { url: "https://example.com/poster.jpg" },
+      screeningCount: undefined,
+      sourceIds: ["source-a", "source-b"],
+      sourceSlugs: ["min-film", "min-film-alias"],
+    });
+  });
+});
+
+describe("mapShowtimeIndexGroups", () => {
+  it("preserves exact tag groups from the aggregated database response", () => {
+    expect(
+      mapShowtimeIndexGroups([
+        {
+          movie_id: "m1",
+          cinema_id: "c1",
+          local_date: "2026-08-20",
+          times: ["12:00", "14:30"],
+          formats: ["2D"],
+          languages: ["Dansk tale"],
+          events: ["Babybio"],
+        },
+        {
+          movie_id: "m1",
+          cinema_id: "c1",
+          local_date: "2026-08-20",
+          times: ["19:00"],
+          formats: ["2D"],
+          languages: [],
+          events: [],
+        },
+      ]),
+    ).toEqual([
+      {
+        movieId: "m1",
+        cinemaId: "c1",
+        date: "2026-08-20",
+        times: ["12:00", "14:30"],
+        formats: ["2D"],
+        languages: ["Dansk tale"],
+        events: ["Babybio"],
+      },
+      {
+        movieId: "m1",
+        cinemaId: "c1",
+        date: "2026-08-20",
+        times: ["19:00"],
+        formats: ["2D"],
+        languages: [],
+        events: [],
+      },
+    ]);
+  });
+});
 
 describe("groupScreeningsForUi", () => {
   it("preserves one ticket URL per exact screening while keeping the existing UI shape", () => {

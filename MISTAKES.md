@@ -41,8 +41,8 @@ This is a concise operational log. Each entry records the failure, cause, perman
 
 - What happened: A connected Supabase project with legacy tables was initially mistaken for Lanterna's actual Lovable production database.
 - Why: Project identity was inferred from its display name.
-- Rule: Confirm project id, canonical tables, and a known current row before using database results.
-- Test: Release notes record the production project id and verify the `screenings` read model exists.
+- Rule: Access Lanterna's Supabase project only through Lovable's Supabase connection. Never substitute a separately connected project based on its display name.
+- Test: Release notes confirm the database was reached through Lovable and verify that the canonical `screenings` read model exists before any query, migration, deployment, or production claim.
 
 ## M-007 — Dashboard could be green on partial/legacy health
 
@@ -78,3 +78,45 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: Hero copy was chosen from persisted filter state before explicit route context.
 - Rule: An explicit curated landing route owns its title and description; persisted filters may narrow results but never relabel the route.
 - Test: Production smoke navigation verifies `/for-boern` keeps its children hero while combined filters remain active.
+
+## M-012 — Public listings rendered the entire catalogue into the first response
+
+- What happened: Home and city pages server-rendered hundreds of cards and serialized detail-only film fields plus full screening rows, producing megabyte-sized HTML and multi-second response times.
+- Why: The client needed the complete filter index, and that requirement was incorrectly treated as a requirement to render and serialize every rich record up front.
+- Rule: Keep canonical filter data compact, render public cards progressively, defer detail-only metadata to detail routes, and cache identical public HTML briefly at the edge.
+- Test: Release smoke records HTML bytes and initial card counts for home and a large city, then verifies filters and “Vis flere” still expose the complete catalogue.
+
+## M-013 — Mistook a missing local GitHub CLI for missing repository access
+
+- What happened: Publication was reported as blocked because the local `gh` executable was absent, even though the connected GitHub integration had administrator and push access and had already been used for prior Lanterna releases.
+- Why: One preferred local tool was treated as the only valid publication path instead of checking the repository integration's actual capabilities.
+- Rule: Verify both the direct GitHub integration and local tooling. When the direct integration supports branch, commit, and pull-request operations, use the traceable direct workflow rather than declaring an access blocker.
+- Test: Release evidence records the verified repository permission plus the resulting branch, commit, draft PR, checks, merge, Lovable deployment, and live smoke result.
+
+## M-014 — Parenthesized language label created a duplicate public film card
+
+- What happened: Production rendered both `Superhunden Charlie` and `Superhunden Charlie (Dansk tale)` as separate film cards even though they represented the same film.
+- Why: Public title normalization removed unparenthesized language suffixes but did not recognize the same suffix inside trailing parentheses.
+- Rule: Treat a trailing parenthesized screening-language label as presentation metadata, not film identity, while preserving every source id, slug, screening, and screening-level language tag during consolidation.
+- Test: The public-catalog regression suite merges the two title variants into one card, sums their screening counts, retains both source references, and keeps showtime metadata separate.
+
+## M-015 — Live production audit created a circular pull-request gate
+
+- What happened: The code fix for a duplicate live film card could not make its pull request green because the required catalog job kept testing the old code already deployed on `lanterna.dk`.
+- Why: A production-state audit was used as a pre-merge code gate even though a pull request cannot alter production before merge and Lovable deployment.
+- Rule: PR-local tests and builds are blocking before merge. Checks against the currently deployed site remain visible but advisory on pull requests; after Lovable deployment, a manually triggered CI run makes the same production checks blocking.
+- Test: A pull request with a known live-only finding completes its code checks and records an advisory warning, while a manual workflow run still fails until the deployed site passes the production audit.
+
+## M-016 — Smoke test timed out while installing Chromium
+
+- What happened: GitHub cancelled the production smoke job after 15 minutes before any Lanterna test ran because `playwright install --with-deps` stalled while reading the runner's Ubuntu package mirror.
+- Why: The workflow installed Chromium and operating-system dependencies from apt on every run instead of using a deterministic browser environment.
+- Rule: Run browser CI in the official Playwright container pinned to the exact `@playwright/test` version in `package.json`; do not add a separate apt/browser installation step.
+- Test: The smoke job starts Playwright directly, reaches the actual Lanterna tests, and completes within its timeout.
+
+## M-017 — Whole-page HTML check confused filter metadata with a film card
+
+- What happened: The non-film smoke test failed on the word `Særvisning` even though it appeared only as valid serialized screening/filter metadata, not as a public film-card title.
+- Why: The assertion searched the entire server response instead of the semantic UI element it claimed to validate.
+- Rule: Scope UI-quality assertions to the rendered element under test. Film-card title checks may inspect only titles inside public `/film/` card links, not filters, scripts, metadata, or screening tags.
+- Test: The smoke test extracts actual film-card `<h3>` titles, requires at least one card, and allows the same vocabulary to exist in unrelated filter data.

@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          filter_name: string | null
+          filter_value: string | null
+          id: number
+          is_active: boolean | null
+          item_id: string | null
+          item_type: string | null
+          path: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          filter_name?: string | null
+          filter_value?: string | null
+          id?: number
+          is_active?: boolean | null
+          item_id?: string | null
+          item_type?: string | null
+          path: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          filter_name?: string | null
+          filter_value?: string | null
+          id?: number
+          is_active?: boolean | null
+          item_id?: string | null
+          item_type?: string | null
+          path?: string
+        }
+        Relationships: []
+      }
       cinemas: {
         Row: {
           address: string
@@ -558,6 +594,45 @@ export type Database = {
         }
         Relationships: []
       }
+      screening_event_overrides: {
+        Row: {
+          action: string
+          active: boolean
+          created_at: string
+          created_by: string | null
+          event: string
+          id: string
+          note: string
+          source: string
+          source_ref: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          event: string
+          id?: string
+          note: string
+          source: string
+          source_ref: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          event?: string
+          id?: string
+          note?: string
+          source?: string
+          source_ref?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       screenings: {
         Row: {
           cinema_id: string
@@ -954,8 +1029,23 @@ export type Database = {
         }
         Relationships: []
       }
+      screening_model_parity: {
+        Row: {
+          canonical_count: number | null
+          cinema_id: string | null
+          delta: number | null
+          legacy_count: number | null
+          screening_date: string | null
+          source: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      apply_screening_event_overrides: {
+        Args: { p_cinema_id: string; p_source: string }
+        Returns: number
+      }
       cinema_authoritative_source: {
         Args: { p_cinema_id: string }
         Returns: string
@@ -986,6 +1076,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      cleanup_import_audit_data: {
+        Args: {
+          p_raw_payload_days?: number
+          p_snapshot_metadata_days?: number
+          p_staging_days?: number
+        }
+        Returns: Json
+      }
+      enqueue_ebillet_import_runs: { Args: never; Returns: number }
       get_movie_showtime_groups: {
         Args: {
           p_first_date: string
@@ -1011,6 +1110,10 @@ export type Database = {
           p_snapshot_id: string
           p_source: string
         }
+        Returns: Json
+      }
+      purge_ebillet_non_cinema_scope: {
+        Args: { p_organizer_id: number }
         Returns: Json
       }
       rebuild_showtimes_for_cinema: {

@@ -986,6 +986,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_movie_showtime_groups: {
+        Args: {
+          p_first_date: string
+          p_last_date: string
+          p_movie_ids: string[]
+          p_starts_after: string
+        }
+        Returns: Json
+      }
       promote_screenings: {
         Args: {
           p_cinema_id: string

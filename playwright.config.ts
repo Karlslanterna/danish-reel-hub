@@ -9,10 +9,12 @@ export default defineConfig({
   // Smoke tests must be fast and deterministic.
   timeout: 30_000,
   expect: { timeout: 10_000 },
-  fullyParallel: true,
+  // A production gate must observe the deployed app, not create an artificial
+  // traffic spike by cold-loading several SSR routes at once.
+  fullyParallel: !isExternalTarget,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : 4,
+  workers: isExternalTarget ? 1 : process.env.CI ? 2 : 4,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL,

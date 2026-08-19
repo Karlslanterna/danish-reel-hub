@@ -139,6 +139,7 @@ export function CityPage({
   const showtimes = useMemo(() => expandShowtimeIndex(compact as CompactShowtimeIndex), [compact]);
   const [visibleMovieCount, setVisibleMovieCount] = useState(INITIAL_MOVIE_CARD_COUNT);
   const {
+    hydrated: filtersHydrated,
     radius,
     userLoc,
     selectedDate,
@@ -163,12 +164,12 @@ export function CityPage({
 
   // Keep the global filter state in sync with the city in the URL.
   useEffect(() => {
-    if (selectedCity !== cityName) setSelectedCity(cityName);
-  }, [cityName, selectedCity, setSelectedCity]);
+    if (filtersHydrated && selectedCity !== cityName) setSelectedCity(cityName);
+  }, [filtersHydrated, cityName, selectedCity, setSelectedCity]);
 
   useEffect(() => {
-    if (fixedChildrenOnly) setChildrenOnly(true);
-  }, [fixedChildrenOnly, setChildrenOnly]);
+    if (filtersHydrated && fixedChildrenOnly) setChildrenOnly(true);
+  }, [filtersHydrated, fixedChildrenOnly, setChildrenOnly]);
 
   const activeChildrenOnly = fixedChildrenOnly || childrenOnly;
 

@@ -174,6 +174,7 @@ export function HomePage({
   }, [catalog, queryClient]);
   const showtimeIndex = useMemo(() => expandShowtimeIndex(compactIndex), [compactIndex]);
   const {
+    hydrated: filtersHydrated,
     radius,
     userLoc,
     selectedDate,
@@ -194,12 +195,12 @@ export function HomePage({
     specialEvent ?? (selectedEvent && isSpecialEventTag(selectedEvent) ? selectedEvent : undefined);
 
   useEffect(() => {
-    if (childrenOnly) setChildrenOnly(true);
-  }, [childrenOnly, setChildrenOnly]);
+    if (filtersHydrated && childrenOnly) setChildrenOnly(true);
+  }, [filtersHydrated, childrenOnly, setChildrenOnly]);
 
   useEffect(() => {
-    if (specialEvent) setSelectedEvent(specialEvent);
-  }, [specialEvent, setSelectedEvent]);
+    if (filtersHydrated && specialEvent) setSelectedEvent(specialEvent);
+  }, [filtersHydrated, specialEvent, setSelectedEvent]);
 
   const screeningsByMovie = useMemo(() => {
     const map = new Map<string, typeof showtimeIndex>();

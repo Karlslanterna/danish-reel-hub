@@ -3,13 +3,7 @@ import { useEffect, useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { MovieDetail } from "@/components/MovieDetail";
 import { useFilters } from "@/lib/filters";
-import {
-  fetchMovieBySlug,
-  fetchMovieProgramme,
-  type Movie,
-  type Cinema,
-  type Showtime,
-} from "@/lib/cinema-data";
+import { fetchMovieBySlug, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
 import {
   baseCityOf,
   cityMatchesSlug,
@@ -22,6 +16,7 @@ import { movieSchemas } from "@/lib/jsonld";
 import { cityMovieTitle, cityMovieDescription } from "@/lib/seo";
 import { compactShowtimes, expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
 import { findCachedHomeMovie } from "@/lib/home-catalog-cache";
+import { getPublicMovieProgramme } from "@/lib/movie-programme.functions";
 
 export const Route = createFileRoute("/$city/film/$slug")({
   loader: async ({ params, context }) => {
@@ -30,9 +25,11 @@ export const Route = createFileRoute("/$city/film/$slug")({
       findCachedHomeMovie(context.queryClient, params.slug) ??
       (await fetchMovieBySlug(params.slug));
     if (!movie) throw notFound();
-    const { cinemas: allCinemas, showtimes } = await fetchMovieProgramme(
-      movie.sourceIds ?? movie.id,
-    );
+    const movieIds = Array.isArray(movie.sourceIds) ? movie.sourceIds : [movie.id];
+    const { cinemas: allCinemas, showtimes: compact } = await getPublicMovieProgramme({
+      data: { movieIds },
+    });
+    const showtimes = expandShowtimes(compact);
     const cityOptions = cityOptionsFrom(allCinemas);
     const cinemas = allCinemas.filter((c) => cityMatchesSlug(c.city, slug));
     // Unknown city slug (no cinema anywhere matches) -> 404. A known city with

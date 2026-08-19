@@ -141,3 +141,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: The same parallelism used to speed up local tests was also applied to a shared production target with cold SSR/database work.
 - Rule: Keep local browser checks parallel, but run external production smoke serially so the gate measures normal route behaviour rather than self-generated concurrency.
 - Test: `SMOKE_BASE_URL` selects one worker and disables full parallelism; the job retains the 30-second per-test limit.
+
+## M-021 — Active filter summary changed the group button's accessible name
+
+- What happened: Production correctly retained Babybio after film navigation, but the smoke test still timed out looking for a button named exactly `Arrangement`.
+- Why: The active selection is intentionally included in the accessible name, so the real button was named `Arrangement Babybio`; the selector encoded an inactive-state label as a permanent contract.
+- Rule: When a control's accessible name includes live state, anchor selectors to the stable group prefix while allowing the user-visible state suffix.
+- Test: The production navigation smoke opens the Arrangement group both while Babybio is selected and after it is cleared.

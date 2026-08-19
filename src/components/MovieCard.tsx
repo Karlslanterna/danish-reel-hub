@@ -34,12 +34,13 @@ export function MovieCard({ movie, citySlug }: { movie: Movie; citySlug?: string
     <Link
       to="/$city/film/$slug"
       params={{ city: citySlug, slug: movie.slug }}
+      preload="intent"
       className="group block"
     >
       {inner}
     </Link>
   ) : (
-    <Link to="/film/$slug" params={{ slug: movie.slug }} className="group block">
+    <Link to="/film/$slug" params={{ slug: movie.slug }} preload="intent" className="group block">
       {inner}
     </Link>
   );

@@ -13,10 +13,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/admin/import_/$jobId")({
   head: () => ({
-    meta: [
-      { title: "Import status — Admin" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
+    meta: [{ title: "Import status — Admin" }, { name: "robots", content: "noindex, nofollow" }],
   }),
   beforeLoad: async () => {
     const { isAdmin } = await checkIsAdmin();
@@ -131,75 +128,113 @@ function ImportStatusPage() {
 
   const pct = (done: number, total: number) =>
     total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  const isCompleted = job?.status === "completed";
 
   return (
     <AdminShell title={`Importkørsel ${jobId.slice(0, 8)}…`}>
       <div className="mx-auto max-w-3xl">
-      <div className="mb-8">
-        <Button asChild variant="outline" size="sm">
-          <Link to="/admin/pipeline">Tilbage til Data Pipeline</Link>
-        </Button>
-      </div>
+        <div className="mb-8">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin/pipeline">Tilbage til Data Pipeline</Link>
+          </Button>
+        </div>
 
-      {fatal && (
-        <Card className="mb-6 border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">{fatal}</p>
-          </CardContent>
-        </Card>
-      )}
+        {fatal && (
+          <Card className="mb-6 border-destructive">
+            <CardContent className="pt-6">
+              <p className="text-sm text-destructive">{fatal}</p>
+            </CardContent>
+          </Card>
+        )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Status: <span className={statusColor}>{job?.status ?? "loading…"}</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Fase: <span className="font-mono">{job?.phase ?? "—"}</span>
-            {job?.message ? ` · ${job.message}` : ""}
-          </p>
-
-          <ProgressBlock
-            label="Film"
-            done={job?.processed_movies ?? 0}
-            total={job?.total_movies ?? 0}
-            pct={pct(job?.processed_movies ?? 0, job?.total_movies ?? 0)}
-          />
-          <ProgressBlock
-            label="Biografer"
-            done={job?.processed_cinemas ?? 0}
-            total={job?.total_cinemas ?? 0}
-            pct={pct(job?.processed_cinemas ?? 0, job?.total_cinemas ?? 0)}
-          />
-          <ProgressBlock
-            label="Visninger"
-            done={job?.processed_showtimes ?? 0}
-            total={job?.total_showtimes ?? 0}
-            pct={pct(job?.processed_showtimes ?? 0, job?.total_showtimes ?? 0)}
-          />
-        </CardContent>
-      </Card>
-
-      {job && job.errors.length > 0 && (
-        <Card className="mt-6">
+        <Card>
           <CardHeader>
-            <CardTitle>Fejl ({job.errors.length})</CardTitle>
+            <CardTitle>
+              Status:{" "}
+              <span className={statusColor}>
+                {job ? (job.status === "completed" ? "Gennemført" : job.status) : "Henter…"}
+              </span>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ul className="space-y-1 rounded border border-border bg-muted/30 p-3">
-              {job.errors.map((e, i) => (
-                <li key={i} className="font-mono text-xs text-destructive">
-                  {e}
-                </li>
-              ))}
-            </ul>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Fase: <span className="font-mono">{job?.phase ?? "—"}</span>
+              {job?.message ? ` · ${job.message}` : ""}
+            </p>
+
+            {isCompleted ? (
+              <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-4 text-sm">
+                <SummaryRow label="Film læst fra feedet" value={job?.total_movies ?? 0} />
+                <SummaryRow
+                  label="Biografer håndteret via Kultunaut"
+                  value={job?.processed_cinemas ?? 0}
+                  total={job?.total_cinemas ?? 0}
+                />
+                <SummaryRow
+                  label="Forestillinger håndteret via Kultunaut"
+                  value={job?.processed_showtimes ?? 0}
+                  total={job?.total_showtimes ?? 0}
+                />
+                <p className="pt-1 text-muted-foreground">
+                  Forskellen skyldes biografer, der allerede hentes direkte fra eBillet. Det er ikke
+                  manglende importarbejde.
+                </p>
+              </div>
+            ) : (
+              <>
+                <ProgressBlock
+                  label="Film"
+                  done={job?.processed_movies ?? 0}
+                  total={job?.total_movies ?? 0}
+                  pct={pct(job?.processed_movies ?? 0, job?.total_movies ?? 0)}
+                />
+                <ProgressBlock
+                  label="Biografer"
+                  done={job?.processed_cinemas ?? 0}
+                  total={job?.total_cinemas ?? 0}
+                  pct={pct(job?.processed_cinemas ?? 0, job?.total_cinemas ?? 0)}
+                />
+                <ProgressBlock
+                  label="Visninger"
+                  done={job?.processed_showtimes ?? 0}
+                  total={job?.total_showtimes ?? 0}
+                  pct={pct(job?.processed_showtimes ?? 0, job?.total_showtimes ?? 0)}
+                />
+              </>
+            )}
           </CardContent>
         </Card>
-      )}
+
+        {job && job.errors.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Fejl ({job.errors.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1 rounded border border-border bg-muted/30 p-3">
+                {job.errors.map((e, i) => (
+                  <li key={i} className="font-mono text-xs text-destructive">
+                    {e}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AdminShell>
+  );
+}
+
+function SummaryRow({ label, value, total }: { label: string; value: number; total?: number }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-border/50 pb-2 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono text-foreground">
+        {value.toLocaleString("da-DK")}
+        {total === undefined ? "" : ` af ${total.toLocaleString("da-DK")}`}
+      </span>
+    </div>
   );
 }
 

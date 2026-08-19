@@ -399,6 +399,22 @@ export async function fetchCinemasForMovie(movieId: string | string[]): Promise<
   return cinemas.filter((cinema) => cinemaIds.has(cinema.id));
 }
 
+/**
+ * Film pages need the same showtime rows to identify their cinemas. Loading the
+ * compact programme once avoids returning the full cinema record once per
+ * screening, which was especially expensive for popular films on mobile.
+ */
+export async function fetchMovieProgramme(
+  movieId: string | string[],
+): Promise<{ cinemas: Cinema[]; showtimes: Showtime[] }> {
+  const [showtimes, cinemas] = await Promise.all([fetchShowtimesForMovie(movieId), fetchCinemas()]);
+  const cinemaIds = new Set(showtimes.map((showtime) => showtime.cinemaId));
+  return {
+    cinemas: cinemas.filter((cinema) => cinemaIds.has(cinema.id)),
+    showtimes,
+  };
+}
+
 export function formatRuntime(min: number) {
   if (!Number.isFinite(min) || min <= 0) return "";
   const h = Math.floor(min / 60);

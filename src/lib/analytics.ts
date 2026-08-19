@@ -1,5 +1,40 @@
 import { useEffect, useRef } from "react";
 
+export const ANALYTICS_OPT_OUT_KEY = "lanterna:analytics-opt-out";
+
+type PreferenceStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+const browserStorage = (): PreferenceStorage | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+export function isAnalyticsOptedOut(storage: PreferenceStorage | null = browserStorage()): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(ANALYTICS_OPT_OUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setAnalyticsOptOut(
+  excluded: boolean,
+  storage: PreferenceStorage | null = browserStorage(),
+): void {
+  if (!storage) return;
+  try {
+    if (excluded) storage.setItem(ANALYTICS_OPT_OUT_KEY, "1");
+    else storage.removeItem(ANALYTICS_OPT_OUT_KEY);
+  } catch {
+    // A blocked storage preference must never interrupt the admin page.
+  }
+}
+
 export type AnalyticsEventType = "page_view" | "filter_change" | "zero_results" | "ticket_click";
 
 export type AnalyticsEvent = {
@@ -17,7 +52,7 @@ export type AnalyticsEvent = {
  * referrer or full destination URL is included in the event payload.
  */
 export function trackAnalyticsEvent(event: AnalyticsEvent) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || isAnalyticsOptedOut()) return;
   const payload = JSON.stringify({
     ...event,
     path: event.path ?? window.location.pathname,

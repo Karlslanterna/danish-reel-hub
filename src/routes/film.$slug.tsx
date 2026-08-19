@@ -4,8 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { MovieDetail } from "@/components/MovieDetail";
 import {
   fetchMovieBySlug,
-  fetchCinemasForMovie,
-  fetchShowtimesForMovie,
+  fetchMovieProgramme,
   type Movie,
   type Cinema,
   type Showtime,
@@ -16,15 +15,15 @@ import { movieSchemas } from "@/lib/jsonld";
 import { movieTitle, movieDescription } from "@/lib/seo";
 import { citySlug } from "@/lib/city-slug";
 import { compactShowtimes, expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
+import { findCachedHomeMovie } from "@/lib/home-catalog-cache";
 
 export const Route = createFileRoute("/film/$slug")({
-  loader: async ({ params }) => {
-    const movie = await fetchMovieBySlug(params.slug);
+  loader: async ({ params, context }) => {
+    const movie =
+      findCachedHomeMovie(context.queryClient, params.slug) ??
+      (await fetchMovieBySlug(params.slug));
     if (!movie) throw notFound();
-    const [cinemas, showtimes] = await Promise.all([
-      fetchCinemasForMovie(movie.sourceIds ?? movie.id),
-      fetchShowtimesForMovie(movie.sourceIds ?? movie.id),
-    ]);
+    const { cinemas, showtimes } = await fetchMovieProgramme(movie.sourceIds ?? movie.id);
     return {
       movie,
       cinemas,

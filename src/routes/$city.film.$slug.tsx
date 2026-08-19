@@ -5,8 +5,7 @@ import { MovieDetail } from "@/components/MovieDetail";
 import { useFilters } from "@/lib/filters";
 import {
   fetchMovieBySlug,
-  fetchCinemasForMovie,
-  fetchShowtimesForMovie,
+  fetchMovieProgramme,
   type Movie,
   type Cinema,
   type Showtime,
@@ -22,16 +21,18 @@ import { canonicalUrl } from "@/lib/canonical";
 import { movieSchemas } from "@/lib/jsonld";
 import { cityMovieTitle, cityMovieDescription } from "@/lib/seo";
 import { compactShowtimes, expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
+import { findCachedHomeMovie } from "@/lib/home-catalog-cache";
 
 export const Route = createFileRoute("/$city/film/$slug")({
-  loader: async ({ params }) => {
+  loader: async ({ params, context }) => {
     const slug = params.city.toLowerCase();
-    const movie = await fetchMovieBySlug(params.slug);
+    const movie =
+      findCachedHomeMovie(context.queryClient, params.slug) ??
+      (await fetchMovieBySlug(params.slug));
     if (!movie) throw notFound();
-    const [allCinemas, showtimes] = await Promise.all([
-      fetchCinemasForMovie(movie.sourceIds ?? movie.id),
-      fetchShowtimesForMovie(movie.sourceIds ?? movie.id),
-    ]);
+    const { cinemas: allCinemas, showtimes } = await fetchMovieProgramme(
+      movie.sourceIds ?? movie.id,
+    );
     const cityOptions = cityOptionsFrom(allCinemas);
     const cinemas = allCinemas.filter((c) => cityMatchesSlug(c.city, slug));
     // Unknown city slug (no cinema anywhere matches) -> 404. A known city with

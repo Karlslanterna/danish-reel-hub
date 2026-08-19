@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function openFilterGroup(page: Page, group: "Arrangement" | "Visningstype" | "Sprog" | "Genre") {
   await page.getByRole("button", { name: "Flere filtre" }).click();
-  await page.getByRole("button", { name: group, exact: true }).click();
+  await page.getByRole("button", { name: new RegExp(`^${group}(?:\\s|$)`) }).click();
 }
 
 test.describe("Filter conformance", () => {

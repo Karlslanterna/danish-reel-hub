@@ -105,7 +105,7 @@ test.describe("Public pages", () => {
     page,
     request,
   }) => {
-    const urls = await getSitemapUrls(request);
+    const urls = await getSitemapUrls(request, "cinemas");
     const cinemaPaths = urls
       .map((url) => new URL(url).pathname)
       .filter((path) => path.startsWith("/biograf/"))

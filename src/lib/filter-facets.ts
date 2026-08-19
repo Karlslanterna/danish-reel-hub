@@ -24,6 +24,21 @@ export type FacetSelection = {
   event?: string | null;
 };
 
+/**
+ * A film page can paint from its compact card before the full programme has
+ * loaded. Keep the arrangement used to enter the page available during that
+ * window so clearing it does not make the arrangement menu disappear between
+ * two clicks. Once loading is complete, only data-backed facet values remain.
+ */
+export function retainPendingFacetOption(
+  values: string[],
+  pendingValue: string | null,
+  loading: boolean,
+) {
+  if (!loading || !pendingValue || values.includes(pendingValue)) return values;
+  return [...values, pendingValue];
+}
+
 type Dimension = "cinema" | "date" | "time" | "genre" | "format" | "language" | "event";
 
 const matches = (

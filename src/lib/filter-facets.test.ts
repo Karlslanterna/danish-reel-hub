@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFilterFacets } from "./filter-facets";
+import { buildFilterFacets, retainPendingFacetOption } from "./filter-facets";
 
 const movies = [
   { id: "family", genre: ["Animation", "Familie"] },
@@ -49,5 +49,14 @@ describe("filter facets", () => {
     const facets = buildFilterFacets(rows, movies, { baseMovieIds: new Set(["family"]) });
     expect(facets.genres).toEqual(["Animation", "Familie"]);
     expect(facets.events).toEqual(["Babybio"]);
+  });
+
+  it("retains the entry arrangement only while a deferred programme is loading", () => {
+    expect(retainPendingFacetOption([], "Babybio", true)).toEqual(["Babybio"]);
+    expect(retainPendingFacetOption(["Seniorbio"], "Babybio", true)).toEqual([
+      "Seniorbio",
+      "Babybio",
+    ]);
+    expect(retainPendingFacetOption([], "Babybio", false)).toEqual([]);
   });
 });

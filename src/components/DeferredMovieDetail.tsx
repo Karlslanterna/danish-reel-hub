@@ -35,5 +35,7 @@ export function DeferredMovieDetail({ movie, details, ...props }: Props) {
     };
   }, [details]);
 
-  return <MovieDetail movie={resolvedMovie} {...props} />;
+  // A new film is a new deferred programme context. Remounting prevents the
+  // entry-filter snapshot from a previous film route leaking into the next.
+  return <MovieDetail key={movie.id} movie={resolvedMovie} {...props} />;
 }

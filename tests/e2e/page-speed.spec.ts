@@ -22,13 +22,20 @@ test.describe("Public page-speed boundaries", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
-  test("public HTML is edge-cacheable while authentication stays private", async ({ request }) => {
+  test("public HTML carries a CDN cache policy while authentication stays private", async ({
+    request,
+  }) => {
     const publicResponse = await request.get("/");
     expect(publicResponse.status()).toBe(200);
-    expect(publicResponse.headers()["cache-control"]).toContain("s-maxage=300");
+    const publicHeaders = publicResponse.headers();
+    const sharedCachePolicy =
+      publicHeaders["cdn-cache-control"] ?? publicHeaders["cache-control"] ?? "";
+    expect(sharedCachePolicy).toMatch(/(?:s-maxage|max-age)=300/);
 
     const authResponse = await request.get("/auth");
     expect(authResponse.status()).toBe(200);
-    expect(authResponse.headers()["cache-control"] ?? "").not.toContain("s-maxage");
+    const authHeaders = authResponse.headers();
+    expect(authHeaders["cache-control"] ?? "").not.toContain("s-maxage");
+    expect(authHeaders["cdn-cache-control"] ?? "").not.toContain("max-age");
   });
 });

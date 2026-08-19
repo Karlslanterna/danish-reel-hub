@@ -17,11 +17,13 @@ import {
 import {
   groupScreeningIndexForUi,
   groupScreeningsForUi,
+  normalizeTicketUrl,
   type ScreeningIndexReadRow,
   type ScreeningReadRow,
   type UiShowtime,
   type UiShowtimeIndexRow,
 } from "@/lib/screening-read-model";
+import { sortShowtimes } from "@/lib/showtime-sort";
 import { consolidatePublicMovies, remapShowtimesToMovies } from "@/lib/public-catalog";
 import {
   canonicalCinemaId,
@@ -315,44 +317,42 @@ export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
 export async function fetchShowtimesForMovie(movieId: string | string[]): Promise<Showtime[]> {
   const bounds = screeningBounds();
   const movieIds = Array.isArray(movieId) ? [...new Set(movieId)] : [movieId];
-  const loadPage = async (from: number, to: number, includeCount = false) => {
-    let query = includeCount
-      ? supabase.from("screenings").select(SCREENING_COLUMNS, { count: "exact" })
-      : supabase.from("screenings").select(SCREENING_COLUMNS);
-    query = query
-      .gte("starts_at", bounds.startsAfter)
-      .gte("local_date", bounds.firstDate)
-      .lte("local_date", bounds.lastDate);
-    query =
-      movieIds.length === 1 ? query.eq("movie_id", movieIds[0]!) : query.in("movie_id", movieIds);
-    return query
-      .order("starts_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to);
-  };
+  const { data, error } = await supabase.rpc("get_movie_showtime_groups", {
+    p_movie_ids: movieIds,
+    p_starts_after: bounds.startsAfter,
+    p_first_date: bounds.firstDate,
+    p_last_date: bounds.lastDate,
+  });
+  if (error) throw error;
 
-  // Supabase returns at most 1,000 rows per response. Popular films can exceed
-  // two pages, so fetch the first page with an exact count and request every
-  // remaining page concurrently instead of making mobile visitors wait for
-  // three or more consecutive network round trips.
-  const first = await loadPage(0, SCREENING_PAGE_SIZE - 1, true);
-  if (first.error) throw first.error;
-  const total = first.count ?? first.data?.length ?? 0;
-  const remainingStarts = Array.from(
-    { length: Math.max(0, Math.ceil(total / SCREENING_PAGE_SIZE) - 1) },
-    (_, index) => (index + 1) * SCREENING_PAGE_SIZE,
+  type GroupRow = {
+    movie_id: string;
+    cinema_id: string;
+    local_date: string;
+    hall: string;
+    times: string[];
+    ticket_urls: string[];
+    formats: string[];
+    languages: string[];
+    events: string[];
+  };
+  const grouped = sortShowtimes(
+    (Array.isArray(data) ? (data as GroupRow[]) : []).map((row) => {
+      const ticketUrls = (row.ticket_urls ?? []).map((url) => normalizeTicketUrl(url) ?? "");
+      return {
+        movieId: row.movie_id,
+        cinemaId: canonicalCinemaId(row.cinema_id),
+        date: row.local_date,
+        times: row.times ?? [],
+        hall: row.hall,
+        bookingUrl: ticketUrls.find(Boolean) ?? null,
+        ticketUrls,
+        formats: row.formats ?? [],
+        languages: row.languages ?? [],
+        events: row.events ?? [],
+      };
+    }),
   );
-  const remaining = await Promise.all(
-    remainingStarts.map((from) => loadPage(from, from + SCREENING_PAGE_SIZE - 1)),
-  );
-  for (const page of remaining) {
-    if (page.error) throw page.error;
-  }
-  const rows = [
-    ...((first.data ?? []) as ScreeningReadRow[]),
-    ...remaining.flatMap((page) => (page.data ?? []) as ScreeningReadRow[]),
-  ];
-  const grouped = groupScreeningsForUi(remapScreeningCinemaIds(rows));
   if (movieIds.length === 1) return grouped;
   const canonicalMovie: Movie = {
     id: movieIds[0]!,

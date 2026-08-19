@@ -69,6 +69,7 @@ type Loc = { lat: number; lng: number };
 export type CinemaFilterOption = { id: string; slug: string; name: string; city: string };
 
 type FiltersState = {
+  hydrated: boolean;
   radius: Radius;
   userLoc: Loc | null;
   selectedDate: string | null;
@@ -431,6 +432,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<FiltersState>(
     () => ({
+      hydrated,
       radius,
       userLoc,
       selectedDate,
@@ -461,6 +463,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       clear,
     }),
     [
+      hydrated,
       radius,
       userLoc,
       selectedDate,

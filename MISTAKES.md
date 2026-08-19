@@ -125,12 +125,19 @@ This is a concise operational log. Each entry records the failure, cause, perman
 
 - What happened: The server emitted `Cache-Control: s-maxage=300`, but Lovable's production proxy returned `no-cache, must-revalidate, max-age=0`, so the release smoke failed after deployment.
 - Why: Application cache intent and the hosting layer's effective browser-facing header were treated as the same state.
-- Rule: Verify both layers separately. Public HTML emits a dedicated `CDN-Cache-Control` directive for shared caches, private routes emit none, and release notes must not claim an actual edge hit without live evidence.
-- Test: Unit tests verify the server directives, and production smoke accepts the dedicated CDN directive while still rejecting shared-cache directives on authentication pages.
+- Rule: Verify both layers separately. Public HTML emits a dedicated `CDN-Cache-Control` directive for a future upstream cache, but Lovable managed hosting may strip it and force revalidation. Actual HTML edge caching then requires a supported external CDN/reverse proxy; never claim an edge hit without live evidence.
+- Test: Unit tests verify the app directives. Production smoke records either a forwarded shared-cache policy or Lovable's explicit revalidation policy while still rejecting shared-cache directives on authentication pages.
 
 ## M-019 — Deferred film data made an active arrangement menu disappear
 
 - What happened: A user could enter a film from `/babybio`, remove Babybio with one press, and then temporarily lose the Arrangement menu before the deferred programme facets finished loading.
-- Why: The active route value made the first menu render, but clearing it removed the only option while the data-backed facet list was still empty.
-- Rule: Retain the arrangement used to enter a film only for the deferred-loading window; after loading, expose only current data-backed options.
-- Test: The facet unit test covers the loading boundary, and the production navigation smoke toggles Babybio off and immediately reopens Arrangement.
+- Why: The Babybio route effect activated the filter before the parent provider finished hydrating localStorage; hydration then overwrote the route value with `null`, while deferred film facets were still empty.
+- Rule: Route-derived filters activate only after persisted state has hydrated. Retain the arrangement used to enter a film only for the deferred-loading window; after loading, expose only current data-backed options.
+- Test: The facet unit test covers the loading boundary, and the production navigation smoke confirms Babybio survives listing → film, toggles off, and immediately reopens Arrangement.
+
+## M-020 — Parallel production smoke created its own SSR load spike
+
+- What happened: Two Playwright workers cold-loaded film, city, search, sitemap, and filter routes concurrently; individual navigations intermittently crossed the 30-second timeout even when the same route passed on retry.
+- Why: The same parallelism used to speed up local tests was also applied to a shared production target with cold SSR/database work.
+- Rule: Keep local browser checks parallel, but run external production smoke serially so the gate measures normal route behaviour rather than self-generated concurrency.
+- Test: `SMOKE_BASE_URL` selects one worker and disables full parallelism; the job retains the 30-second per-test limit.

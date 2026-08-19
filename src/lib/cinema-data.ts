@@ -315,10 +315,11 @@ export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
 export async function fetchShowtimesForMovie(movieId: string | string[]): Promise<Showtime[]> {
   const bounds = screeningBounds();
   const movieIds = Array.isArray(movieId) ? [...new Set(movieId)] : [movieId];
-  const rows = await collectPages<ScreeningReadRow>((from, to) => {
-    let query = supabase
-      .from("screenings")
-      .select(SCREENING_COLUMNS)
+  const loadPage = async (from: number, to: number, includeCount = false) => {
+    let query = includeCount
+      ? supabase.from("screenings").select(SCREENING_COLUMNS, { count: "exact" })
+      : supabase.from("screenings").select(SCREENING_COLUMNS);
+    query = query
       .gte("starts_at", bounds.startsAfter)
       .gte("local_date", bounds.firstDate)
       .lte("local_date", bounds.lastDate);
@@ -328,7 +329,29 @@ export async function fetchShowtimesForMovie(movieId: string | string[]): Promis
       .order("starts_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to);
-  });
+  };
+
+  // Supabase returns at most 1,000 rows per response. Popular films can exceed
+  // two pages, so fetch the first page with an exact count and request every
+  // remaining page concurrently instead of making mobile visitors wait for
+  // three or more consecutive network round trips.
+  const first = await loadPage(0, SCREENING_PAGE_SIZE - 1, true);
+  if (first.error) throw first.error;
+  const total = first.count ?? first.data?.length ?? 0;
+  const remainingStarts = Array.from(
+    { length: Math.max(0, Math.ceil(total / SCREENING_PAGE_SIZE) - 1) },
+    (_, index) => (index + 1) * SCREENING_PAGE_SIZE,
+  );
+  const remaining = await Promise.all(
+    remainingStarts.map((from) => loadPage(from, from + SCREENING_PAGE_SIZE - 1)),
+  );
+  for (const page of remaining) {
+    if (page.error) throw page.error;
+  }
+  const rows = [
+    ...((first.data ?? []) as ScreeningReadRow[]),
+    ...remaining.flatMap((page) => (page.data ?? []) as ScreeningReadRow[]),
+  ];
   const grouped = groupScreeningsForUi(remapScreeningCinemaIds(rows));
   if (movieIds.length === 1) return grouped;
   const canonicalMovie: Movie = {

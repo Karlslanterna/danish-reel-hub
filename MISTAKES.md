@@ -99,3 +99,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: Public title normalization removed unparenthesized language suffixes but did not recognize the same suffix inside trailing parentheses.
 - Rule: Treat a trailing parenthesized screening-language label as presentation metadata, not film identity, while preserving every source id, slug, screening, and screening-level language tag during consolidation.
 - Test: The public-catalog regression suite merges the two title variants into one card, sums their screening counts, retains both source references, and keeps showtime metadata separate.
+
+## M-015 — Live production audit created a circular pull-request gate
+
+- What happened: The code fix for a duplicate live film card could not make its pull request green because the required catalog job kept testing the old code already deployed on `lanterna.dk`.
+- Why: A production-state audit was used as a pre-merge code gate even though a pull request cannot alter production before merge and Lovable deployment.
+- Rule: PR-local tests and builds are blocking before merge. Checks against the currently deployed site remain visible but advisory on pull requests; after Lovable deployment, a manually triggered CI run makes the same production checks blocking.
+- Test: A pull request with a known live-only finding completes its code checks and records an advisory warning, while a manual workflow run still fails until the deployed site passes the production audit.

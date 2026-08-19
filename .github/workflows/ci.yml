@@ -82,7 +82,19 @@ jobs:
           node-version: 22
 
       - name: Audit every active movie and filter value
+        id: catalog
+        # A pull request cannot change the already deployed lanterna.dk. Keep
+        # the live finding visible, but let PR-local tests decide whether the
+        # proposed code is mergeable. Manual post-deploy runs remain blocking.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: node scripts/audit-public-catalog.mjs
+
+      - name: Explain production-only finding
+        if: steps.catalog.outcome == 'failure' && github.event_name == 'pull_request'
+        run: |
+          echo "::warning::The production catalog audit found an issue on the currently deployed lanterna.dk. It is advisory on pull requests and blocking on manual post-deploy runs."
+          echo "### Production catalog finding" >> "$GITHUB_STEP_SUMMARY"
+          echo "The audit found an issue on the currently deployed **lanterna.dk**. This is advisory here because a pull request cannot change production before merge and Lovable deployment. Run this workflow manually after deployment; the same audit is then blocking." >> "$GITHUB_STEP_SUMMARY"
 
   smoke:
     name: Production smoke test

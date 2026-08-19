@@ -16,7 +16,16 @@ export type PublicMovieProgramme = {
 export const getPublicMovieProgramme = createServerFn({ method: "GET" })
   .inputValidator(
     z.object({
-      movieIds: z.array(z.string().uuid()).min(1).max(20),
+      movieIds: z
+        .array(
+          z
+            .string()
+            .min(1)
+            .max(160)
+            .regex(/^[A-Za-z0-9_-]+$/),
+        )
+        .min(1)
+        .max(20),
     }),
   )
   .handler(async ({ data }): Promise<PublicMovieProgramme> => {

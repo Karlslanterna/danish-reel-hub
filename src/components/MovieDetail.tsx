@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -44,6 +44,11 @@ export function MovieDetail({
   } = useFilters();
   const { lang } = useLanguage();
   useCinemaUrlSync(cinemasShowing);
+  const [visibleCinemaCount, setVisibleCinemaCount] = useState(24);
+
+  useEffect(() => {
+    setVisibleCinemaCount(24);
+  }, [movie.id]);
 
   // City is routing context: when this page is city-scoped, keep the global
   // (persisted) city filter in sync so the selection carries across the site.
@@ -96,9 +101,16 @@ export function MovieDetail({
     }).values(),
   ].flat();
 
+  const showtimesByCinema = new Map<string, Showtime[]>();
+  for (const showtime of filteredShowtimes) {
+    const rows = showtimesByCinema.get(showtime.cinemaId) ?? [];
+    rows.push(showtime);
+    showtimesByCinema.set(showtime.cinemaId, rows);
+  }
   const byCinema = filteredCinemas
-    .map((c) => ({ cinema: c, days: filteredShowtimes.filter((s) => s.cinemaId === c.id) }))
+    .map((c) => ({ cinema: c, days: showtimesByCinema.get(c.id) ?? [] }))
     .filter((x) => x.days.length > 0);
+  const visibleByCinema = byCinema.slice(0, visibleCinemaCount);
 
   useTrackZeroResults(
     byCinema.length,
@@ -303,8 +315,12 @@ export function MovieDetail({
           </div>
         ) : (
           <div className="space-y-px overflow-hidden rounded-md bg-border">
-            {byCinema.map(({ cinema, days }) => (
-              <div key={cinema.id} className="bg-background p-4 sm:p-6 lg:p-8">
+            {visibleByCinema.map(({ cinema, days }) => (
+              <div
+                key={cinema.id}
+                className="bg-background p-4 sm:p-6 lg:p-8"
+                style={{ contentVisibility: "auto", containIntrinsicSize: "360px" }}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -372,6 +388,17 @@ export function MovieDetail({
                 </div>
               </div>
             ))}
+            {visibleByCinema.length < byCinema.length && (
+              <div className="bg-background p-6 text-center">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCinemaCount((count) => count + 24)}
+                  className="rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                >
+                  Vis flere biografer ({byCinema.length - visibleByCinema.length} tilbage)
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>

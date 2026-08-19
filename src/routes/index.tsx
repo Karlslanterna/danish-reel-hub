@@ -41,14 +41,13 @@ import {
 } from "@/lib/special-events";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { buildFilterFacets } from "@/lib/filter-facets";
+import { HOME_CATALOG_QUERY_KEY } from "@/lib/home-catalog-cache";
 
 export type HomeCatalogData = {
   movies: Movie[];
   cinemas: Cinema[];
   showtimeIndex: CompactShowtimeIndex;
 };
-
-export const HOME_CATALOG_QUERY_KEY = ["public-home-catalog"] as const;
 
 export async function loadHomeCatalog(): Promise<HomeCatalogData> {
   const [movies, cinemas, rawShowtimeIndex] = await Promise.all([

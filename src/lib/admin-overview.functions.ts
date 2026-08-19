@@ -5,6 +5,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertAdmin } from "@/lib/admin.functions";
 import { FILM_PROGRAMMES, programmeTagsForMovieTitle } from "@/lib/film-programmes";
 import { isMovieForChildren } from "@/lib/children-filter";
+import {
+  isSupersededActiveRun,
+  summarizeAdminSourceRuns,
+  type AdminImportRun,
+} from "@/lib/admin-run-status";
 
 type Status = "healthy" | "warning" | "critical";
 
@@ -32,6 +37,7 @@ export type AdminOverview = {
     finishedAt: string | null;
     error: string | null;
     stats: string;
+    superseded: boolean;
   }>;
   quality: {
     missingPosters: number;
@@ -114,10 +120,10 @@ const posterExists = (movie: any) => {
   const poster = movie.poster;
   return Boolean(
     poster &&
-      typeof poster === "object" &&
-      [poster.url, poster.a, poster.b, poster.c, poster.d].some(
-        (value) => typeof value === "string" && value.trim(),
-      ),
+    typeof poster === "object" &&
+    [poster.url, poster.a, poster.b, poster.c, poster.d].some(
+      (value) => typeof value === "string" && value.trim(),
+    ),
   );
 };
 
@@ -133,7 +139,9 @@ export const adminGetOverview = createServerFn({ method: "GET" })
     const nowIso = now.toISOString();
     const start30 = new Date(now.getTime() - 30 * 86_400_000).toISOString();
     const start7 = new Date(now.getTime() - 7 * 86_400_000).toISOString();
-    const startToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+    const startToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    ).toISOString();
 
     const [screenings, movies, cinemas, runsResult, unresolvedResult, analytics, overridesResult] =
       await Promise.all([
@@ -153,9 +161,7 @@ export const adminGetOverview = createServerFn({ method: "GET" })
             .select("id,title,slug,genre,rating,synopsis,poster,tmdb_poster_url")
             .range(from, to),
         ),
-        collectPages((from, to) =>
-          db.from("cinemas").select("id,name,slug,city").range(from, to),
-        ),
+        collectPages((from, to) => db.from("cinemas").select("id,name,slug,city").range(from, to)),
         db
           .from("import_runs")
           .select(
@@ -200,11 +206,18 @@ export const adminGetOverview = createServerFn({ method: "GET" })
     const activeMovies = movies.filter((movie) => activeMovieIds.has(movie.id));
     const activeCinemas = cinemas.filter((cinema) => activeCinemaIds.has(cinema.id));
     const cities = new Set(
-      activeCinemas.map((cinema) => String(cinema.city ?? "").replace(/^\s*\d{3,4}\s+/u, "").trim()),
+      activeCinemas.map((cinema) =>
+        String(cinema.city ?? "")
+          .replace(/^\s*\d{3,4}\s+/u, "")
+          .trim(),
+      ),
     );
 
     const dimensions = (key: "events" | "formats" | "languages") => {
-      const map = new Map<string, { screenings: number; movies: Set<string>; cinemas: Set<string> }>();
+      const map = new Map<
+        string,
+        { screenings: number; movies: Set<string>; cinemas: Set<string> }
+      >();
       for (const screening of screenings) {
         for (const value of screening[key] ?? []) {
           const item = map.get(value) ?? { screenings: 0, movies: new Set(), cinemas: new Set() };
@@ -250,46 +263,20 @@ export const adminGetOverview = createServerFn({ method: "GET" })
       duplicateKeys.add(key);
     }
 
-    const sourceSummaries = ["kultunaut", "ebillet"].map((source) => {
-      const sourceRuns = runs.filter((run: any) => run.source === source);
-      const successes = sourceRuns.filter((run: any) => run.state === "completed" && run.finished_at);
-      const latestSuccess = successes[0]?.finished_at ?? null;
-      const newest = sourceRuns[0];
-      const queued = sourceRuns.filter((run: any) => run.state === "queued").length;
-      const running = sourceRuns.filter((run: any) => run.state === "running").length;
-      const failedSinceSuccess = sourceRuns.filter(
-        (run: any) => run.state === "failed" && (!latestSuccess || run.created_at > latestSuccess),
-      ).length;
-      const ageHours = latestSuccess
-        ? (now.getTime() - new Date(latestSuccess).getTime()) / 3_600_000
-        : Number.POSITIVE_INFINITY;
-      const status: Status =
-        failedSinceSuccess > 0 || ageHours > 48
-          ? "critical"
-          : queued > 0 || running > 0 || ageHours > 30
-            ? "warning"
-            : "healthy";
-      return {
-        source,
-        label: sourceLabel(source),
-        status,
-        latestSuccessAt: latestSuccess,
-        latestState: newest?.state ?? null,
-        queued,
-        running,
-        failedSinceSuccess,
-      };
-    });
-
-    const staleRuns = runs.filter(
-      (run: any) =>
-        ["queued", "running"].includes(run.state) &&
-        now.getTime() - new Date(run.updated_at ?? run.created_at).getTime() > 30 * 60_000,
-    ).length;
+    const typedRuns = runs as AdminImportRun[];
+    const sourceSummaries = ["kultunaut", "ebillet"].map((source) => ({
+      ...summarizeAdminSourceRuns(typedRuns, source, now),
+      label: sourceLabel(source),
+    }));
+    const latestSuccessBySource = new Map(
+      sourceSummaries.map((summary) => [summary.source, summary.latestSuccessAt]),
+    );
+    const staleRuns = sourceSummaries.reduce(
+      (total, summary) => total + summary.staleActiveRuns,
+      0,
+    );
     const empireIds = new Set(
-      cinemas
-        .filter((cinema) => /empire bio/i.test(cinema.name))
-        .map((cinema) => cinema.id),
+      cinemas.filter((cinema) => /empire bio/i.test(cinema.name)).map((cinema) => cinema.id),
     );
     const empireBabybio = screenings.filter(
       (screening) =>
@@ -366,7 +353,8 @@ export const adminGetOverview = createServerFn({ method: "GET" })
       if (source.status !== "healthy")
         attention.push(`${source.label}: seneste datahentning kræver opmærksomhed.`);
     }
-    if (staleRuns) attention.push(`${staleRuns} importkørsel${staleRuns === 1 ? "" : "er"} sidder fast.`);
+    if (staleRuns)
+      attention.push(`${staleRuns} importkørsel${staleRuns === 1 ? "" : "er"} sidder fast.`);
     if (quality.unresolvedEntities)
       attention.push(`${quality.unresolvedEntities} kildereferencer mangler en sikker kobling.`);
     if (incorrectProgrammeTags || missingProgrammeTags)
@@ -402,6 +390,7 @@ export const adminGetOverview = createServerFn({ method: "GET" })
         finishedAt: run.finished_at,
         error: run.last_error,
         stats: JSON.stringify(run.stats ?? {}),
+        superseded: isSupersededActiveRun(run, latestSuccessBySource.get(run.source) ?? null),
       })),
       quality,
       filters: {

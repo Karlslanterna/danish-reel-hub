@@ -139,6 +139,7 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const navigating = useRouterState({ select: (state) => state.status === "pending" });
 
   useEffect(() => {
     initClientErrorMonitor();
@@ -158,6 +159,16 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <div
+        className={`fixed inset-x-0 top-0 z-[100] h-1 overflow-hidden bg-primary/20 transition-opacity ${
+          navigating ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        role="progressbar"
+        aria-label="Åbner siden"
+        aria-hidden={!navigating}
+      >
+        <div className="h-full w-2/3 animate-pulse bg-primary" />
+      </div>
       <LanguageProvider>
         <FiltersProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}

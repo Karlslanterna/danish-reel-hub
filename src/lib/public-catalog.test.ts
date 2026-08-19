@@ -106,6 +106,35 @@ describe("public catalog consolidation", () => {
     expect(result.movies[0]?.poster.url).toBe("poster.jpg");
   });
 
+  it("merges a parenthesized language variant without losing sources or screenings", () => {
+    const result = consolidatePublicMovies([
+      movie({
+        id: "canonical",
+        slug: "superhunden-charlie-7107013",
+        title: "Superhunden Charlie",
+        poster: { url: "poster.jpg" },
+        screeningCount: 3,
+      }),
+      movie({
+        id: "dubbed",
+        slug: "superhunden-charlie-dansk-tale",
+        title: "Superhunden Charlie (Dansk tale)",
+        screeningCount: 2,
+      }),
+    ]);
+
+    expect(result.movies).toHaveLength(1);
+    expect(result.movies[0]).toMatchObject({
+      title: "Superhunden Charlie",
+      poster: { url: "poster.jpg" },
+      screeningCount: 5,
+    });
+    expect(result.movies[0]?.sourceIds).toEqual(expect.arrayContaining(["canonical", "dubbed"]));
+    expect(result.movies[0]?.sourceSlugs).toEqual(
+      expect.arrayContaining(["superhunden-charlie-7107013", "superhunden-charlie-dansk-tale"]),
+    );
+  });
+
   it("merges connector and compound-spacing variants with compatible years", () => {
     const result = consolidatePublicMovies([
       movie({

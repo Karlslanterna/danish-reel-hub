@@ -92,3 +92,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: One preferred local tool was treated as the only valid publication path instead of checking the repository integration's actual capabilities.
 - Rule: Verify both the direct GitHub integration and local tooling. When the direct integration supports branch, commit, and pull-request operations, use the traceable direct workflow rather than declaring an access blocker.
 - Test: Release evidence records the verified repository permission plus the resulting branch, commit, draft PR, checks, merge, Lovable deployment, and live smoke result.
+
+## M-014 — Parenthesized language label created a duplicate public film card
+
+- What happened: Production rendered both `Superhunden Charlie` and `Superhunden Charlie (Dansk tale)` as separate film cards even though they represented the same film.
+- Why: Public title normalization removed unparenthesized language suffixes but did not recognize the same suffix inside trailing parentheses.
+- Rule: Treat a trailing parenthesized screening-language label as presentation metadata, not film identity, while preserving every source id, slug, screening, and screening-level language tag during consolidation.
+- Test: The public-catalog regression suite merges the two title variants into one card, sums their screening counts, retains both source references, and keeps showtime metadata separate.

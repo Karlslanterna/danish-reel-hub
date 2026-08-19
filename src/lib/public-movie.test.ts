@@ -84,6 +84,10 @@ describe("public movie catalog rules", () => {
     expect(publicMovieDisplayTitle("Don't Look Back in Anger")).toBe("Don't Look Back in Anger");
     expect(publicMovieDisplayTitle("Biler - Dansk Tale")).toBe("Biler");
     expect(publicMovieDisplayTitle("Vaiana - Med dansk tale")).toBe("Vaiana");
+    expect(publicMovieDisplayTitle("Superhunden Charlie (Dansk tale)")).toBe("Superhunden Charlie");
+    expect(publicMovieDisplayTitle("Superhunden Charlie (Danske undertekster)")).toBe(
+      "Superhunden Charlie",
+    );
     expect(publicMovieDisplayTitle("Veronikas to liv - Cin. Præs.")).toBe("Veronikas to liv");
     expect(publicMovieDisplayTitle("A Dessert for Constance - Sarah Maldoror")).toBe(
       "A Dessert for Constance",
@@ -100,6 +104,9 @@ describe("public movie catalog rules", () => {
     expect(publicMovieIdentityTitle("The Odyssey (2026)")).toBe("the odyssey");
     expect(publicMovieIdentityTitle("Vishwanath & Sons")).toBe(
       publicMovieIdentityTitle("Vishwanath and Sons"),
+    );
+    expect(publicMovieIdentityTitle("Superhunden Charlie (Dansk tale)")).toBe(
+      publicMovieIdentityTitle("Superhunden Charlie"),
     );
   });
 

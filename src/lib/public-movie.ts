@@ -69,8 +69,11 @@ export function isPublicMovieTitle(title: string | null | undefined): boolean {
 const PROGRAMME_SUFFIX =
   /\s*[-–—]\s*(?=(?:event\b|late\s+night\b|fright\s+night\b|h\.?\s*bio\b|musikfilm\b|musik\s+i\s+mørket\b|havet\b|klassikere\b|filmuniversitetet\b|events?\b|arabiske\s+stemmer\b|monstrene\b|sergej\s+paradjanov\b|sarah\s+maldoror\b|carla\s+sim[oó]n\b|alexander\s+payne\b|hitchcock(?:-hits)?\b|tupac\s+shakur\b|venedig-vindere\b|udflugt\s+på\s+landet\b|strikkebio\b|psych-out\b|anime\b|lang\s*\(som\)\s+søndag\b|film,\s*tapas\b|lejre\s+klimauge\b|hvalsø\s+bio\b|mørkekammerater\b|viva\s+la\s+revoluci[oó]n\b))/iu;
 
-const LANGUAGE_SUFFIX =
-  /\s*[-–—]?\s*(?:(?:med\s+)?(?:dansk|dk|engelsk|eng|ensk|original|org)\s+(?:tale|tala|tekst|undertekster)|med\s+danske?\s+undertekster|danske?\s+undertekster|tekstet|dubbet)\s*$/iu;
+const LANGUAGE_LABEL = String.raw`(?:(?:med\s+)?(?:dansk|dk|engelsk|eng|ensk|original|org)\s+(?:tale|tala|tekst|undertekster)|med\s+danske?\s+undertekster|danske?\s+undertekster|tekstet|dubbet)`;
+const LANGUAGE_SUFFIX = new RegExp(
+  String.raw`\s*[-–—]?\s*(?:\(\s*${LANGUAGE_LABEL}\s*\)|${LANGUAGE_LABEL})\s*$`,
+  "iu",
+);
 
 const PRESENTATION_SUFFIX = /\s*[-–—]?\s*(?:CI|CIN)(?:\.?\s*præs\.?)?\s*$/iu;
 

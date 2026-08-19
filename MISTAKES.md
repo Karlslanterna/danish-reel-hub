@@ -148,3 +148,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: The active selection is intentionally included in the accessible name, so the real button was named `Arrangement Babybio`; the selector encoded an inactive-state label as a permanent contract.
 - Rule: When a control's accessible name includes live state, anchor selectors to the stable group prefix while allowing the user-visible state suffix.
 - Test: The production navigation smoke opens the Arrangement group both while Babybio is selected and after it is cleared.
+
+## M-022 — One smoke fixture crawled every sitemap before opening a film
+
+- What happened: The movie-page smoke exhausted its 30-second budget before navigation because fixture discovery fetched the root index and every child sitemap, including the large city/movie matrix.
+- Why: Dynamic fixture discovery was implemented as a full canonical-URL crawl even when the test needed only one movie, cinema, or city path.
+- Rule: Read the smallest relevant child sitemap and cache it by section; never fetch unrelated sitemap sections to discover one smoke fixture.
+- Test: Movie, cinema, city, search, and booking smoke cases request only their relevant sitemap section and retain the 30-second test boundary.

@@ -126,7 +126,7 @@ const PRIVATE_PAGE_PREFIXES = [
  * crawler or campaign spike does not repeat the full catalogue query for each
  * request. Auth/admin/API responses and anything setting a cookie stay private.
  */
-function withPublicPageCache(response: Response, request: Request): Response {
+export function withPublicPageCache(response: Response, request: Request): Response {
   if (request.method !== "GET" && request.method !== "HEAD") return response;
   if (response.status !== 200 || response.headers.has("set-cookie")) return response;
   const contentType = response.headers.get("content-type") ?? "";
@@ -136,7 +136,11 @@ function withPublicPageCache(response: Response, request: Request): Response {
   if (PRIVATE_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return response;
 
   const headers = new Headers(response.headers);
-  headers.set("cache-control", "public, max-age=0, s-maxage=300, stale-while-revalidate=60");
+  // Lovable's browser-facing proxy may enforce revalidation by replacing
+  // Cache-Control. CDN-Cache-Control carries the shared-cache policy separately
+  // and is the standard signal for an upstream CDN/reverse proxy.
+  headers.set("cache-control", "public, max-age=0, s-maxage=300");
+  headers.set("cdn-cache-control", "public, max-age=300, stale-while-revalidate=60");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,

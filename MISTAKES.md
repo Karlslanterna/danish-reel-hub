@@ -120,3 +120,17 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: The assertion searched the entire server response instead of the semantic UI element it claimed to validate.
 - Rule: Scope UI-quality assertions to the rendered element under test. Film-card title checks may inspect only titles inside public `/film/` card links, not filters, scripts, metadata, or screening tags.
 - Test: The smoke test extracts actual film-card `<h3>` titles, requires at least one card, and allows the same vocabulary to exist in unrelated filter data.
+
+## M-018 — Hosting policy overwrote the app's public cache header
+
+- What happened: The server emitted `Cache-Control: s-maxage=300`, but Lovable's production proxy returned `no-cache, must-revalidate, max-age=0`, so the release smoke failed after deployment.
+- Why: Application cache intent and the hosting layer's effective browser-facing header were treated as the same state.
+- Rule: Verify both layers separately. Public HTML emits a dedicated `CDN-Cache-Control` directive for shared caches, private routes emit none, and release notes must not claim an actual edge hit without live evidence.
+- Test: Unit tests verify the server directives, and production smoke accepts the dedicated CDN directive while still rejecting shared-cache directives on authentication pages.
+
+## M-019 — Deferred film data made an active arrangement menu disappear
+
+- What happened: A user could enter a film from `/babybio`, remove Babybio with one press, and then temporarily lose the Arrangement menu before the deferred programme facets finished loading.
+- Why: The active route value made the first menu render, but clearing it removed the only option while the data-backed facet list was still empty.
+- Rule: Retain the arrangement used to enter a film only for the deferred-loading window; after loading, expose only current data-backed options.
+- Test: The facet unit test covers the loading boundary, and the production navigation smoke toggles Babybio off and immediately reopens Arrangement.

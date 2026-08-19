@@ -16,7 +16,7 @@ import {
 } from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
 import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
-import { buildFilterFacets } from "@/lib/filter-facets";
+import { buildFilterFacets, retainPendingFacetOption } from "@/lib/filter-facets";
 import { cinemaProgramShowtimesByMovie } from "@/lib/cinema-program";
 import { expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
 
@@ -57,6 +57,10 @@ export function MovieDetail({
     clear,
   } = useFilters();
   const { lang } = useLanguage();
+  // Capture the arrangement that led into this film. The compact film card can
+  // render before programme facets arrive, but the selected option must still
+  // remain removable (and visible for an immediate verification click).
+  const [entryEvent] = useState(selectedEvent);
   const [cinemasShowing, setCinemasShowing] = useState(initialCinemas);
   const [currentCityOptions, setCurrentCityOptions] = useState(cityOptions ?? []);
   const [visibleCinemaCount, setVisibleCinemaCount] = useState(24);
@@ -143,6 +147,7 @@ export function MovieDetail({
     language: selectedLanguage,
     event: selectedEvent,
   });
+  const eventOptions = retainPendingFacetOption(facets.events, entryEvent, programmeLoading);
 
   const filteredShowtimes = [
     ...cinemaProgramShowtimesByMovie(programmeShowtimes, {
@@ -318,7 +323,7 @@ export function MovieDetail({
             availableTimes={facets.times}
             formats={facets.formats}
             languages={facets.languages}
-            events={facets.events}
+            events={eventOptions}
             cities={cityFilterOptions}
             cinemas={geoCinemas
               .filter((c) => facets.cinemaIds.has(c.id))

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
@@ -14,7 +14,7 @@ import {
 import { showtimeMatchesTags } from "@/lib/showtime-tags";
 import {
   fetchCinemas,
-  fetchMoviesAndShowtimesForCinemas,
+  fetchMoviesAndShowtimeIndexForCinemas,
   type Cinema,
   type Movie,
   type Showtime,
@@ -36,18 +36,35 @@ import { showtimeMatchesTimePeriod } from "@/lib/time-filter";
 import { isMovieForChildren } from "@/lib/children-filter";
 import { buildFilterFacets } from "@/lib/filter-facets";
 import { useTrackZeroResults } from "@/lib/analytics";
+import {
+  compactShowtimeIndex,
+  expandShowtimeIndex,
+  type CompactShowtimeIndex,
+} from "@/lib/public-catalog";
+
+const INITIAL_MOVIE_CARD_COUNT = 40;
+const MOVIE_CARD_BATCH_SIZE = 40;
 
 export async function loadCityCatalog(cityParam: string) {
-    const slug = cityParam.toLowerCase();
-    const all = await fetchCinemas();
-    const cinemas = all.filter((c) => cityMatchesSlug(c.city, slug));
-    if (cinemas.length === 0) throw notFound();
-    const { movies, showtimes } = await fetchMoviesAndShowtimesForCinemas(cinemas.map((c) => c.id));
-    movies.sort((a, b) => a.title.localeCompare(b.title, "da"));
-    const cityName = baseCityOf(cinemas[0].city);
-    const canonicalSlug = citySlug(cinemas[0].city);
-    const otherCities = cityOptionsFrom(all).filter((c) => c.slug !== canonicalSlug);
-    return { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities };
+  const slug = cityParam.toLowerCase();
+  const all = await fetchCinemas();
+  const cinemas = all.filter((c) => cityMatchesSlug(c.city, slug));
+  if (cinemas.length === 0) throw notFound();
+  const { movies, showtimes } = await fetchMoviesAndShowtimeIndexForCinemas(
+    cinemas.map((c) => c.id),
+  );
+  movies.sort((a, b) => a.title.localeCompare(b.title, "da"));
+  const cityName = baseCityOf(cinemas[0].city);
+  const canonicalSlug = citySlug(cinemas[0].city);
+  const otherCities = cityOptionsFrom(all).filter((c) => c.slug !== canonicalSlug);
+  return {
+    cityName,
+    canonicalSlug,
+    cinemas,
+    movies,
+    showtimes: compactShowtimeIndex(showtimes),
+    otherCities,
+  };
 }
 
 export type CityCatalogData = Awaited<ReturnType<typeof loadCityCatalog>>;
@@ -66,7 +83,7 @@ export const Route = createFileRoute("/$city/")({
       loaderData.cinemas.length,
       loaderData.movies.length,
     );
-    const hasScreenings = loaderData.showtimes.length > 0;
+    const hasScreenings = loaderData.showtimes.rows.length > 0;
     return {
       meta: [
         { title },
@@ -118,7 +135,9 @@ export function CityPage({
   data: CityCatalogData;
   fixedChildrenOnly?: boolean;
 }) {
-  const { cityName, canonicalSlug, cinemas, movies, showtimes, otherCities } = data;
+  const { cityName, canonicalSlug, cinemas, movies, showtimes: compact, otherCities } = data;
+  const showtimes = useMemo(() => expandShowtimeIndex(compact as CompactShowtimeIndex), [compact]);
+  const [visibleMovieCount, setVisibleMovieCount] = useState(INITIAL_MOVIE_CARD_COUNT);
   const {
     radius,
     userLoc,
@@ -251,18 +270,27 @@ export function CityPage({
     selectedCinemaId,
   ]);
 
+  useEffect(() => {
+    setVisibleMovieCount(INITIAL_MOVIE_CARD_COUNT);
+  }, [filtered]);
+
+  const visibleMovies = useMemo(
+    () => filtered.slice(0, visibleMovieCount),
+    [filtered, visibleMovieCount],
+  );
+
   useTrackZeroResults(
     filtered.length,
     Boolean(
       selectedDate ||
-        selectedTime ||
-        selectedGenre ||
-        selectedFormat ||
-        selectedLanguage ||
-        selectedEvent ||
-        activeChildrenOnly ||
-        selectedCinemaId ||
-        (radius !== "all" && userLoc)
+      selectedTime ||
+      selectedGenre ||
+      selectedFormat ||
+      selectedLanguage ||
+      selectedEvent ||
+      activeChildrenOnly ||
+      selectedCinemaId ||
+      (radius !== "all" && userLoc),
     ),
     [
       canonicalSlug,
@@ -346,11 +374,24 @@ export function CityPage({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {filtered.map((m) => (
-              <MovieCard key={m.id} movie={m} citySlug={canonicalSlug} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {visibleMovies.map((m) => (
+                <MovieCard key={m.id} movie={m} citySlug={canonicalSlug} />
+              ))}
+            </div>
+            {visibleMovies.length < filtered.length && (
+              <div className="mt-12 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setVisibleMovieCount((count) => count + MOVIE_CARD_BATCH_SIZE)}
+                  className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                >
+                  Vis flere film ({filtered.length - visibleMovies.length})
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 

@@ -24,7 +24,11 @@ import {
   type UiShowtimeIndexRow,
 } from "@/lib/screening-read-model";
 import { sortShowtimes } from "@/lib/showtime-sort";
-import { consolidatePublicMovies, remapShowtimesToMovies } from "@/lib/public-catalog";
+import {
+  consolidatePublicMovies,
+  remapShowtimeIndexToMovies,
+  remapShowtimesToMovies,
+} from "@/lib/public-catalog";
 import {
   canonicalCinemaId,
   consolidatePublicCinemas,
@@ -134,14 +138,32 @@ type CinemaRow = {
 
 type ScreeningMovieRow = ScreeningReadRow & { movies: MovieRow | null };
 
+type ShowtimeIndexGroupRow = {
+  movie_id: string;
+  cinema_id: string;
+  local_date: string;
+  times: string[];
+  formats: string[];
+  languages: string[];
+  events: string[];
+};
+
 type PageResponse = {
   data: unknown[] | null;
   error: unknown;
+  count?: number | null;
 };
 
 const SCREENING_COLUMNS =
   "movie_id, cinema_id, starts_at, local_date, local_time, hall, ticket_url, formats, languages, events";
 const SCREENING_PAGE_SIZE = 1000;
+const SCREENING_PARALLEL_PAGE_REQUESTS = 8;
+const PUBLIC_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type TimedPromise<T> = { expiresAt: number; promise: Promise<T> };
+
+const movieListCache = new Map<MovieSortStrategy, TimedPromise<Movie[]>>();
+let cinemaListCache: TimedPromise<Cinema[]> | null = null;
 
 /** A screening stops being user-visible once its advertised start time passes. */
 const screeningBounds = () => ({
@@ -166,6 +188,103 @@ async function collectPages<T>(
     out.push(...page);
     if (page.length < SCREENING_PAGE_SIZE) return out;
   }
+}
+
+/**
+ * High-volume listing reads first request an exact row count, then load the
+ * remaining PostgREST pages in small parallel batches. Page order is retained,
+ * but a national catalogue no longer pays one network round-trip per 1,000
+ * screenings in series.
+ */
+async function collectCountedPages<T>(
+  loadPage: (from: number, to: number, withCount: boolean) => PromiseLike<PageResponse>,
+): Promise<T[]> {
+  const first = await loadPage(0, SCREENING_PAGE_SIZE - 1, true);
+  if (first.error) throw first.error;
+  const firstPage = (first.data ?? []) as T[];
+  if (firstPage.length < SCREENING_PAGE_SIZE) return firstPage;
+
+  const count = first.count;
+  if (count === null || count === undefined) {
+    const rest = await collectPages<T>((from, to) =>
+      loadPage(from + SCREENING_PAGE_SIZE, to + SCREENING_PAGE_SIZE, false),
+    );
+    return [...firstPage, ...rest];
+  }
+
+  const ranges: Array<[number, number]> = [];
+  for (let from = SCREENING_PAGE_SIZE; from < count; from += SCREENING_PAGE_SIZE) {
+    ranges.push([from, Math.min(from + SCREENING_PAGE_SIZE - 1, count - 1)]);
+  }
+
+  const out = [...firstPage];
+  for (let index = 0; index < ranges.length; index += SCREENING_PARALLEL_PAGE_REQUESTS) {
+    const batch = ranges.slice(index, index + SCREENING_PARALLEL_PAGE_REQUESTS);
+    const responses = await Promise.all(batch.map(([from, to]) => loadPage(from, to, false)));
+    for (const response of responses) {
+      if (response.error) throw response.error;
+      out.push(...((response.data ?? []) as T[]));
+    }
+  }
+  return out;
+}
+
+const isMissingPublicIndexRpc = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const value = error as { code?: string; message?: string };
+  return (
+    value.code === "PGRST202" ||
+    /get_public_showtime_index|schema cache|function.*not found/iu.test(value.message ?? "")
+  );
+};
+
+export const mapShowtimeIndexGroups = (data: unknown): ShowtimeIndexRow[] => {
+  const physicalRows: ScreeningIndexReadRow[] = [];
+  for (const row of Array.isArray(data) ? (data as ShowtimeIndexGroupRow[]) : []) {
+    for (const time of row.times ?? []) {
+      physicalRows.push({
+        movie_id: row.movie_id,
+        cinema_id: row.cinema_id,
+        local_date: row.local_date,
+        local_time: time,
+        formats: row.formats ?? [],
+        languages: row.languages ?? [],
+        events: row.events ?? [],
+      });
+    }
+  }
+  return groupScreeningIndexForUi(remapScreeningCinemaIds(physicalRows));
+};
+
+async function fetchGroupedShowtimeIndex(sourceCinemaIds: string[] | null = null) {
+  const bounds = screeningBounds();
+  const { data, error } = await supabase.rpc("get_public_showtime_index", {
+    p_starts_after: bounds.startsAfter,
+    p_first_date: bounds.firstDate,
+    p_last_date: bounds.lastDate,
+    p_cinema_ids: sourceCinemaIds,
+  });
+  if (!error) return mapShowtimeIndexGroups(data);
+  if (!isMissingPublicIndexRpc(error)) throw error;
+
+  // Safe deployment-order fallback while the new database function reaches a
+  // project. Once migrated, the normal path is one aggregated JSON response.
+  const rows = await collectCountedPages<ScreeningIndexReadRow>((from, to, withCount) => {
+    let query = supabase
+      .from("screenings")
+      .select("movie_id, cinema_id, local_date, local_time, formats, languages, events", {
+        count: withCount ? "exact" : undefined,
+      })
+      .gte("starts_at", bounds.startsAfter)
+      .gte("local_date", bounds.firstDate)
+      .lte("local_date", bounds.lastDate);
+    if (sourceCinemaIds) query = query.in("cinema_id", sourceCinemaIds);
+    return query
+      .order("starts_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+  });
+  return groupScreeningIndexForUi(remapScreeningCinemaIds(rows));
 }
 
 const nonEmpty = (v: string | null | undefined): string | undefined => {
@@ -225,6 +344,33 @@ const mapMovie = (r: MovieRow): Movie => {
   };
 };
 
+/**
+ * Listing routes only render card metadata. Removing long descriptions, cast
+ * arrays and trailer/backdrop URLs after server-side consolidation keeps the
+ * homepage payload small while preserving the exact public identity chosen by
+ * the richer source data. Film routes fetch the full record separately.
+ */
+export const compactMovieForListing = (movie: Movie): Movie => ({
+  id: movie.id,
+  slug: movie.slug,
+  title: movie.title,
+  runtime: movie.runtime,
+  genre: movie.genre,
+  year: movie.year,
+  director: movie.director,
+  rating: movie.rating,
+  synopsis: "",
+  poster: movie.poster,
+  screeningCount: movie.screeningCount,
+  sourceIds: movie.sourceIds,
+  sourceSlugs: movie.sourceSlugs,
+});
+
+const compactCinemaForListing = (cinema: Cinema): Cinema => ({
+  ...cinema,
+  description: "",
+});
+
 const mapCinema = (r: CinemaRow): Cinema => ({
   id: r.id,
   slug: r.slug,
@@ -260,48 +406,124 @@ async function fetchPublicMovieIdSet(): Promise<Set<string>> {
 export async function fetchMovies(
   strategy: MovieSortStrategy = DEFAULT_MOVIE_SORT,
 ): Promise<Movie[]> {
-  let query = supabase
-    .from("movies_ranked")
-    .select("*")
-    .gt("screening_count", 0)
-    .lte("next_screening_date", windowEnd());
-  for (const o of MOVIE_SORT_ORDERS[strategy]) {
-    query = query.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
+  const now = Date.now();
+  const cached = movieListCache.get(strategy);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = (async () => {
+    let query = supabase
+      .from("movies_ranked")
+      .select("*")
+      .gt("screening_count", 0)
+      .lte("next_screening_date", windowEnd());
+    for (const o of MOVIE_SORT_ORDERS[strategy]) {
+      query = query.order(o.column, { ascending: o.ascending, nullsFirst: o.nullsFirst });
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    const visible = preparePublicMoviePosters(
+      (data ?? [])
+        .map((row) => row as MovieRow)
+        .filter((row) => isPublicMovieTitle(row.title))
+        .map(mapMovie),
+    );
+    return sortConsolidatedMovies(consolidatePublicMovies(visible).movies, strategy).map(
+      compactMovieForListing,
+    );
+  })();
+
+  movieListCache.set(strategy, { expiresAt: now + PUBLIC_DATA_CACHE_TTL_MS, promise });
+  try {
+    return await promise;
+  } catch (error) {
+    if (movieListCache.get(strategy)?.promise === promise) movieListCache.delete(strategy);
+    throw error;
   }
-  const { data, error } = await query;
-  if (error) throw error;
-  const visible = preparePublicMoviePosters(
-    (data ?? [])
-      .map((row) => row as MovieRow)
-      .filter((row) => isPublicMovieTitle(row.title))
-      .map(mapMovie),
-  );
-  return sortConsolidatedMovies(consolidatePublicMovies(visible).movies, strategy);
 }
 
 export async function fetchCinemas(): Promise<Cinema[]> {
-  const { data, error } = await supabase.from("cinemas").select("*").order("name");
-  if (error) throw error;
-  const sourceCinemas = (data ?? []).map((r) => mapCinema(r as CinemaRow));
-  const sourceById = new Map(sourceCinemas.map((cinema) => [cinema.id, cinema] as const));
-  return consolidatePublicCinemas(sourceCinemas)
-    .map((cinema) => {
-      const members = cinema.sourceIds.map((id) => sourceById.get(id)).filter(Boolean) as Cinema[];
-      return {
-        ...cinema,
-        description:
-          cinema.description || members.find((member) => member.description)?.description || "",
-        screens: Math.max(cinema.screens, ...members.map((member) => member.screens)),
-        website: cinema.website || members.find((member) => member.website)?.website || null,
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name, "da"));
+  const now = Date.now();
+  if (cinemaListCache && cinemaListCache.expiresAt > now) return cinemaListCache.promise;
+
+  const promise = (async () => {
+    const { data, error } = await supabase.from("cinemas").select("*").order("name");
+    if (error) throw error;
+    const sourceCinemas = (data ?? []).map((r) => mapCinema(r as CinemaRow));
+    const sourceById = new Map(sourceCinemas.map((cinema) => [cinema.id, cinema] as const));
+    return consolidatePublicCinemas(sourceCinemas)
+      .map((cinema) => {
+        const members = cinema.sourceIds
+          .map((id) => sourceById.get(id))
+          .filter(Boolean) as Cinema[];
+        return {
+          ...cinema,
+          description:
+            cinema.description || members.find((member) => member.description)?.description || "",
+          screens: Math.max(cinema.screens, ...members.map((member) => member.screens)),
+          website: cinema.website || members.find((member) => member.website)?.website || null,
+        };
+      })
+      .map(compactCinemaForListing)
+      .sort((a, b) => a.name.localeCompare(b.name, "da"));
+  })();
+
+  cinemaListCache = { expiresAt: now + PUBLIC_DATA_CACHE_TTL_MS, promise };
+  try {
+    return await promise;
+  } catch (error) {
+    if (cinemaListCache?.promise === promise) cinemaListCache = null;
+    throw error;
+  }
 }
 
 export async function fetchMovieBySlug(slug: string): Promise<Movie | null> {
-  const activeMovies = await fetchMovies();
-  const active = activeMovies.find((movie) => (movie.sourceSlugs ?? [movie.slug]).includes(slug));
-  if (active) return active;
+  // A detail page needs rich metadata from the requested row and the compact
+  // catalogue's canonical identity. The latter preserves every source id, so
+  // a consolidated film never loses screenings from one of its providers.
+  const [rankedResult, activeMovies] = await Promise.all([
+    supabase
+      .from("movies_ranked")
+      .select("*")
+      .eq("slug", slug)
+      .gt("screening_count", 0)
+      .lte("next_screening_date", windowEnd())
+      .maybeSingle(),
+    fetchMovies(),
+  ]);
+  const { data: ranked, error: rankedError } = rankedResult;
+  if (rankedError) throw rankedError;
+
+  const active = activeMovies.find(
+    (movie) =>
+      (movie.sourceSlugs ?? [movie.slug]).includes(slug) ||
+      (ranked?.id ? (movie.sourceIds ?? [movie.id]).includes(ranked.id) : false),
+  );
+  if (active) {
+    const sourceIds = active.sourceIds ?? [active.id];
+    if (ranked && sourceIds.length === 1 && sourceIds[0] === ranked.id) {
+      return {
+        ...(preparePublicMoviePosters([mapMovie(ranked as MovieRow)])[0] ?? active),
+        sourceIds: active.sourceIds,
+        sourceSlugs: active.sourceSlugs,
+      };
+    }
+    const { data, error } = await supabase.from("movies_ranked").select("*").in("id", sourceIds);
+    if (error) throw error;
+    const rows = preparePublicMoviePosters(
+      (data ?? [])
+        .map((row) => row as MovieRow)
+        .filter((row) => isPublicMovieTitle(row.title))
+        .map(mapMovie),
+    );
+    const detailed = consolidatePublicMovies(rows).movies.find((movie) =>
+      (movie.sourceSlugs ?? [movie.slug]).includes(slug),
+    );
+    return detailed ?? active;
+  }
+
+  if (ranked && isPublicMovieTitle(ranked.title)) {
+    return preparePublicMoviePosters([mapMovie(ranked as MovieRow)])[0] ?? null;
+  }
 
   const { data, error } = await supabase.from("movies").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
@@ -423,9 +645,9 @@ export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {
     out.push(movie);
   }
   const visible = preparePublicMoviePosters(out);
-  return consolidatePublicMovies(visible).movies.sort((a, b) =>
-    a.title.localeCompare(b.title, "da"),
-  );
+  return consolidatePublicMovies(visible)
+    .movies.map(compactMovieForListing)
+    .sort((a, b) => a.title.localeCompare(b.title, "da"));
 }
 
 export async function fetchCinemasForMovie(movieId: string | string[]): Promise<Cinema[]> {
@@ -528,24 +750,34 @@ export async function fetchShowtimes(): Promise<Showtime[]> {
 
 /** Lightweight index used by homepage radius/date/tag filtering. */
 export async function fetchShowtimeIndex(): Promise<ShowtimeIndexRow[]> {
-  const bounds = screeningBounds();
   const [rows, publicMovieIds] = await Promise.all([
-    collectPages<ScreeningIndexReadRow>((from, to) =>
-      supabase
-        .from("screenings")
-        .select("movie_id, cinema_id, local_date, local_time, formats, languages, events")
-        .gte("starts_at", bounds.startsAfter)
-        .gte("local_date", bounds.firstDate)
-        .lte("local_date", bounds.lastDate)
-        .order("starts_at", { ascending: true })
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
+    fetchGroupedShowtimeIndex(),
     fetchPublicMovieIdSet(),
   ]);
-  return groupScreeningIndexForUi(
-    remapScreeningCinemaIds(rows.filter((row) => publicMovieIds.has(row.movie_id))),
+  return rows.filter((row) => publicMovieIds.has(row.movieId));
+}
+
+/**
+ * City listings only need card metadata and the filter index. Fetching
+ * `movies(*)` once per physical screening multiplied the response size for
+ * large cities, so this path reuses the compact national movie catalogue and
+ * loads only the seven screening fields used by filters.
+ */
+export async function fetchMoviesAndShowtimeIndexForCinemas(
+  cinemaIds: string[],
+): Promise<{ movies: Movie[]; showtimes: ShowtimeIndexRow[] }> {
+  if (cinemaIds.length === 0) return { movies: [], showtimes: [] };
+  const sourceCinemaIds = expandCinemaIds(cinemaIds);
+  const [rows, allMovies] = await Promise.all([
+    fetchGroupedShowtimeIndex(sourceCinemaIds),
+    fetchMovies(),
+  ]);
+  const sourceMovieIds = new Set(rows.map((row) => row.movieId));
+  const movies = allMovies.filter((movie) =>
+    (movie.sourceIds ?? [movie.id]).some((id) => sourceMovieIds.has(id)),
   );
+  const showtimes = remapShowtimeIndexToMovies(rows, movies);
+  return { movies, showtimes };
 }
 
 export async function fetchShowtimesForCinema(cinemaId: string): Promise<Showtime[]> {
@@ -602,7 +834,7 @@ export async function fetchMoviesAndShowtimesForCinemas(
   const visibleMovies = preparePublicMoviePosters(movies);
   const consolidated = consolidatePublicMovies(visibleMovies).movies;
   return {
-    movies: consolidated,
+    movies: consolidated.map(compactMovieForListing),
     showtimes: remapShowtimesToMovies(
       groupScreeningsForUi(remapScreeningCinemaIds(visibleRows)),
       consolidated,

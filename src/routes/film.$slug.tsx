@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
-import { MovieDetail, type MovieDetailProgramme } from "@/components/MovieDetail";
+import { type MovieDetailProgramme } from "@/components/MovieDetail";
+import { DeferredMovieDetail } from "@/components/DeferredMovieDetail";
 import { fetchMovieBySlug, fetchMovieProgramme, type Movie } from "@/lib/cinema-data";
 import { cityOptionsFrom } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
@@ -11,9 +12,9 @@ import { findCachedHomeMovie } from "@/lib/home-catalog-cache";
 
 export const Route = createFileRoute("/film/$slug")({
   loader: async ({ params, context }) => {
-    const movie =
-      findCachedHomeMovie(context.queryClient, params.slug) ??
-      (await fetchMovieBySlug(params.slug));
+    const cachedMovie = findCachedHomeMovie(context.queryClient, params.slug);
+    const details = fetchMovieBySlug(params.slug);
+    const movie = cachedMovie ?? (await details);
     if (!movie) throw notFound();
     const programme: Promise<MovieDetailProgramme> = fetchMovieProgramme(
       movie.sourceIds ?? movie.id,
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/film/$slug")({
     }));
     return {
       movie,
+      details: cachedMovie ? details : Promise.resolve(movie),
       programme,
     };
   },
@@ -89,9 +91,18 @@ export const Route = createFileRoute("/film/$slug")({
 });
 
 function MoviePage() {
-  const { movie, programme } = Route.useLoaderData() as {
+  const { movie, details, programme } = Route.useLoaderData() as {
     movie: Movie;
+    details: Promise<Movie | null>;
     programme: Promise<MovieDetailProgramme>;
   };
-  return <MovieDetail movie={movie} cinemas={[]} showtimes={[]} programme={programme} />;
+  return (
+    <DeferredMovieDetail
+      movie={movie}
+      details={details}
+      cinemas={[]}
+      showtimes={[]}
+      programme={programme}
+    />
+  );
 }

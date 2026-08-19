@@ -49,14 +49,52 @@ export type HomeCatalogData = {
   showtimeIndex: CompactShowtimeIndex;
 };
 
+const INITIAL_MOVIE_CARD_COUNT = 40;
+const MOVIE_CARD_BATCH_SIZE = 40;
+const INITIAL_CINEMA_CARD_COUNT = 24;
+const HOME_CATALOG_TTL_MS = 5 * 60 * 1000;
+let homeCatalogCache: { expiresAt: number; promise: Promise<HomeCatalogData> } | null = null;
+
+const compactCinemaForHome = (cinema: Cinema): Cinema =>
+  ({
+    id: cinema.id,
+    slug: cinema.slug,
+    name: cinema.name,
+    city: cinema.city,
+    screens: cinema.screens,
+    latitude: cinema.latitude,
+    longitude: cinema.longitude,
+  }) as Cinema;
+
+const compactMovieForHome = (movie: Movie): Movie => {
+  const { sourceSlugs: _sourceSlugs, ...compact } = movie;
+  return compact;
+};
+
 export async function loadHomeCatalog(): Promise<HomeCatalogData> {
-  const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
-    fetchMovies(),
-    fetchCinemas(),
-    fetchShowtimeIndex(),
-  ]);
-  const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, movies);
-  return { movies, cinemas, showtimeIndex: compactShowtimeIndex(showtimeIndex) };
+  const now = Date.now();
+  if (homeCatalogCache && homeCatalogCache.expiresAt > now) return homeCatalogCache.promise;
+
+  const promise = (async () => {
+    const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
+      fetchMovies(),
+      fetchCinemas(),
+      fetchShowtimeIndex(),
+    ]);
+    const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, movies);
+    return {
+      movies: movies.map(compactMovieForHome),
+      cinemas: cinemas.map(compactCinemaForHome),
+      showtimeIndex: compactShowtimeIndex(showtimeIndex),
+    };
+  })();
+  homeCatalogCache = { expiresAt: now + HOME_CATALOG_TTL_MS, promise };
+  try {
+    return await promise;
+  } catch (error) {
+    if (homeCatalogCache?.promise === promise) homeCatalogCache = null;
+    throw error;
+  }
 }
 
 export function loadCachedHomeCatalog(queryClient: QueryClient): Promise<HomeCatalogData> {
@@ -184,6 +222,7 @@ export function HomePage({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [visibleMovieCount, setVisibleMovieCount] = useState(INITIAL_MOVIE_CARD_COUNT);
   useCinemaUrlSync(
     useMemo(
       () => cinemas.map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
@@ -406,6 +445,15 @@ export function HomePage({
     return noScreeningFilter ? visible : rankMoviesByScreenings(visible, matchingScreenings);
   }, [query, catalogMovies, matchingMovieIds, selectedGenre, matchingScreenings]);
 
+  useEffect(() => {
+    setVisibleMovieCount(INITIAL_MOVIE_CARD_COUNT);
+  }, [filtered]);
+
+  const visibleMovies = useMemo(
+    () => filtered.slice(0, visibleMovieCount),
+    [filtered, visibleMovieCount],
+  );
+
   const lastZeroResult = useRef("");
   useEffect(() => {
     const hasConstraint = Boolean(
@@ -468,6 +516,11 @@ export function HomePage({
         .map((c) => ({ id: c.id, slug: c.slug, name: c.name, city: c.city })),
     [cinemas, facets.cinemaIds],
   );
+
+  const cinemaCards = useMemo(() => {
+    const matching = cinemas.filter((cinema) => !activeCinemaIds || activeCinemaIds.has(cinema.id));
+    return activeCinemaIds ? matching : matching.slice(0, INITIAL_CINEMA_CARD_COUNT);
+  }, [activeCinemaIds, cinemas]);
 
   const childrenCitySlugs = useMemo(() => {
     if (!activeChildrenOnly) return [];
@@ -707,15 +760,30 @@ export function HomePage({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {filtered.map((m) => (
-              <MovieCard
-                key={m.id}
-                movie={m}
-                citySlug={selectedCity && !nearbyCinemaIds ? slugifyCity(selectedCity) : null}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {visibleMovies.map((m) => (
+                <MovieCard
+                  key={m.id}
+                  movie={m}
+                  citySlug={selectedCity && !nearbyCinemaIds ? slugifyCity(selectedCity) : null}
+                />
+              ))}
+            </div>
+            {visibleMovies.length < filtered.length && (
+              <div className="mt-12 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setVisibleMovieCount((count) => count + MOVIE_CARD_BATCH_SIZE)}
+                  className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                >
+                  {lang === "da"
+                    ? `Vis flere film (${filtered.length - visibleMovies.length})`
+                    : `Show more films (${filtered.length - visibleMovies.length})`}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -730,41 +798,48 @@ export function HomePage({
             </div>
           </div>
           <div className="grid grid-cols-1 gap-px overflow-hidden rounded-md bg-border md:grid-cols-2 lg:grid-cols-3">
-            {cinemas
-              .filter((c) => !activeCinemaIds || activeCinemaIds.has(c.id))
-              .map((c) => (
-                <Link
-                  key={c.id}
-                  to="/biograf/$slug"
-                  params={{ slug: c.slug }}
-                  className="group flex items-center justify-between bg-background p-6 transition-colors hover:bg-card"
-                >
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                      {displayCityOf(c.city)}
-                    </div>
-                    <h3 className="mt-2 font-display text-2xl tracking-tight text-foreground group-hover:text-primary">
-                      {c.name}
-                    </h3>
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      {c.description}
-                    </p>
+            {cinemaCards.map((c) => (
+              <Link
+                key={c.id}
+                to="/biograf/$slug"
+                params={{ slug: c.slug }}
+                className="group flex items-center justify-between bg-background p-6 transition-colors hover:bg-card"
+              >
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    {displayCityOf(c.city)}
                   </div>
-                  <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-                    {c.screens > 0 ? (
-                      <span>
-                        {c.screens} {t("home.screens")}
-                      </span>
-                    ) : (
-                      <span />
-                    )}
-                    <span className="text-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary">
-                      →
+                  <h3 className="mt-2 font-display text-2xl tracking-tight text-foreground group-hover:text-primary">
+                    {c.name}
+                  </h3>
+                </div>
+                <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
+                  {c.screens > 0 ? (
+                    <span>
+                      {c.screens} {t("home.screens")}
                     </span>
-                  </div>
-                </Link>
-              ))}
+                  ) : (
+                    <span />
+                  )}
+                  <span className="text-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary">
+                    →
+                  </span>
+                </div>
+              </Link>
+            ))}
           </div>
+          {!activeCinemaIds && cinemaCards.length < cinemas.length && (
+            <div className="mt-8 flex justify-center">
+              <Link
+                to="/biograf"
+                className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                {lang === "da"
+                  ? `Se alle ${cinemas.length} biografer`
+                  : `See all ${cinemas.length} cinemas`}
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

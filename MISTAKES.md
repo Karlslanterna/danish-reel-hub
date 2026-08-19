@@ -41,8 +41,8 @@ This is a concise operational log. Each entry records the failure, cause, perman
 
 - What happened: A connected Supabase project with legacy tables was initially mistaken for Lanterna's actual Lovable production database.
 - Why: Project identity was inferred from its display name.
-- Rule: Confirm project id, canonical tables, and a known current row before using database results.
-- Test: Release notes record the production project id and verify the `screenings` read model exists.
+- Rule: Access Lanterna's Supabase project only through Lovable's Supabase connection. Never substitute a separately connected project based on its display name.
+- Test: Release notes confirm the database was reached through Lovable and verify that the canonical `screenings` read model exists before any query, migration, deployment, or production claim.
 
 ## M-007 — Dashboard could be green on partial/legacy health
 
@@ -78,3 +78,17 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: Hero copy was chosen from persisted filter state before explicit route context.
 - Rule: An explicit curated landing route owns its title and description; persisted filters may narrow results but never relabel the route.
 - Test: Production smoke navigation verifies `/for-boern` keeps its children hero while combined filters remain active.
+
+## M-012 — Public listings rendered the entire catalogue into the first response
+
+- What happened: Home and city pages server-rendered hundreds of cards and serialized detail-only film fields plus full screening rows, producing megabyte-sized HTML and multi-second response times.
+- Why: The client needed the complete filter index, and that requirement was incorrectly treated as a requirement to render and serialize every rich record up front.
+- Rule: Keep canonical filter data compact, render public cards progressively, defer detail-only metadata to detail routes, and cache identical public HTML briefly at the edge.
+- Test: Release smoke records HTML bytes and initial card counts for home and a large city, then verifies filters and “Vis flere” still expose the complete catalogue.
+
+## M-013 — Mistook a missing local GitHub CLI for missing repository access
+
+- What happened: Publication was reported as blocked because the local `gh` executable was absent, even though the connected GitHub integration had administrator and push access and had already been used for prior Lanterna releases.
+- Why: One preferred local tool was treated as the only valid publication path instead of checking the repository integration's actual capabilities.
+- Rule: Verify both the direct GitHub integration and local tooling. When the direct integration supports branch, commit, and pull-request operations, use the traceable direct workflow rather than declaring an access blocker.
+- Test: Release evidence records the verified repository permission plus the resulting branch, commit, draft PR, checks, merge, Lovable deployment, and live smoke result.

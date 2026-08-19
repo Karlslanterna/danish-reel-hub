@@ -314,31 +314,28 @@ export async function fetchCinemaBySlug(slug: string): Promise<Cinema | null> {
   return cinemas.find((cinema) => (cinema.sourceSlugs ?? [cinema.slug]).includes(slug)) ?? null;
 }
 
-export async function fetchShowtimesForMovie(movieId: string | string[]): Promise<Showtime[]> {
-  const bounds = screeningBounds();
-  const movieIds = Array.isArray(movieId) ? [...new Set(movieId)] : [movieId];
-  const { data, error } = await supabase.rpc("get_movie_showtime_groups", {
-    p_movie_ids: movieIds,
-    p_starts_after: bounds.startsAfter,
-    p_first_date: bounds.firstDate,
-    p_last_date: bounds.lastDate,
-  });
-  if (error) throw error;
+type MovieShowtimeGroupRow = {
+  movie_id: string;
+  cinema_id: string;
+  local_date: string;
+  hall: string;
+  times: string[];
+  ticket_urls?: string[];
+  formats: string[];
+  languages: string[];
+  events: string[];
+};
 
-  type GroupRow = {
-    movie_id: string;
-    cinema_id: string;
-    local_date: string;
-    hall: string;
-    times: string[];
-    ticket_urls: string[];
-    formats: string[];
-    languages: string[];
-    events: string[];
-  };
+function mapMovieShowtimeGroups(
+  data: unknown,
+  movieIds: string[],
+  includeTicketUrls: boolean,
+): Showtime[] {
   const grouped = sortShowtimes(
-    (Array.isArray(data) ? (data as GroupRow[]) : []).map((row) => {
-      const ticketUrls = (row.ticket_urls ?? []).map((url) => normalizeTicketUrl(url) ?? "");
+    (Array.isArray(data) ? (data as MovieShowtimeGroupRow[]) : []).map((row) => {
+      const ticketUrls = includeTicketUrls
+        ? (row.ticket_urls ?? []).map((url) => normalizeTicketUrl(url) ?? "")
+        : [];
       return {
         movieId: row.movie_id,
         cinemaId: canonicalCinemaId(row.cinema_id),
@@ -368,6 +365,37 @@ export async function fetchShowtimesForMovie(movieId: string | string[]): Promis
     sourceIds: movieIds,
   };
   return remapShowtimesToMovies(grouped, [canonicalMovie]);
+}
+
+async function fetchGroupedMovieShowtimes(
+  movieId: string | string[],
+  withTicketUrls: boolean,
+): Promise<Showtime[]> {
+  const bounds = screeningBounds();
+  const movieIds = Array.isArray(movieId) ? [...new Set(movieId)] : [movieId];
+  const args = {
+    p_movie_ids: movieIds,
+    p_starts_after: bounds.startsAfter,
+    p_first_date: bounds.firstDate,
+    p_last_date: bounds.lastDate,
+  };
+  const { data, error } = withTicketUrls
+    ? await supabase.rpc("get_movie_showtime_groups", args)
+    : await supabase.rpc("get_movie_showtime_schedule", args);
+  if (error) throw error;
+  return mapMovieShowtimeGroups(data, movieIds, withTicketUrls);
+}
+
+/** Fast programme payload used while navigating to a film page. */
+export async function fetchShowtimesForMovie(movieId: string | string[]): Promise<Showtime[]> {
+  return fetchGroupedMovieShowtimes(movieId, false);
+}
+
+/** Ticket URLs are large, so the film page fetches them after its programme is visible. */
+export async function fetchTicketedShowtimesForMovie(
+  movieId: string | string[],
+): Promise<Showtime[]> {
+  return fetchGroupedMovieShowtimes(movieId, true);
 }
 
 export async function fetchMoviesForCinema(cinemaId: string): Promise<Movie[]> {

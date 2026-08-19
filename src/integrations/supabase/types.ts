@@ -995,6 +995,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_movie_showtime_schedule: {
+        Args: {
+          p_first_date: string
+          p_last_date: string
+          p_movie_ids: string[]
+          p_starts_after: string
+        }
+        Returns: Json
+      }
       promote_screenings: {
         Args: {
           p_cinema_id: string

@@ -7,7 +7,13 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { FilterBar, useFilters, useCinemaUrlSync, haversineKm, fmtDateLabel } from "@/lib/filters";
 import { useLanguage } from "@/lib/i18n";
-import { formatRuntime, type Movie, type Cinema, type Showtime } from "@/lib/cinema-data";
+import {
+  fetchTicketedShowtimesForMovie,
+  formatRuntime,
+  type Movie,
+  type Cinema,
+  type Showtime,
+} from "@/lib/cinema-data";
 import { displayCityOf, type CityOption } from "@/lib/city-slug";
 import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
 import { buildFilterFacets } from "@/lib/filter-facets";
@@ -45,10 +51,29 @@ export function MovieDetail({
   const { lang } = useLanguage();
   useCinemaUrlSync(cinemasShowing);
   const [visibleCinemaCount, setVisibleCinemaCount] = useState(24);
+  const [programmeShowtimes, setProgrammeShowtimes] = useState(showtimes);
+  const [ticketLinksReady, setTicketLinksReady] = useState(false);
 
   useEffect(() => {
     setVisibleCinemaCount(24);
-  }, [movie.id]);
+    setProgrammeShowtimes(showtimes);
+    setTicketLinksReady(false);
+
+    let active = true;
+    void fetchTicketedShowtimesForMovie(movie.sourceIds ?? movie.id)
+      .then((ticketedShowtimes) => {
+        if (!active) return;
+        setProgrammeShowtimes(ticketedShowtimes);
+        setTicketLinksReady(true);
+      })
+      .catch(() => {
+        if (active) setTicketLinksReady(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [movie.id, movie.sourceIds, showtimes]);
 
   // City is routing context: when this page is city-scoped, keep the global
   // (persisted) city filter in sync so the selection carries across the site.
@@ -83,7 +108,7 @@ export function MovieDetail({
 
   const baseCinemaIds = new Set(geoCinemas.map((cinema) => cinema.id));
   const selectedCinemaIds = selectedCinemaId ? new Set([selectedCinemaId]) : null;
-  const facets = buildFilterFacets(showtimes, [movie], {
+  const facets = buildFilterFacets(programmeShowtimes, [movie], {
     baseCinemaIds,
     cinemaIds: selectedCinemaIds,
     date: selectedDate,
@@ -94,7 +119,7 @@ export function MovieDetail({
   });
 
   const filteredShowtimes = [
-    ...cinemaProgramShowtimesByMovie(showtimes, {
+    ...cinemaProgramShowtimesByMovie(programmeShowtimes, {
       date: selectedDate,
       time: selectedTime,
       ...tagSel,
@@ -285,6 +310,7 @@ export function MovieDetail({
           <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             {byCinema.length} biografer{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
             {hasGeo ? ` · inden for ${radius} km` : ""}
+            {!ticketLinksReady ? " · billetlinks indlæses" : ""}
           </div>
         </div>
 

@@ -113,3 +113,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: The workflow installed Chromium and operating-system dependencies from apt on every run instead of using a deterministic browser environment.
 - Rule: Run browser CI in the official Playwright container pinned to the exact `@playwright/test` version in `package.json`; do not add a separate apt/browser installation step.
 - Test: The smoke job starts Playwright directly, reaches the actual Lanterna tests, and completes within its timeout.
+
+## M-017 — Whole-page HTML check confused filter metadata with a film card
+
+- What happened: The non-film smoke test failed on the word `Særvisning` even though it appeared only as valid serialized screening/filter metadata, not as a public film-card title.
+- Why: The assertion searched the entire server response instead of the semantic UI element it claimed to validate.
+- Rule: Scope UI-quality assertions to the rendered element under test. Film-card title checks may inspect only titles inside public `/film/` card links, not filters, scripts, metadata, or screening tags.
+- Test: The smoke test extracts actual film-card `<h3>` titles, requires at least one card, and allows the same vocabulary to exist in unrelated filter data.

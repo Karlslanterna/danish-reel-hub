@@ -122,13 +122,24 @@ jobs:
         run: npm ci
 
       - name: Run smoke tests against production
+        id: smoke
+        # The PR cannot change the already deployed site. Keep live failures
+        # visible before merge; manual post-deploy runs remain blocking.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: npm run test:smoke
 
       - name: Upload Playwright report on failure
-        if: failure()
+        if: steps.smoke.outcome == 'failure'
         uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Explain production-only smoke findings
+        if: steps.smoke.outcome == 'failure' && github.event_name == 'pull_request'
+        run: |
+          echo "::warning::The smoke tests found issues on the currently deployed lanterna.dk. They are advisory on pull requests and blocking on manual post-deploy runs."
+          echo "### Production smoke findings" >> "$GITHUB_STEP_SUMMARY"
+          echo "The smoke tests found issues on the currently deployed **lanterna.dk**. This is advisory here because a pull request cannot change production before merge and Lovable deployment. The Playwright report is attached. Run this workflow manually after deployment; the same tests are then blocking." >> "$GITHUB_STEP_SUMMARY"

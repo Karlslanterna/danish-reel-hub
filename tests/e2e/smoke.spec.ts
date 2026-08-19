@@ -30,11 +30,26 @@ test.describe("Public pages", () => {
   test("1b. public catalog excludes obvious non-film programme shells", async ({ request }) => {
     const response = await request.get("/");
     expect(response.status(), "Homepage must return HTTP 200").toBe(200);
-    const html = (await response.text()).toLocaleLowerCase("da");
+    const html = await response.text();
+    const filmCardTitles = [
+      ...html.matchAll(/<a\b[^>]*\bhref=["']\/film\/[^"']+["'][^>]*>(.*?)<\/a>/gis),
+    ]
+      .map((match) => match[1]?.match(/<h3\b[^>]*>(.*?)<\/h3>/is)?.[1] ?? "")
+      .map((title) =>
+        title
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim(),
+      )
+      .filter(Boolean);
+    expect(filmCardTitles.length, "Homepage did not render any film-card titles").toBeGreaterThan(
+      0,
+    );
+    const renderedTitles = filmCardTitles.join("\n").toLocaleLowerCase("da");
     for (const forbidden of ["særvisning", "bestil bord og mad", "andre film"]) {
       expect(
-        html,
-        `Homepage still exposes non-film/filter-noise label: ${forbidden}`,
+        renderedTitles,
+        `Homepage still renders a non-film card title: ${forbidden}`,
       ).not.toContain(forbidden);
     }
   });

@@ -363,7 +363,7 @@ export function HomePage({
         out.push({
           kind: "city",
           label: c.city,
-          sub: `${c.count} ${c.count === 1 ? t("sug.cinema") : t("sug.cinemas")} · ${b.variants} ${t("sug.areas")}`,
+          sub: `${c.count} ${c.count === 1 ? t("sug.cinema") : t("sug.cinemas")}`,
           city: c.city,
         });
         seenCities.add(c.city.toLowerCase());

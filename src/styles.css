@@ -107,3 +107,14 @@
     display: none;
   }
 }
+
+/*
+ * The homepage keeps filter options inert while the complete national catalogue
+ * hydrates. Distance is different: it only needs the browser location to open,
+ * and that first interaction also starts the catalogue load. Keep the first
+ * filter trigger (distance, whenever no cinema is pinned) clickable so the
+ * user's first tap is never swallowed on mobile or desktop.
+ */
+[aria-busy="true"].pointer-events-none > button:first-of-type {
+  pointer-events: auto;
+}

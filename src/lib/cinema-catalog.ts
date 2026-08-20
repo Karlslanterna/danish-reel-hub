@@ -30,6 +30,7 @@ export const CINEMA_ALIAS_TO_CANONICAL = {
   "eb-149": "kn-171004",
   "eb-165": "kn-641227",
   "eb-123": "kn-891102",
+  "eb-104": "kn-2016163",
 } as const satisfies Record<string, string>;
 
 const aliasesByCanonical = new Map<string, string[]>();

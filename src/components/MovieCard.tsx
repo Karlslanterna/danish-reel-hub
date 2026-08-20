@@ -3,15 +3,29 @@ import type { Movie } from "@/lib/cinema-data";
 import { formatRuntime } from "@/lib/cinema-data";
 import { Poster } from "./Poster";
 
-export function MovieCard({ movie, citySlug }: { movie: Movie; citySlug?: string | null }) {
+export function MovieCard({
+  movie,
+  citySlug,
+  priority = false,
+  sizes,
+}: {
+  movie: Movie;
+  citySlug?: string | null;
+  /** Only the first few above-the-fold posters should preload eagerly. */
+  priority?: boolean;
+  sizes?: string;
+}) {
   const facts = [formatRuntime(movie.runtime), movie.genre.join(", ")].filter(Boolean);
   const inner = (
     <>
       <Poster
         movie={movie}
         showTitle={false}
+        priority={priority}
+        {...(sizes ? { sizes } : {})}
         className="transition-transform duration-500 ease-out group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-black/50"
       />
+
       <div className="mt-3">
         <h3 className="font-display text-base leading-snug text-foreground line-clamp-2 transition-colors group-hover:text-primary">
           {movie.title}

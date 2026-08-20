@@ -16,7 +16,7 @@ import {
 import { HOME_CATALOG_QUERY_KEY } from "@/lib/home-catalog-cache";
 
 /** Cards rendered before the visitor scrolls or interacts. */
-export const HOME_SHELL_MOVIE_COUNT = 20;
+export const HOME_SHELL_MOVIE_COUNT = 12;
 export const HOME_SHELL_CINEMA_COUNT = 24;
 
 export type HomeCatalogData = {

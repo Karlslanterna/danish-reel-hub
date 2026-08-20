@@ -20,12 +20,14 @@ const NETWORK = {
 const CPU_SLOWDOWN = 4;
 
 const BUDGETS = {
+  shellVisibleMs: 5000,
   ttfbMs: 1500,
   fcpMs: 3000,
   lcpMs: 4000,
   htmlBytes: 350 * 1024,
   totalColdBytes: 1.75 * 1024 * 1024,
   warmFilmNavigationMs: 2000,
+  warmFilmNavigationBytes: 1.25 * 1024 * 1024,
 };
 
 async function throttle(page: Page): Promise<CDPSession> {
@@ -36,25 +38,40 @@ async function throttle(page: Page): Promise<CDPSession> {
   return cdp;
 }
 
-/** `transferSize` is 0 for cache hits and some protocols; fall back to the body size. */
-const RESOURCE_BYTES_SCRIPT = `
-  (() => {
-    const entries = performance.getEntriesByType("resource");
-    const bytes = (e) => e.transferSize || e.encodedBodySize || 0;
-    const nav = performance.getEntriesByType("navigation")[0];
-    const html = nav ? (nav.transferSize || nav.encodedBodySize || 0) : 0;
-    return {
-      html,
-      total: html + entries.reduce((sum, e) => sum + bytes(e), 0),
-      ttfb: nav ? nav.responseStart : 0,
-    };
-  })()
-`;
+type TransferSnapshot = { total: number; document: number };
+
+/**
+ * ResourceTiming hides cross-origin transfer sizes without Timing-Allow-Origin.
+ * CDP's encodedDataLength observes the actual browser network traffic and is
+ * therefore suitable for Supabase/API traffic as well as same-origin assets.
+ */
+function trackTransfers(cdp: CDPSession): () => TransferSnapshot {
+  let total = 0;
+  let document = 0;
+  const documentRequestIds = new Set<string>();
+
+  cdp.on("Network.responseReceived", (event) => {
+    if (event.type === "Document") documentRequestIds.add(event.requestId);
+  });
+  cdp.on("Network.loadingFinished", (event) => {
+    const bytes = Math.max(0, Number(event.encodedDataLength ?? 0));
+    total += bytes;
+    if (documentRequestIds.has(event.requestId)) document += bytes;
+  });
+
+  return () => ({ total, document });
+}
+
+async function navigationTtfb(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    return nav?.responseStart ?? 0;
+  });
+}
 
 async function paintMetrics(page: Page): Promise<{ fcp: number; lcp: number }> {
   return page.evaluate(async () => {
-    const fcp =
-      performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0;
+    const fcp = performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0;
     const lcp = await new Promise<number>((resolve) => {
       let last = 0;
       try {
@@ -79,51 +96,55 @@ test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
 test("cold homepage and warm film navigation stay inside the mobile budgets", async ({
   page,
 }, testInfo) => {
-  await throttle(page);
+  const cdp = await throttle(page);
+  const transferSnapshot = trackTransfers(cdp);
 
   const coldStart = Date.now();
-  await page.goto("/", { waitUntil: "load" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.locator('a[href^="/film/"]').first().waitFor();
-  const coldMs = Date.now() - coldStart;
+  const shellVisibleMs = Date.now() - coldStart;
 
+  // Let the deferred full catalogue settle before taking the complete cold
+  // session byte total and before measuring a warm client-side film route.
+  await page.waitForLoadState("networkidle");
   const paints = await paintMetrics(page);
-  const resources = (await page.evaluate(RESOURCE_BYTES_SCRIPT)) as {
-    html: number;
-    total: number;
-    ttfb: number;
-  };
+  const ttfb = await navigationTtfb(page);
+  const coldTransfer = transferSnapshot();
 
-  // Warm navigation: the client router is hydrated, so this measures the
-  // film-route data path rather than a cold SSR document.
   const firstFilm = page.locator('a[href^="/film/"]').first();
+  const beforeWarm = transferSnapshot();
   const warmStart = Date.now();
   await firstFilm.click();
   await page.waitForURL(/\/film\//);
   await page.locator("h1").first().waitFor();
+  await page.waitForLoadState("networkidle");
   const warmMs = Date.now() - warmStart;
-  const warmBytes = (
-    (await page.evaluate(RESOURCE_BYTES_SCRIPT)) as { total: number }
-  ).total;
+  const afterWarm = transferSnapshot();
+  const warmBytes = Math.max(0, afterWarm.total - beforeWarm.total);
 
   const report = {
     profile: { network: NETWORK, cpuSlowdown: CPU_SLOWDOWN, viewport: "390x844" },
     cold: {
-      loadMs: coldMs,
-      ttfbMs: Math.round(resources.ttfb),
+      shellVisibleMs,
+      ttfbMs: Math.round(ttfb),
       fcpMs: Math.round(paints.fcp),
       lcpMs: Math.round(paints.lcp),
-      htmlBytes: resources.html,
-      totalBytes: resources.total,
+      htmlBytes: coldTransfer.document,
+      totalBytes: coldTransfer.total,
     },
-    warmFilmNavigation: { durationMs: warmMs, totalBytes: warmBytes },
+    warmFilmNavigation: { durationMs: warmMs, transferredBytes: warmBytes },
     budgets: BUDGETS,
   };
+  const metrics = JSON.stringify(report, null, 2);
   await testInfo.attach("performance.json", {
-    body: JSON.stringify(report, null, 2),
+    body: metrics,
     contentType: "application/json",
   });
-  console.log(JSON.stringify(report, null, 2));
+  console.log(`[performance-metrics] ${JSON.stringify(report)}`);
 
+  expect(report.cold.shellVisibleMs, "cold shell visible").toBeLessThanOrEqual(
+    BUDGETS.shellVisibleMs,
+  );
   expect(report.cold.ttfbMs, "cold TTFB").toBeLessThanOrEqual(BUDGETS.ttfbMs);
   expect(report.cold.fcpMs, "cold FCP").toBeLessThanOrEqual(BUDGETS.fcpMs);
   expect(report.cold.lcpMs, "cold LCP").toBeLessThanOrEqual(BUDGETS.lcpMs);
@@ -133,5 +154,8 @@ test("cold homepage and warm film navigation stay inside the mobile budgets", as
   );
   expect(warmMs, "warm homepage → film navigation").toBeLessThanOrEqual(
     BUDGETS.warmFilmNavigationMs,
+  );
+  expect(warmBytes, "warm homepage → film transferred bytes").toBeLessThanOrEqual(
+    BUDGETS.warmFilmNavigationBytes,
   );
 });

@@ -541,17 +541,60 @@ export async function fetchCinemasByIds(ids: string[]): Promise<Cinema[]> {
 /**
  * Bounded first-paint reads.
  *
- * The homepage renders 40 movie cards and 24 cinema cards, so its SSR loader
- * must not await (nor serialize) the national catalogue. Source rows are
- * over-sampled because consolidation merges duplicate source records before
- * the visible slice is taken.
+ * The homepage renders a small slice of movie and cinema cards, so its SSR
+ * loader must not await (nor serialize) the national catalogue. Source rows
+ * are over-sampled because consolidation merges duplicate source records
+ * before the visible slice is taken.
  */
 const SHELL_OVERSAMPLE = 3;
 
+/** A missing/not-yet-cached RPC, i.e. code deployed before its migration. */
+const isMissingFunctionError = (error: { code?: string; message?: string } | null): boolean => {
+  if (!error) return false;
+  const code = error.code ?? "";
+  if (code === "PGRST202" || code === "42883") return true;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes("could not find the function") ||
+    message.includes("schema cache") ||
+    message.includes("does not exist")
+  );
+};
+
+type HomeShellRow = MovieRow & { total_count?: number | string | null };
+
+/**
+ * Top movies for the bounded shell. The RPC resolves ranking, the public
+ * cinema rule and the total in a single narrow query; the `movies_ranked`
+ * path stays as a fallback for the window where code is deployed before the
+ * migration has propagated.
+ */
 export async function fetchTopMovies(
   limit: number,
   strategy: MovieSortStrategy = DEFAULT_MOVIE_SORT,
 ): Promise<{ movies: Movie[]; total: number }> {
+  const consolidate = (rows: unknown[], total: number | null) => {
+    const movies = sortConsolidatedMovies(
+      consolidatePublicMovies(mapListingMovies(rows)).movies,
+      strategy,
+    )
+      .map(compactMovieForListing)
+      .slice(0, limit);
+    return { movies, total: total ?? movies.length };
+  };
+
+  if (strategy === DEFAULT_MOVIE_SORT) {
+    const { data, error } = await supabase
+      .rpc("get_home_shell_movies", { p_limit: limit })
+      .returns<HomeShellRow[]>();
+    if (!error) {
+      const rows = data ?? [];
+      const total = Number(rows[0]?.total_count ?? 0);
+      return consolidate(rows, Number.isFinite(total) && total > 0 ? total : null);
+    }
+    if (!isMissingFunctionError(error)) throw error;
+  }
+
   let query = supabase
     .from("movies_ranked")
     .select(MOVIE_LISTING_COLUMNS, { count: "exact" })
@@ -564,14 +607,9 @@ export async function fetchTopMovies(
     .range(0, limit * SHELL_OVERSAMPLE - 1)
     .returns<MovieRow[]>();
   if (error) throw error;
-  const movies = sortConsolidatedMovies(
-    consolidatePublicMovies(mapListingMovies(data ?? [])).movies,
-    strategy,
-  )
-    .map(compactMovieForListing)
-    .slice(0, limit);
-  return { movies, total: count ?? movies.length };
+  return consolidate(data ?? [], count ?? null);
 }
+
 
 export async function fetchTopCinemas(limit: number): Promise<{
   cinemas: Cinema[];

@@ -12,11 +12,12 @@ test.describe("Public page-speed boundaries", () => {
     expect(initialCount).toBeGreaterThan(0);
     expect(initialCount).toBeLessThanOrEqual(40);
 
-    const more = page.getByRole("button", { name: /Vis flere film|Show more films/i });
-    if (await more.isVisible()) {
-      await more.click();
-      await expect.poll(() => cards.count()).toBeGreaterThan(initialCount);
-    }
+    const sentinel = page.getByTestId("movie-load-sentinel");
+    await expect(sentinel).toBeAttached();
+    await sentinel.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() => cards.count(), { timeout: 30_000 })
+      .toBeGreaterThan(initialCount);
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);

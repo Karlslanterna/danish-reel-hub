@@ -40,6 +40,12 @@ export type { HomeCatalogData };
 
 const INITIAL_MOVIE_CARD_COUNT = 40;
 const MOVIE_CARD_BATCH_SIZE = 40;
+/** Posters that are plausibly above the fold on the first mobile viewport. */
+const LCP_PRIORITY_POSTERS = 2;
+/** Matches the 2 / 3 / 4 / 5 column poster grid below. */
+const MOVIE_CARD_SIZES = "(min-width: 1280px) 18vw, (min-width: 1024px) 23vw, (min-width: 640px) 31vw, 46vw";
+/** Delayed safety net for visitors who never search or touch the filters. */
+const FULL_CATALOG_FALLBACK_MS = 8000;
 const INITIAL_CINEMA_CARD_COUNT = 24;
 
 export const Route = createFileRoute("/")({

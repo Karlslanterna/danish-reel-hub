@@ -109,13 +109,13 @@ export function HomePage({
   // query key, so toggling between them never refetches it.
   const [loadFull, setLoadFull] = useState(catalog.complete);
   const requestFullCatalog = useCallback(() => setLoadFull(true), []);
+  // The complete catalogue is the single largest read on the site, so it must
+  // not compete with the shell through LCP. It starts on real user intent
+  // (search, or pointing at / focusing the filter controls), with a
+  // conservative delayed fallback for visitors who never interact.
   useEffect(() => {
     if (catalog.complete) return;
-    if (typeof requestIdleCallback === "function") {
-      const id = requestIdleCallback(requestFullCatalog, { timeout: 2000 });
-      return () => cancelIdleCallback(id);
-    }
-    const id = setTimeout(requestFullCatalog, 200);
+    const id = setTimeout(requestFullCatalog, FULL_CATALOG_FALLBACK_MS);
     return () => clearTimeout(id);
   }, [catalog.complete, requestFullCatalog]);
 
@@ -690,7 +690,12 @@ export function HomePage({
       <section className="mx-auto max-w-[1400px] px-4 py-5 sm:px-8 sm:py-10">
         <GeoNotice className="mb-4" />
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div
+            className="flex flex-wrap items-center gap-x-6 gap-y-3"
+            onPointerEnter={requestFullCatalog}
+            onPointerDown={requestFullCatalog}
+            onFocusCapture={requestFullCatalog}
+          >
             <FilterBar
               loading={!catalogReady}
               showChildrenFilter
@@ -739,10 +744,12 @@ export function HomePage({
         ) : (
           <>
             <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {visibleMovies.map((m) => (
+              {visibleMovies.map((m, index) => (
                 <MovieCard
                   key={m.id}
                   movie={m}
+                  priority={index < LCP_PRIORITY_POSTERS}
+                  sizes={MOVIE_CARD_SIZES}
                   citySlug={selectedCity && !nearbyCinemaIds ? slugifyCity(selectedCity) : null}
                 />
               ))}

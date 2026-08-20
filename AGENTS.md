@@ -24,6 +24,14 @@ Read `FILTER_PRINCIPLES.md` and `MISTAKES.md` before changing filters, imports, 
 - After merge, deploy the frontend through Lovable's **Update** publish flow. Deploy Supabase migrations/functions separately through Lovable, then manually run the GitHub CI workflow. In that post-deploy run, production audit and smoke jobs are blocking and must pass.
 - A task is complete only when the states are reported separately: implemented, locally verified, published in a PR, merged, deployed, and production-verified.
 
+## Lovable token / credit usage
+
+- **Never use Lovable AI tokens or credits.** Do not invoke Lovable's AI agent for implementation, debugging, analysis, testing, planning, code edits, or repository work.
+- Do not use Lovable agent/message/variant/project-generation actions when they can consume tokens or credits. Use the direct GitHub integration for code work instead.
+- Lovable may only be used for non-AI platform operations that are strictly required by this project, such as accessing the project's connected Supabase database, checking sync/status, and publishing/deploying — and only when those operations do not consume Lovable AI tokens or credits.
+- If it is unclear whether a Lovable operation consumes tokens or credits, treat it as chargeable and **do not use it**.
+- Never spend Lovable tokens or credits for convenience, speed, or because a GitHub/direct-tool workflow is more cumbersome.
+
 ## Filters and data
 
 - Use one shared filter state across internal navigation. A selected filter must survive navigation to film, city, and cinema pages until the user removes it.

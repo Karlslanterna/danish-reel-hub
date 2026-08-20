@@ -134,7 +134,7 @@ export function HomePage({
   });
   const activeCatalog = fullCatalogQuery.data?.complete ? fullCatalogQuery.data : catalog;
   // Until the catalogue is complete, filtering and search would silently work
-  // on a 40-card slice, so every consumer of that state waits for this flag.
+  // on a bounded slice, so every consumer of that state waits for this flag.
   const catalogReady = activeCatalog.complete;
   const { movies, cinemas, showtimeIndex: compactIndex } = activeCatalog;
   const showtimeIndex = useMemo(() => expandShowtimeIndex(compactIndex), [compactIndex]);
@@ -220,6 +220,7 @@ export function HomePage({
 
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -335,7 +336,7 @@ export function HomePage({
 
   const suggestions = useMemo<Suggestion[]>(() => {
     const q = query.trim().toLowerCase();
-    // Suggesting from the 40-card shell would look like "no such film".
+    // Suggesting from the bounded shell would look like "no such film".
     if (!q || !catalogReady) return [];
     const out: Suggestion[] = [];
     const seenCities = new Set<string>();
@@ -427,6 +428,29 @@ export function HomePage({
     () => filtered.slice(0, visibleMovieCount),
     [filtered, visibleMovieCount],
   );
+  const hasMoreMovies = !catalogReady || visibleMovies.length < filtered.length;
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMoreMovies || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        if (!catalogReady) {
+          requestFullCatalog();
+          return;
+        }
+        setVisibleMovieCount((count) =>
+          Math.min(count + MOVIE_CARD_BATCH_SIZE, filtered.length),
+        );
+      },
+      { rootMargin: "1200px 0px" },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [catalogReady, filtered.length, hasMoreMovies, requestFullCatalog]);
 
   const lastZeroResult = useRef("");
   useEffect(() => {
@@ -760,17 +784,19 @@ export function HomePage({
                 />
               ))}
             </div>
-            {visibleMovies.length < filtered.length && (
-              <div className="mt-12 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setVisibleMovieCount((count) => count + MOVIE_CARD_BATCH_SIZE)}
-                  className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
-                >
-                  {lang === "da"
-                    ? `Vis flere film (${filtered.length - visibleMovies.length})`
-                    : `Show more films (${filtered.length - visibleMovies.length})`}
-                </button>
+            {hasMoreMovies && (
+              <div ref={loadMoreRef} data-testid="movie-load-sentinel" className="mt-12 flex min-h-px justify-center">
+                {catalogReady && visibleMovies.length < filtered.length && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleMovieCount((count) => count + MOVIE_CARD_BATCH_SIZE)}
+                    className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {lang === "da"
+                      ? `Vis flere film (${filtered.length - visibleMovies.length})`
+                      : `Show more films (${filtered.length - visibleMovies.length})`}
+                  </button>
+                )}
               </div>
             )}
           </>

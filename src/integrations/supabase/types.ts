@@ -1085,6 +1085,30 @@ export type Database = {
         Returns: Json
       }
       enqueue_ebillet_import_runs: { Args: never; Returns: number }
+      get_home_shell_movies: {
+        Args: { p_limit?: number }
+        Returns: {
+          director: string
+          genre: string[]
+          id: string
+          next_screening_date: string
+          original_title: string
+          poster: Json
+          rating: string
+          release_date: string
+          runtime: number
+          screening_count: number
+          slug: string
+          title: string
+          tmdb_director: string
+          tmdb_genres: string[]
+          tmdb_id: number
+          tmdb_poster_url: string
+          tmdb_runtime: number
+          total_count: number
+          year: number
+        }[]
+      }
       get_movie_showtime_groups: {
         Args: {
           p_first_date: string

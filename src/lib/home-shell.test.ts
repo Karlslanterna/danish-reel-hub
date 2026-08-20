@@ -22,8 +22,8 @@ describe("bounded listing reads", () => {
     }
   });
 
-  it("keeps the shell sized to what the homepage actually paints", () => {
-    expect(HOME_SHELL_MOVIE_COUNT).toBe(20);
+  it("keeps the shell large enough for the first mobile viewport without overfetching posters", () => {
+    expect(HOME_SHELL_MOVIE_COUNT).toBe(12);
     expect(HOME_SHELL_CINEMA_COUNT).toBe(24);
   });
 });

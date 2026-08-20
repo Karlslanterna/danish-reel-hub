@@ -1,5 +1,5 @@
 import type { Movie } from "@/lib/cinema-data";
-import { toHttpsUrl } from "@/lib/poster-url";
+import { cardPosterSources, toHttpsUrl } from "@/lib/poster-url";
 
 type Props = {
   movie: Movie;
@@ -17,8 +17,9 @@ export function Poster({
   sizes,
 }: Props) {
   const posterUrl = toHttpsUrl(movie.poster.url);
+  const cardSources = sizes ? cardPosterSources(posterUrl) : { src: posterUrl };
 
-  if (!posterUrl) {
+  if (!cardSources.src) {
     return (
       <div
         className={`relative aspect-[2/3] w-full overflow-hidden rounded-md border border-border/40 bg-card ${className}`}
@@ -46,12 +47,13 @@ export function Poster({
       className={`poster-gradient grain grain-overlay relative aspect-[2/3] w-full overflow-hidden rounded-md ${className}`}
     >
       <img
-        src={posterUrl}
+        src={cardSources.src}
+        {...(cardSources.srcSet ? { srcSet: cardSources.srcSet } : {})}
         alt={movie.poster.alt ?? movie.title}
         width={400}
         height={600}
         loading={priority ? "eager" : "lazy"}
-        decoding={priority ? "sync" : "async"}
+        decoding="async"
         {...(priority ? { fetchPriority: "high" as const } : { fetchPriority: "low" as const })}
         {...(sizes ? { sizes } : {})}
         className={`absolute inset-0 h-full w-full bg-black ${

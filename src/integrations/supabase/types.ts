@@ -1085,15 +1085,6 @@ export type Database = {
         Returns: Json
       }
       enqueue_ebillet_import_runs: { Args: never; Returns: number }
-      get_public_showtime_index: {
-        Args: {
-          p_cinema_ids?: string[] | null
-          p_first_date: string
-          p_last_date: string
-          p_starts_after: string
-        }
-        Returns: Json
-      }
       get_movie_showtime_groups: {
         Args: {
           p_first_date: string
@@ -1108,6 +1099,15 @@ export type Database = {
           p_first_date: string
           p_last_date: string
           p_movie_ids: string[]
+          p_starts_after: string
+        }
+        Returns: Json
+      }
+      get_public_showtime_index: {
+        Args: {
+          p_cinema_ids?: string[]
+          p_first_date: string
+          p_last_date: string
           p_starts_after: string
         }
         Returns: Json

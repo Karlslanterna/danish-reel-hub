@@ -1,95 +1,174 @@
-# Lanterna — arkitektur- og backend-audit
+# Performance plan — homepage payload, film navigation, mobile benchmark gate
 
-Baseret på gennemgang af den aktuelle kode (`src/lib/ebillet/*`, `src/lib/kultunaut/*`, `src/lib/tmdb/*`) og direkte forespørgsler mod produktionsdatabasen i dag. Tidligere audit-dokumenter er ikke lagt til grund.
+Baseline reviewed at commit `283e6f97`. No code changed.
 
-## Målte tal fra den faktiske database
+## What is slow today, and why
 
-| Måling | Værdi |
-|---|---|
-| showtimes | 9.580 (ebillet 7.381 / kultunaut 2.199) |
-| movies | 855 (ebillet 782 / kultunaut 73) |
-| cinemas | 192 (ebillet 32 / kultunaut 160) |
-| movies med `year = 0` | 547 (64 %) |
-| eBillet-film uden synopsis eller plakat | 772 af 782 |
-| Kultunaut-showtimes på eBillet-ejede biografer | 199 (14+ biografer, bl.a. Grand Teatret, Empire Bio) |
-| eBillet-oprettede biografer uden lat/lon | 32 af 32 |
-| showtimes uden for 30-dages vinduet | 2.014 |
-| duplikerede titler / fortidige showtimes / skæve ticket_urls | 0 / 0 / 0 |
-| tabelstørrelse showtimes | 8,7 MB |
+`src/routes/index.tsx` → `loadHomeCatalog()` awaits three national queries in parallel
+(`fetchMovies()`, `fetchCinemas()`, `fetchShowtimeIndex()` in `src/lib/cinema-data.ts`) and returns
+the whole thing as loader data. Because it is loader data, the entire catalogue (612 movies,
+195 cinemas, ~17,957 screening index rows) is both awaited before the first byte of HTML and
+serialized into the SSR payload, on every cold hit of `/`, `/for-boern`, `/babybio`,
+`/seniorbio`, `/filmporten`, `/biografklub-danmark`. The page then only renders 40 movie cards
+(`INITIAL_MOVIE_CARD_COUNT`) and 24 cinema cards.
 
-## A. Kritiske fejl
+`fetchMovieProgramme()` (`src/lib/cinema-data.ts:680`) awaits `fetchCinemas()` — the full national
+cinema list — only to filter it down to the handful of cinemas that show the film. Same in
+`fetchCinemasForMovie()` (`:653`).
 
-1. **Source authority er kun håndhævet på skrivning, aldrig på eksisterende data.** Kultunaut-importen springer eBillet-dækkede biografer over, men fjerner ikke de 199 Kultunaut-rækker, der allerede ligger der. De vises offentligt side om side med eBillet-rækker. Authority-reglen er dermed ikke opfyldt i dag.
-2. **`cleanupStaleData()` er global, cross-source og destruktiv, og kører inde i Kultunaut-jobbet.** Den sletter alle fortidige showtimes uanset kilde og derefter enhver film/biograf uden showtimes. Hvis en eBillet-sync fejler eller en biograf er midlertidigt tom, sletter Kultunaut-jobbet eBillet-biografen — og `showtimes_cinema_id_fkey ON DELETE CASCADE` river dens showtimes med. Det er præcis den implicitte cross-source cleanup, der ikke må findes.
-3. **Ingen unik constraint på showtime-identitet.** Grupperingen `(movie_id, cinema_id, date, hall)` findes kun i applikationskode. To samtidige kørsler kan skabe dubletter uden at databasen protesterer. `external_id` er unik, men eBillet sætter den til `eb-<org>-<første showtime id>`, som ændrer sig når det første id forsvinder.
-4. **Grupperede array-rækker er den forkerte kanoniske granularitet.** Én række bærer `times[]`, `ticket_urls[]`, `ebillet_showtime_ids[]`, ét `min/max_price` og ét aggregeret `free_seats`. Identitet, reconciliation, priser og ledige sæder pr. forestilling går tabt, `start_time` duplikerer `date+times[0]`, og diff-logikken skal genopfinde identitet fra arrays.
-5. **Film-identitet skabes af titel.** `matchMovie` kræver titel + år, men 64 % af rækkerne har `year = 0`, så fallback fejler næsten altid og opretter en ny `eb-`-film i stedet. Det forklarer 782 eBillet-film mod 73 Kultunaut-film: samme fysiske film findes i praksis flere gange på tværs af kilder. Kultunaut-importens `merge`-fase gør det modsatte — den sletter film ud fra `ilike`-titelmatch alene og re-pointer showtimes, hvilket kan kollapse to forskellige film.
-6. **Biograf-identitet bruger stadig navnepræfiks-søgning** (`ilike '<første ord>%' limit 50`) plus bynavn. Robust nok i dag, men det er strengmatch der bestemmer canonical identity.
-7. **To uafhængige, uforenelige job-modeller.** `import_jobs` (faseautomat, gemmer hele XML-payloaden i rækken, ingen lease, ingen forsøgstæller, en fejl i én fase fejler hele jobbet) og `ebillet_sync_runs` (cursor-CAS pr. organizer). Single-flight i eBillet hviler kun på cursor-CAS: intet forhindrer to `running` runs i at blive oprettet, og resume-forespørgslen tager vilkårligt ældste `running` run uanset `kind`.
-8. **Partial commits overalt.** Hver organizer laver 5–10 uafhængige skrivninger (cinema, organizer, movies, insert/update/delete af showtimes) uden transaktion. En timeout midt i reconciliation efterlader biografen halvt slettet.
-9. **Tavse trigger-drops.** `enforce_showtime_source_authority` returnerer `NULL`/`OLD` ved konflikt. Skrivninger forsvinder uden fejl — usynligt datatab og meget svær fejlsøgning.
-10. **RLS kalder en SECURITY DEFINER-funktion pr. række** (`private.cinema_is_public(cinema_id)`) på hver showtime-læsning. Fungerer ved 9.600 rækker, bliver en flaskehals ved 100.000.
-11. **TMDb-berigelse ligger inde i importjobbet** (op til 40 runder i `enrich`-fasen) og kobler en ekstern, ratelimiteret API til import-completion.
-12. **Datakvalitet, brugersynligt:** ingen af de 32 eBillet-biografer har koordinater, så de er usynlige for "Afstand fra mig"-filteret. 772 eBillet-film mangler synopsis eller plakat.
+## Task 1 — Split the homepage into "shell" and "full catalogue"
 
-## B. Rodårsager
+### New module: `src/lib/home-catalog.ts`
+Move `HomeCatalogData`, `compactMovieForHome`, `compactCinemaForHome`, `loadHomeCatalog`,
+`loadCachedHomeCatalog` out of `src/routes/index.tsx` (route files should stay thin) and add:
 
-- Der findes ingen source-scoped stagingzone. Begge importere skriver direkte i canonical tabeller, så hver fejl er en produktionsfejl.
-- Kildeejerskab er kodet ind i primærnøglen (`kn-`/`eb-`-præfikser) i stedet for i en mapping-tabel. Et objekt kan ikke skifte eller dele kilde uden at skifte identitet.
-- Der findes ingen eksplicit identity-resolution-tabel. Matching genberegnes fra strenge ved hver kørsel i stedet for at blive besluttet én gang og gemt.
-- Databasen håndhæver ingen af de invarianter, koden antager (unik screening, én kilde pr. biograf, ingen cross-source sletning). Alt er applikationslogik.
-- Cleanup og ejerskab blev tilføjet efter datamodellen i stedet for at være en del af den.
+- `type HomeShell = { movies: Movie[]; cinemas: Cinema[]; showtimeIndex: CompactShowtimeIndex; totalMovies: number; totalCinemas: number; complete: boolean }`
+- `loadHomeShell(opts: { childrenOnly?: boolean; specialEvent?: SpecialEventTag })` — server-side
+  it reuses the same three fetches (they are already TTL-cached in-process by
+  `movieListCache` / `cinemaListCache`), applies the route's own children/special-event filter,
+  then trims to the first 40 ranked movies and the 24 cinemas rendered above the fold, plus the
+  screening-index rows belonging *only* to those movies. `complete: false`.
+- `loadFullHomeCatalog()` — the existing `loadHomeCatalog`, unchanged semantics, `complete: true`.
 
-## C. Målarkitektur
+The trim is what removes the payload: the shell serializes ~40 movies + ~24 cinemas + their
+screening rows instead of the national index. Ranking/order comes from the same
+`movies_ranked` order the unfiltered view already uses, so the first paint is byte-identical in
+content to today's first 40 cards.
 
-**Kanonisk model og ejerskab**
+### Route loaders
+`src/routes/index.tsx`, `for-boern.tsx`, `babybio.tsx`, `seniorbio.tsx`, `filmporten.tsx`,
+`biografklub-danmark.tsx`: loader returns `await loadHomeShell({...})` only. No deferred promise
+in loader data (a streamed promise still blocks/serializes on SSR-heavy paths and complicates the
+`head()` contract).
 
-| Objekt | Ejer af identitet | Ejer af felter |
-|---|---|---|
-| `cinemas` | Lanterna (stabilt `uuid`) | eBillet for eBillet-koblede: navn, sal-antal, aktiv. Kultunaut: adresse, geo, beskrivelse, website (eBillet leverer dem ikke) |
-| `movies` | Lanterna | TMDb først (plakat, synopsis, runtime, genrer, cast), derefter kildens værdi, aldrig blank overskrivning |
-| `screenings` (ny, erstatter `showtimes`) | Kilden, via `(source, source_ref)` | 100 % ejet af den kilde biografen er bundet til |
+### Client-side completion
+In `HomePage` (`src/routes/index.tsx`), replace the `useEffect` that seeds
+`HOME_CATALOG_QUERY_KEY` with a `useQuery`:
 
-**Nye strukturer**
+```
+const { data } = useQuery({
+  queryKey: HOME_CATALOG_QUERY_KEY,
+  queryFn: loadFullHomeCatalog,     // browser-side supabase-js call
+  staleTime: 5 * 60 * 1000,
+  initialData: shell.complete ? shell : undefined,
+})
+const catalog = data ?? shell
+```
+Everything downstream (`screeningsByMovie`, `catalogMovies`, `facets`, `suggestions`,
+`matchingScreenings`, `filtered`, `useCinemaUrlSync`) keeps consuming `catalog` unchanged, so
+filter/search semantics and `buildFilterFacets` inputs are identical once the catalogue lands.
+No change to `src/lib/filters.tsx` persistence, URL sync, or localStorage.
 
-- `source_refs(source, entity_type, external_id, canonical_id, confidence, method, confirmed_at)` — én besluttet identitet pr. eksternt id. Strengmatch må kun foreslå, aldrig binde.
-- `import_snapshots(id, source, scope, fetched_at, payload_hash, status, validation)` — én række pr. fetch pr. scope (organizer eller hele Kultunaut-feedet).
-- `staged_screenings(snapshot_id, …)` — normaliseret, validerbar landingszone.
-- `screenings` — én række pr. forestilling: `cinema_id, movie_id, starts_at timestamptz, hall, source, source_ref, ticket_url, price_min, price_max, free_seats, formats[], languages[], events[]`, med `unique (source, source_ref)` og `unique (cinema_id, hall, starts_at, movie_id)`. Gruppering pr. dato/sal sker ved læsning, ikke i lagringen.
-- `cinemas.authoritative_source` som eksplicit kolonne + `cinemas.is_public` som denormaliseret boolean vedligeholdt af trigger, så RLS bliver et kolonneopslag i stedet for et funktionskald.
-- Promotion sker i én `SECURITY DEFINER`-RPC pr. scope: valider snapshot → diff mod `screenings` for netop den `(cinema_id, source)` → insert/update/delete i én transaktion. Ingen delvise commits; cleanup kan pr. konstruktion ikke ramme en anden kilde.
-- Cleanup opdeles: retention (slet forestillinger ældre end N dage, kildeagnostisk og ufarlig) adskilt fra orphan-oprydning (kun film uden nogen forestillinger, aldrig biografer).
-- TMDb-berigelse bliver et selvstændigt, købaseret job med egen TTL — ikke en importfase.
-- Én job-model for begge kilder: `jobs(kind, scope, state, lease_until, attempts, cursor, last_error)` med lease/heartbeat, forsøgstæller, dead-letter og et partielt unikt indeks der gør to aktive kørsler af samme kind umuligt.
+### Behaviour while the catalogue is loading
+- `filtersHydrated` in `useFilters()` is already false during SSR; persisted filters are applied
+  only after hydration, which is also when the full catalogue request is in flight. Gate the
+  filter/search UI on `catalog.complete` **or** keep it enabled but disable the "no results"
+  zero-result analytics event until `complete` — otherwise `useTrackZeroResults` /
+  `lastZeroResult` will fire false zero-results against the 40-movie shell. This is the single
+  most important correctness detail of this task.
+- `FilterBar` facet lists must not shrink to shell-only options: render facets from
+  `catalog.complete ? facets : previousFacets ?? facets` (or show the filter chips in a
+  loading state) so a user cannot select against a partial option set.
+- If a persisted filter is active at hydration, keep the shell cards rendered and re-rank when
+  the catalogue arrives; do not blank the grid.
 
-**Anbefaling, eksplicit:** dette er en omskrivning af importlaget. `src/lib/ebillet/sync.server.ts` (972 linjer) og `src/lib/kultunaut/import.server.ts` (650 linjer) bør erstattes, ikke lappes. Genbrugelig og god kode: `parser.server.ts`, `reconcile.ts` (diff/validate-logikken), `cinema-match.ts`, `venue-filter.ts`, `api.server.ts`, `tmdb/*`.
+### SEO / SSR (task 4)
+- `head()` on `/` is static — unaffected.
+- `for-boern.tsx` head builds `childrenMoviesSchemas(movies)` and a `noindex` gate from
+  `loaderData`; `special-event-seo.ts` does the same for the four event routes. `loadHomeShell`
+  must therefore return the route-filtered `totalMovies` count and the *ranked* subset used for
+  schema, computed server-side over the full catalogue before trimming. Cap schema items
+  (e.g. first 40) — Google does not need 600 ItemList entries and it is pure payload.
+- The `noindex, follow` gate keys off `totalMovies === 0`, not `movies.length === 0`.
+- Routes, canonicals, breadcrumbs, JSON-LD types unchanged.
 
-## D. Migrationssekvens
+## Task 2 — Film navigation should not load all cinemas
 
-1. **Stop blødningen (lav risiko, ingen modelændring).** Fjern biograf-sletning fra cleanup; begræns cleanup til kildens eget scope; fjern de 199 Kultunaut-rækker på eBillet-biografer via en eksplicit, revisérbar migration; erstat de tavse triggere med `RAISE EXCEPTION`; tilføj `unique (movie_id, cinema_id, date, hall)`; backfyld koordinater på de 32 eBillet-biografer.
-2. **Identitetslag.** Opret `source_refs`, backfyld fra `external_id`, `ebillet_organizer_id`, `ebillet_movie_base_id`, `ebillet_movie_ids`. Kør en read-only rapport over sandsynlige cross-source filmdubletter; flet kun manuelt bekræftede.
-3. **Ny screenings-tabel skygge-udfyldes** fra `showtimes` og fra næste import, mens læsestien stadig bruger `showtimes`. Sammenlign counts pr. biograf og dato.
-4. **Snapshot + promotion-RPC** tages i brug for eBillet først (mest veldefineret payload), derefter Kultunaut.
-5. **Læsestien flyttes** til `screenings` bag en flag; `showtimes` beholdes read-only en release-cyklus og droppes derefter.
-6. **Job-modellen konsolideres** og de to gamle drivere fjernes.
-7. **Enrichment afkobles** til eget job.
+`src/lib/cinema-data.ts`:
 
-## E. Tests og invarianter
+- `fetchMovieProgramme(movieId)`: drop `fetchCinemas()`. Fetch the showtimes first, collect
+  `cinemaId`s, then fetch only those cinemas via a new
+  `fetchCinemasByIds(ids: string[])` (`supabase.from("cinemas").select("*").in("id", expandCinemaIds(ids))`)
+  that runs the same `consolidatePublicCinemas` + `compactCinemaForListing` mapping as
+  `fetchCinemas()` so the returned records are shape-identical. Extract the mapping body of
+  `fetchCinemas()` into a shared `mapCinemaRows(rows)` helper used by both.
+- `fetchCinemasForMovie(movieId)`: same substitution (it currently calls `fetchCinemas()` at `:673`).
+- Keep the `PUBLIC_DATA_CACHE_TTL_MS` in-process cache: if `fetchCinemas()` is already warm,
+  `fetchCinemasByIds` should serve from it rather than issue a query (cheap `Map` lookup guard).
+- `src/routes/film.$slug.tsx` and `$city.film.$slug.tsx` need no change; `findCachedHomeMovie`
+  still works because the homepage shell seeds the same query key — but note the film route can
+  now miss the cache when navigation happens before the full catalogue lands. That path already
+  falls back to `fetchMovieBySlug`, so it degrades to today's behaviour, not worse.
 
-Databasehåndhævet: unik screening-identitet; ingen `screenings`-række hvis kilde ≠ biografens `authoritative_source`; ingen sletning af rækker uden for det promoverede scope; ingen biograf uden `source_refs`-post.
+## Task 3 — Real mobile performance gate
 
-Testet: stale delete inden for scope; ugyldigt/tomt snapshot bevarer eksisterende data; Kultunaut-only biograf urørt af eBillet-kørsel; idempotent gentaget promotion (nul writes anden gang); titelkollision opretter aldrig forkert identitet; afbrudt promotion efterlader ingen delvis tilstand; to samtidige kørsler af samme scope → én taber uden skade; retention sletter aldrig fremtidige forestillinger.
+New spec `tests/e2e/performance.spec.ts` (keep `page-speed.spec.ts` as-is; it covers layout and
+cache-header policy).
 
-## F. Kan trygt forblive uændret
+- Project: add a `mobile-perf` Playwright project in `playwright.config.ts` using
+  `devices["Pixel 7"]`, plus CPU throttling (`Emulation.setCPUThrottlingRate`, 4x) and network
+  throttling (`Network.emulateNetworkConditions`, ~Fast 3G: 1.6 Mbps down, 150 ms RTT) via CDP
+  session, so numbers are stable and comparable.
+- Cold homepage: `page.goto("/")`, read `PerformanceNavigationTiming` for TTFB, PerformanceObserver
+  for `first-contentful-paint` and `largest-contentful-paint`, and sum `transferSize` of all
+  resources (`performance.getEntriesByType("resource")` + navigation entry) to get payload bytes.
+  Also assert HTML document bytes separately — that is the metric task 1 actually moves.
+- Warm navigation: after the homepage settles, click the first `a[href^="/film/"]`, measure time
+  to the film `h1` being visible and the bytes transferred during that navigation.
+- Budgets, expressed as named constants at the top of the spec so they are reviewable:
+  TTFB ≤ 800 ms, FCP ≤ 2.5 s, LCP ≤ 4.0 s, SSR HTML document ≤ 250 KB transferred,
+  total cold transfer ≤ 1.5 MB, warm homepage→film ≤ 1.5 s and ≤ 400 KB.
+  Numbers get calibrated against a first local run before the gate is turned on; they are
+  ceilings, not targets.
+- Emit the measurements with `testInfo.attach("metrics", …)` as JSON so CI keeps a trend record.
+- CI (`.github/workflows/ci.yml`): run the new project in the pinned official Playwright
+  container, non-blocking on PRs (advisory, per the delivery rules — a PR run cannot observe the
+  deployed code), blocking in the post-deploy production run against `SMOKE_BASE_URL`.
+  Run serially (`workers: 1`) for external targets, which the config already does.
 
-Frontend og design; `src/lib/cinema-data.ts` læsemønstre (bortset fra kildetabel); `parser.server.ts`; `venue-filter.ts`; `cinema-match.ts`; TMDb-klient og -matching; discovery af organizers; admin-UI'et; RLS-modellen som koncept (kun implementeringen af `cinema_is_public` bør denormaliseres).
+## Hosting caching limitation
 
-## Performance ved 1.000 film / 500 biografer / 100.000 forestillinger
+Lovable's managed hosting rewrites the browser-facing `Cache-Control` on SSR HTML and forces
+revalidation — `tests/e2e/page-speed.spec.ts` already encodes this as an accepted state. So the
+homepage cannot be served from a shared edge cache and every cold visit pays a real SSR render.
+That is precisely why shrinking the awaited/serialized payload (task 1), not adding cache
+directives, is the lever here. The in-process TTL caches (`homeCatalogCache`,
+`movieListCache`, `cinemaListCache`) survive only for the lifetime of a worker isolate, so a cold
+isolate always re-queries. `CDN-Cache-Control` can be set for an upstream shared cache, but an
+actual edge-cache hit must not be claimed without production evidence.
 
-Datamængden i sig selv er triviel (< 100 MB). Det, der ikke skalerer, er: `cleanupStaleData()` som henter alle id'er til hukommelsen (200+ round trips); Kultunaut-fasens ét `SELECT` pr. gruppe (~30.000 kald); `movies_ranked` som fuld aggregering pr. request; RLS-funktionskald pr. række; og `loadAll` over alle showtimes pr. biograf. Målarkitekturen løser alle fem med scope-forespørgsler, mængdebaseret diff i SQL, en materialiseret rangeringstabel og et boolsk RLS-prædikat. Nødvendige indekser: `screenings(cinema_id, starts_at)`, `screenings(movie_id, starts_at)`, `screenings(starts_at)`, `unique(source, source_ref)`.
+## Test plan
 
-## Spørgsmål inden implementering
+- Unit (`vitest run src`): new tests for `loadHomeShell` (trim size, ranking preserved, children /
+  special-event filtering applied before trim, `totalMovies` reflects the full catalogue) and for
+  `fetchCinemasByIds` shape-equality with `fetchCinemas()` output for the same ids. Existing
+  `filter-facets`, `movie-sort`, `children-filter`, `home-catalog-cache`, `public-catalog` tests
+  must stay green untouched.
+- SSR assertions: for `/`, `/for-boern`, `/babybio`, `/seniorbio`, `/filmporten`,
+  `/biografklub-danmark` — curl the SSR HTML and assert canonical, title, `robots` gate, and
+  JSON-LD are unchanged versus baseline; assert document bytes dropped substantially.
+- E2E: existing `filters.spec.ts`, `smoke.spec.ts`, `cinema-pages.spec.ts`, `page-speed.spec.ts`
+  unchanged and green; add a filter-persistence case that sets a filter, reloads, and asserts the
+  same result set after the catalogue completes.
+- New `performance.spec.ts` run locally to calibrate, then in CI.
+- Manual: throttled mobile check of `/` → film → back, with a persisted city + date filter.
 
-1. Skal jeg starte med trin 1 (stop blødningen) som en isoleret, hurtig leverance, før vi tager stilling til omskrivningen?
-2. Accepteres `screenings` pr. forestilling som ny kanonisk granularitet — det er den ændring, alt andet hænger på?
-3. Skal cross-source filmdubletter flettes automatisk over en confidence-tærskel, eller kun manuelt via en admin-kø?
+## Likely regressions to watch
+
+1. False zero-result state and false zero-result analytics between hydration and catalogue arrival.
+2. Filter/search options briefly limited to the shell's 40 movies / 24 cinemas.
+3. `useCinemaUrlSync` receiving a partial cinema list, failing to resolve a `?biograf=` slug on
+   first pass — it must re-run when the catalogue completes.
+4. Special-event and children `head()` gates flipping to `noindex` if they read the trimmed
+   `movies.length` instead of the full-catalogue count.
+5. Layout shift / LCP regression if the grid changes height when the catalogue lands — keep the
+   first 40 cards stable and append only.
+6. Duplicate work: shell + full catalogue means two passes over the data on first visit; the
+   query-key seeding must prevent a third fetch on film-page navigation.
+7. `fetchCinemasByIds` returning differently-consolidated records than `fetchCinemas()` (multi-source
+   cinemas) — hence the shared mapping helper and the shape-equality test.
+
+## Delivery
+
+Branch `agent/perf-home-shell`, one commit, draft PR with root cause, measurements before/after,
+and validation evidence. No database schema changes.

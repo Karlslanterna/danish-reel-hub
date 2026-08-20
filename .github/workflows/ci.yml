@@ -143,3 +143,48 @@ jobs:
           echo "::warning::The smoke tests found issues on the currently deployed lanterna.dk. They are advisory on pull requests and blocking on manual post-deploy runs."
           echo "### Production smoke findings" >> "$GITHUB_STEP_SUMMARY"
           echo "The smoke tests found issues on the currently deployed **lanterna.dk**. This is advisory here because a pull request cannot change production before merge and Lovable deployment. The Playwright report is attached. Run this workflow manually after deployment; the same tests are then blocking." >> "$GITHUB_STEP_SUMMARY"
+
+  performance:
+    name: Production mobile performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [smoke]
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+    env:
+      PERF_BASE_URL: https://lanterna.dk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Measure production mobile performance
+        id: performance
+        # PRs can only measure the currently deployed site. The same test is
+        # blocking when the workflow is dispatched after Lovable deployment.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        run: npm run test:performance
+
+      - name: Upload performance report on failure
+        if: steps.performance.outcome == 'failure'
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report-performance
+          path: playwright-report-performance/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Explain production-only performance findings
+        if: steps.performance.outcome == 'failure' && github.event_name == 'pull_request'
+        run: |
+          echo "::warning::The mobile performance budgets failed on the currently deployed lanterna.dk. This is advisory on pull requests and blocking on the manual post-deploy run."
+          echo "### Production performance finding" >> "$GITHUB_STEP_SUMMARY"
+          echo "The performance test measured the currently deployed **lanterna.dk**, not the pull-request code. Re-run this workflow manually after Lovable deployment; the performance budgets are then blocking." >> "$GITHUB_STEP_SUMMARY"

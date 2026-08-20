@@ -26,6 +26,7 @@ const BUDGETS = {
   htmlBytes: 350 * 1024,
   totalColdBytes: 1.75 * 1024 * 1024,
   warmFilmNavigationMs: 2000,
+  warmFilmNavigationBytes: 1.25 * 1024 * 1024,
 };
 
 async function throttle(page: Page): Promise<CDPSession> {
@@ -51,10 +52,17 @@ const RESOURCE_BYTES_SCRIPT = `
   })()
 `;
 
+async function resourceBytes(page: Page): Promise<{ html: number; total: number; ttfb: number }> {
+  return page.evaluate(RESOURCE_BYTES_SCRIPT) as Promise<{
+    html: number;
+    total: number;
+    ttfb: number;
+  }>;
+}
+
 async function paintMetrics(page: Page): Promise<{ fcp: number; lcp: number }> {
   return page.evaluate(async () => {
-    const fcp =
-      performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0;
+    const fcp = performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0;
     const lcp = await new Promise<number>((resolve) => {
       let last = 0;
       try {
@@ -87,23 +95,25 @@ test("cold homepage and warm film navigation stay inside the mobile budgets", as
   const coldMs = Date.now() - coldStart;
 
   const paints = await paintMetrics(page);
-  const resources = (await page.evaluate(RESOURCE_BYTES_SCRIPT)) as {
-    html: number;
-    total: number;
-    ttfb: number;
-  };
+  // Let the post-paint full catalogue finish before the warm navigation. This
+  // keeps the film measurement focused on the route itself and makes total
+  // cold bytes include the deferred catalogue that a real session downloads.
+  await page.waitForLoadState("networkidle");
+  const resources = await resourceBytes(page);
 
-  // Warm navigation: the client router is hydrated, so this measures the
-  // film-route data path rather than a cold SSR document.
+  // Warm navigation: the client router and full catalogue are hydrated. Record
+  // the resource counter before the click so film bytes are a delta, not the
+  // entire session's accumulated transfer.
   const firstFilm = page.locator('a[href^="/film/"]').first();
+  const beforeWarm = await resourceBytes(page);
   const warmStart = Date.now();
   await firstFilm.click();
   await page.waitForURL(/\/film\//);
   await page.locator("h1").first().waitFor();
+  await page.waitForLoadState("networkidle");
   const warmMs = Date.now() - warmStart;
-  const warmBytes = (
-    (await page.evaluate(RESOURCE_BYTES_SCRIPT)) as { total: number }
-  ).total;
+  const afterWarm = await resourceBytes(page);
+  const warmBytes = Math.max(0, afterWarm.total - beforeWarm.total);
 
   const report = {
     profile: { network: NETWORK, cpuSlowdown: CPU_SLOWDOWN, viewport: "390x844" },
@@ -115,14 +125,15 @@ test("cold homepage and warm film navigation stay inside the mobile budgets", as
       htmlBytes: resources.html,
       totalBytes: resources.total,
     },
-    warmFilmNavigation: { durationMs: warmMs, totalBytes: warmBytes },
+    warmFilmNavigation: { durationMs: warmMs, transferredBytes: warmBytes },
     budgets: BUDGETS,
   };
+  const metrics = JSON.stringify(report, null, 2);
   await testInfo.attach("performance.json", {
-    body: JSON.stringify(report, null, 2),
+    body: metrics,
     contentType: "application/json",
   });
-  console.log(JSON.stringify(report, null, 2));
+  console.log(`[performance-metrics] ${JSON.stringify(report)}`);
 
   expect(report.cold.ttfbMs, "cold TTFB").toBeLessThanOrEqual(BUDGETS.ttfbMs);
   expect(report.cold.fcpMs, "cold FCP").toBeLessThanOrEqual(BUDGETS.fcpMs);
@@ -133,5 +144,8 @@ test("cold homepage and warm film navigation stay inside the mobile budgets", as
   );
   expect(warmMs, "warm homepage → film navigation").toBeLessThanOrEqual(
     BUDGETS.warmFilmNavigationMs,
+  );
+  expect(warmBytes, "warm homepage → film transferred bytes").toBeLessThanOrEqual(
+    BUDGETS.warmFilmNavigationBytes,
   );
 });

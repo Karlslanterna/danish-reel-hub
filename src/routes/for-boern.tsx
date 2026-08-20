@@ -3,7 +3,8 @@ import { canonicalUrl } from "@/lib/canonical";
 import { isMovieForChildren } from "@/lib/children-filter";
 import { childrenMoviesSchemas } from "@/lib/jsonld";
 import { expandShowtimeIndex } from "@/lib/public-catalog";
-import { HomePage, loadCachedHomeCatalog } from "./index";
+import { HomePage } from "./index";
+import { loadCachedHomeCatalog } from "@/lib/home-catalog";
 
 export const Route = createFileRoute("/for-boern")({
   loader: ({ context }) => loadCachedHomeCatalog(context.queryClient),
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/for-boern")({
       rows.push(screening);
       screeningsByMovie.set(screening.movieId, rows);
     }
-    const movies = (loaderData?.movies ?? []).filter((movie) =>
+    const movies = (loaderData?.movies ?? []).filter((movie: import("@/lib/cinema-data").Movie) =>
       isMovieForChildren(movie, screeningsByMovie.get(movie.id) ?? []),
     );
     return {

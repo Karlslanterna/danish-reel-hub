@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { MovieCard } from "@/components/MovieCard";
@@ -15,25 +15,13 @@ import {
 } from "@/lib/filters";
 import { showtimeMatchesTags, hasTagSelection } from "@/lib/showtime-tags";
 import { rankMoviesByScreenings } from "@/lib/movie-sort";
-import {
-  fetchMovies,
-  fetchCinemas,
-  fetchShowtimeIndex,
-  type Movie,
-  type Cinema,
-} from "@/lib/cinema-data";
 import { canonicalUrl } from "@/lib/canonical";
 import { citySlug, slugifyCity } from "@/lib/city-slug";
 import { homeSchemas } from "@/lib/jsonld";
 import { useLanguage } from "@/lib/i18n";
 import { isMovieForChildren } from "@/lib/children-filter";
 import { showtimeMatchesTimePeriod } from "@/lib/time-filter";
-import {
-  compactShowtimeIndex,
-  expandShowtimeIndex,
-  remapShowtimeIndexToMovies,
-  type CompactShowtimeIndex,
-} from "@/lib/public-catalog";
+import { expandShowtimeIndex } from "@/lib/public-catalog";
 import {
   isSpecialEventTag,
   specialEventDefinition,
@@ -41,73 +29,24 @@ import {
 } from "@/lib/special-events";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { buildFilterFacets } from "@/lib/filter-facets";
-import { HOME_CATALOG_QUERY_KEY } from "@/lib/home-catalog-cache";
+import {
+  HOME_CATALOG_QUERY_KEY,
+  loadHomeCatalog,
+  loadHomeShell,
+  type HomeCatalogData,
+} from "@/lib/home-catalog";
 
-export type HomeCatalogData = {
-  movies: Movie[];
-  cinemas: Cinema[];
-  showtimeIndex: CompactShowtimeIndex;
-};
+export type { HomeCatalogData };
 
 const INITIAL_MOVIE_CARD_COUNT = 40;
 const MOVIE_CARD_BATCH_SIZE = 40;
 const INITIAL_CINEMA_CARD_COUNT = 24;
-const HOME_CATALOG_TTL_MS = 5 * 60 * 1000;
-let homeCatalogCache: { expiresAt: number; promise: Promise<HomeCatalogData> } | null = null;
-
-const compactCinemaForHome = (cinema: Cinema): Cinema =>
-  ({
-    id: cinema.id,
-    slug: cinema.slug,
-    name: cinema.name,
-    city: cinema.city,
-    screens: cinema.screens,
-    latitude: cinema.latitude,
-    longitude: cinema.longitude,
-  }) as Cinema;
-
-const compactMovieForHome = (movie: Movie): Movie => {
-  const { sourceSlugs: _sourceSlugs, ...compact } = movie;
-  return compact;
-};
-
-export async function loadHomeCatalog(): Promise<HomeCatalogData> {
-  const now = Date.now();
-  if (homeCatalogCache && homeCatalogCache.expiresAt > now) return homeCatalogCache.promise;
-
-  const promise = (async () => {
-    const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
-      fetchMovies(),
-      fetchCinemas(),
-      fetchShowtimeIndex(),
-    ]);
-    const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, movies);
-    return {
-      movies: movies.map(compactMovieForHome),
-      cinemas: cinemas.map(compactCinemaForHome),
-      showtimeIndex: compactShowtimeIndex(showtimeIndex),
-    };
-  })();
-  homeCatalogCache = { expiresAt: now + HOME_CATALOG_TTL_MS, promise };
-  try {
-    return await promise;
-  } catch (error) {
-    if (homeCatalogCache?.promise === promise) homeCatalogCache = null;
-    throw error;
-  }
-}
-
-export function loadCachedHomeCatalog(queryClient: QueryClient): Promise<HomeCatalogData> {
-  return queryClient.ensureQueryData({
-    queryKey: HOME_CATALOG_QUERY_KEY,
-    queryFn: loadHomeCatalog,
-    staleTime: 5 * 60 * 1000,
-    revalidateIfStale: true,
-  });
-}
 
 export const Route = createFileRoute("/")({
-  loader: ({ context }) => loadCachedHomeCatalog(context.queryClient),
+  // Bounded first paint: only the cards the visitor sees. The complete
+  // catalogue is loaded by the component after hydration.
+  loader: () => loadHomeShell(),
+
   head: () => {
     const title = "Lanterna — Find film og spilletider i Danmark";
     const description =
@@ -164,15 +103,36 @@ export function HomePage({
   childrenOnly?: boolean;
   specialEvent?: SpecialEventTag;
 }) {
-  const queryClient = useQueryClient();
-  const { movies, cinemas, showtimeIndex: compactIndex } = catalog;
-
-  // Both `/` and `/for-boern` render from the same public catalog. Seeding the
-  // shared query cache avoids downloading and rebuilding it on every toggle.
+  // `/` ships a bounded shell so first paint does not wait for (or serialize)
+  // the national catalogue. The complete catalogue arrives after hydration and
+  // is shared with `/for-boern` and the special-event routes through the same
+  // query key, so toggling between them never refetches it.
+  const [loadFull, setLoadFull] = useState(catalog.complete);
+  const requestFullCatalog = useCallback(() => setLoadFull(true), []);
   useEffect(() => {
-    queryClient.setQueryData(HOME_CATALOG_QUERY_KEY, catalog);
-  }, [catalog, queryClient]);
+    if (catalog.complete) return;
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(requestFullCatalog, { timeout: 2000 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(requestFullCatalog, 200);
+    return () => clearTimeout(id);
+  }, [catalog.complete, requestFullCatalog]);
+
+  const fullCatalogQuery = useQuery({
+    queryKey: HOME_CATALOG_QUERY_KEY,
+    queryFn: loadHomeCatalog,
+    enabled: loadFull,
+    staleTime: 5 * 60 * 1000,
+    ...(catalog.complete ? { initialData: catalog } : {}),
+  });
+  const activeCatalog = fullCatalogQuery.data?.complete ? fullCatalogQuery.data : catalog;
+  // Until the catalogue is complete, filtering and search would silently work
+  // on a 40-card slice, so every consumer of that state waits for this flag.
+  const catalogReady = activeCatalog.complete;
+  const { movies, cinemas, showtimeIndex: compactIndex } = activeCatalog;
   const showtimeIndex = useMemo(() => expandShowtimeIndex(compactIndex), [compactIndex]);
+
   const {
     hydrated: filtersHydrated,
     radius,
@@ -213,13 +173,18 @@ export function HomePage({
   }, [showtimeIndex]);
   const catalogMovies = useMemo(
     () =>
-      movies.filter((movie) => {
-        const screenings = screeningsByMovie.get(movie.id) ?? [];
-        if (activeChildrenOnly && !isMovieForChildren(movie, screenings)) return false;
-        return true;
-      }),
-    [activeChildrenOnly, movies, screeningsByMovie],
+      // The shell has no screening index, so a children/event predicate would
+      // wrongly empty the grid. Keep the first cards stable until completion.
+      !catalogReady
+        ? movies
+        : movies.filter((movie) => {
+            const screenings = screeningsByMovie.get(movie.id) ?? [];
+            if (activeChildrenOnly && !isMovieForChildren(movie, screenings)) return false;
+            return true;
+          }),
+    [catalogReady, activeChildrenOnly, movies, screeningsByMovie],
   );
+
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -364,7 +329,8 @@ export function HomePage({
 
   const suggestions = useMemo<Suggestion[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
+    // Suggesting from the 40-card shell would look like "no such film".
+    if (!q || !catalogReady) return [];
     const out: Suggestion[] = [];
     const seenCities = new Set<string>();
 
@@ -407,7 +373,7 @@ export function HomePage({
       }
     }
     return out.slice(0, 8);
-  }, [query, catalogMovies, cinemas, cities, baseCities, t]);
+  }, [catalogReady, query, catalogMovies, cinemas, cities, baseCities, t]);
 
   // Screenings that survive the active cinema/date/tag filters — they drive the ranking.
   const matchingScreenings = useMemo(() => {
@@ -430,6 +396,7 @@ export function HomePage({
   }, [activeCinemaIds, selectedDate, selectedTime, tagSel, matchingScreenings]);
 
   const filtered = useMemo(() => {
+    if (!catalogReady) return catalogMovies;
     const q = query.trim().toLowerCase();
     const visible = catalogMovies.filter((m) => {
       if (matchingMovieIds && !matchingMovieIds.has(m.id)) return false;
@@ -444,7 +411,7 @@ export function HomePage({
     // Unfiltered view keeps the database ranking from `movies_ranked`.
     const noScreeningFilter = matchingMovieIds === null;
     return noScreeningFilter ? visible : rankMoviesByScreenings(visible, matchingScreenings);
-  }, [query, catalogMovies, matchingMovieIds, selectedGenre, matchingScreenings]);
+  }, [catalogReady, query, catalogMovies, matchingMovieIds, selectedGenre, matchingScreenings]);
 
   useEffect(() => {
     setVisibleMovieCount(INITIAL_MOVIE_CARD_COUNT);
@@ -467,7 +434,7 @@ export function HomePage({
       selectedGenre ||
       hasTagSelection(tagSel),
     );
-    if (!hasConstraint || filtered.length > 0) {
+    if (!catalogReady || !hasConstraint || filtered.length > 0) {
       lastZeroResult.current = "";
       return;
     }
@@ -487,6 +454,7 @@ export function HomePage({
     lastZeroResult.current = signature;
     trackAnalyticsEvent({ eventType: "zero_results" });
   }, [
+    catalogReady,
     filtered.length,
     query,
     activeChildrenOnly,
@@ -576,7 +544,12 @@ export function HomePage({
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader onSearchClick={() => setOpen(true)} />
+      <SiteHeader
+        onSearchClick={() => {
+          requestFullCatalog();
+          setOpen(true);
+        }}
+      />
 
       {open && (
         <div
@@ -702,10 +675,12 @@ export function HomePage({
             </div>
             <div className="hidden text-right text-xs uppercase tracking-[0.2em] text-muted-foreground lg:block">
               <div>
-                {catalogMovies.length} {t("home.movies")}
+                {catalogReady ? catalogMovies.length : activeCatalog.totalMovies}{" "}
+                {t("home.movies")}
               </div>
               <div className="mt-1">
-                {cinemas.length} {t("home.cinemas")}
+                {catalogReady ? cinemas.length : activeCatalog.totalCinemas}{" "}
+                {t("home.cinemas")}
               </div>
             </div>
           </div>
@@ -717,6 +692,7 @@ export function HomePage({
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 sm:mb-6 sm:gap-6">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <FilterBar
+              loading={!catalogReady}
               showChildrenFilter
               childrenOnly={childrenOnly}
               childrenRouteEnabled

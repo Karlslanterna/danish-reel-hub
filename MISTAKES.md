@@ -155,3 +155,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: Dynamic fixture discovery was implemented as a full canonical-URL crawl even when the test needed only one movie, cinema, or city path.
 - Rule: Read the smallest relevant child sitemap and cache it by section; never fetch unrelated sitemap sections to discover one smoke fixture.
 - Test: Movie, cinema, city, search, and booking smoke cases request only their relevant sitemap section and retain the 30-second test boundary.
+
+## M-023 — "Page-speed" tests measured payload boundaries, not speed
+
+- What happened: The homepage SSR loader awaited and serialized the full national catalogue (all movies, cinemas and the complete showtime index) while the existing `page-speed` spec passed, because it only asserted card counts, horizontal overflow and cache headers.
+- Why: Those assertions describe DOM/payload boundaries. They cannot observe TTFB, FCP, LCP, or transferred bytes, so a regression in cold-start cost is invisible to them.
+- Rule: A performance gate must measure real timings and Core-Web-Vitals-like metrics (TTFB, FCP, LCP, navigation duration) plus transferred bytes under a documented CPU/network throttling profile. DOM- or header-only checks stay in the functional smoke suite and must never be described as page-speed coverage.
+- Test: `npm run test:performance` (`playwright.performance.config.ts`, mobile viewport, 4x CPU throttling, Slow-4G profile) attaches a JSON report and fails on explicit budgets; `npm run test:smoke` remains functional and deterministic.

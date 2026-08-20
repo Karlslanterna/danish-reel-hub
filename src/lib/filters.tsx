@@ -633,6 +633,7 @@ export function FilterBar({
   cinemas,
   fixedEvent,
   eventRouteEnabled = false,
+  loading = false,
 }: {
   className?: string;
   hideRadius?: boolean;
@@ -655,6 +656,11 @@ export function FilterBar({
   fixedEvent?: SpecialEventTag;
   /** On national overview pages, special-event choices use their canonical URL. */
   eventRouteEnabled?: boolean;
+  /**
+   * The page still renders a bounded first-paint slice, so the option lists are
+   * not yet trustworthy. The bar stays visible (no layout shift) but inert.
+   */
+  loading?: boolean;
 }) {
   const {
     radius,
@@ -893,7 +899,10 @@ export function FilterBar({
   };
 
   return (
-    <div className={`flex flex-wrap items-center gap-2 sm:gap-3 ${className}`}>
+    <div
+      className={`flex flex-wrap items-center gap-2 sm:gap-3 ${loading ? "pointer-events-none opacity-60" : ""} ${className}`}
+      aria-busy={loading || undefined}
+    >
       {selectedCinemaId && selectedCinemaName && (
         <button
           type="button"

@@ -13,6 +13,7 @@
     "test": "vitest run src",
     "test:smoke": "playwright test",
     "test:smoke:ui": "playwright test --ui",
+    "test:performance": "playwright test --config=playwright.performance.config.ts",
     "audit:cinemas": "node scripts/audit-cinemas.mjs",
     "audit:cinema-pages": "node scripts/audit-cinema-pages.mjs",
     "format": "prettier --write ."

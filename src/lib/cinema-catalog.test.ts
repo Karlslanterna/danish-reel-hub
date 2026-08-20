@@ -29,6 +29,24 @@ describe("public cinema catalog", () => {
     expect(new Set(expandCinemaIds(["eb-126"]))).toEqual(new Set(["kn-891098", "eb-126"]));
   });
 
+  it("maps Assens Bio screenings to the geocoded Tobaksgaarden record", () => {
+    expect(canonicalCinemaId("eb-104")).toBe("kn-2016163");
+    expect(new Set(expandCinemaIds(["kn-2016163"]))).toEqual(
+      new Set(["kn-2016163", "eb-104"]),
+    );
+
+    const result = consolidatePublicCinemas([
+      { id: "eb-104", slug: "assens-bio", name: "Assens Bio" },
+      { id: "kn-2016163", slug: "tobaksgaarden", name: "Tobaksgaarden" },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "kn-2016163",
+      sourceIds: ["eb-104", "kn-2016163"],
+    });
+  });
+
   it("remaps screening rows without changing unknown cinemas", () => {
     expect(canonicalCinemaId("eb-126")).toBe("kn-891098");
     expect(

@@ -7,10 +7,17 @@ import { specialEventDefinition, type SpecialEventTag } from "./special-events";
 type SpecialEventCatalog = {
   movies: Movie[];
   showtimeIndex: CompactShowtimeIndex;
+  complete?: boolean;
 };
 
 export function specialEventMovies(catalog: SpecialEventCatalog | undefined, tag: SpecialEventTag) {
   if (!catalog) return [];
+  // The special-route loader has already selected these movies from the full
+  // canonical showtime index. Requiring that full index to be serialized again
+  // solely so head() can rediscover the same set delays first paint for no SEO
+  // benefit. Complete catalogues retain the normal defensive filter below.
+  if (catalog.complete === false) return catalog.movies;
+
   const movieIds = new Set(
     expandShowtimeIndex(catalog.showtimeIndex)
       .filter((screening) => screening.events.includes(tag))

@@ -20,6 +20,7 @@ import { Route as ForBoernRouteImport } from './routes/for-boern'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SeniorbioRouteImport } from './routes/seniorbio'
+import { Route as SitemapCinemaMoviesDotxmlRouteImport } from './routes/sitemap-cinema-movies[.]xml'
 import { Route as SitemapCinemasDotxmlRouteImport } from './routes/sitemap-cinemas[.]xml'
 import { Route as SitemapCityMoviesDotxmlRouteImport } from './routes/sitemap-city-movies[.]xml'
 import { Route as SitemapCoreDotxmlRouteImport } from './routes/sitemap-core[.]xml'
@@ -56,6 +57,7 @@ import { Route as ApiPublicTmdbEnrichRouteImport } from './routes/api/public/tmd
 import { Route as AuthenticatedAdminImportJobIdRouteImport } from './routes/_authenticated/admin.import_.$jobId'
 import { Route as ApiPublicKultunautImportProcessRouteImport } from './routes/api/public/kultunaut-import.process'
 import { Route as ApiPublicKultunautImportStatusRouteImport } from './routes/api/public/kultunaut-import.status'
+import { Route as BiografCinemaSlugFilmSlugRouteImport } from './routes/biograf_.$cinemaSlug.film.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -111,6 +113,12 @@ const SeniorbioRoute = SeniorbioRouteImport.update({
   path: '/seniorbio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapCinemaMoviesDotxmlRoute =
+  SitemapCinemaMoviesDotxmlRouteImport.update({
+    id: '/sitemap-cinema-movies.xml',
+    path: '/sitemap-cinema-movies.xml',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SitemapCinemasDotxmlRoute = SitemapCinemasDotxmlRouteImport.update({
   id: '/sitemap-cinemas.xml',
   path: '/sitemap-cinemas.xml',
@@ -306,6 +314,12 @@ const ApiPublicKultunautImportStatusRoute =
     path: '/status',
     getParentRoute: () => ApiPublicKultunautImportRoute,
   } as any)
+const BiografCinemaSlugFilmSlugRoute =
+  BiografCinemaSlugFilmSlugRouteImport.update({
+    id: '/biograf_/$cinemaSlug/film/$slug',
+    path: '/biograf/$cinemaSlug/film/$slug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -318,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/seniorbio': typeof SeniorbioRoute
+  '/sitemap-cinema-movies.xml': typeof SitemapCinemaMoviesDotxmlRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
@@ -354,6 +369,7 @@ export interface FileRoutesByFullPath {
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
+  '/biograf/$cinemaSlug/film/$slug': typeof BiografCinemaSlugFilmSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -365,6 +381,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/seniorbio': typeof SeniorbioRoute
+  '/sitemap-cinema-movies.xml': typeof SitemapCinemaMoviesDotxmlRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
@@ -401,6 +418,7 @@ export interface FileRoutesByTo {
   '/admin/import/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
+  '/biograf/$cinemaSlug/film/$slug': typeof BiografCinemaSlugFilmSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -415,6 +433,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/reset-password': typeof ResetPasswordRoute
   '/seniorbio': typeof SeniorbioRoute
+  '/sitemap-cinema-movies.xml': typeof SitemapCinemaMoviesDotxmlRoute
   '/sitemap-cinemas.xml': typeof SitemapCinemasDotxmlRoute
   '/sitemap-city-movies.xml': typeof SitemapCityMoviesDotxmlRoute
   '/sitemap-core.xml': typeof SitemapCoreDotxmlRoute
@@ -451,6 +470,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/import_/$jobId': typeof AuthenticatedAdminImportJobIdRoute
   '/api/public/kultunaut-import/process': typeof ApiPublicKultunautImportProcessRoute
   '/api/public/kultunaut-import/status': typeof ApiPublicKultunautImportStatusRoute
+  '/biograf_/$cinemaSlug/film/$slug': typeof BiografCinemaSlugFilmSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -465,6 +485,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/reset-password'
     | '/seniorbio'
+    | '/sitemap-cinema-movies.xml'
     | '/sitemap-cinemas.xml'
     | '/sitemap-city-movies.xml'
     | '/sitemap-core.xml'
@@ -501,6 +522,7 @@ export interface FileRouteTypes {
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
+    | '/biograf/$cinemaSlug/film/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -512,6 +534,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/reset-password'
     | '/seniorbio'
+    | '/sitemap-cinema-movies.xml'
     | '/sitemap-cinemas.xml'
     | '/sitemap-city-movies.xml'
     | '/sitemap-core.xml'
@@ -548,6 +571,7 @@ export interface FileRouteTypes {
     | '/admin/import/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
+    | '/biograf/$cinemaSlug/film/$slug'
   id:
     | '__root__'
     | '/'
@@ -561,6 +585,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/reset-password'
     | '/seniorbio'
+    | '/sitemap-cinema-movies.xml'
     | '/sitemap-cinemas.xml'
     | '/sitemap-city-movies.xml'
     | '/sitemap-core.xml'
@@ -597,6 +622,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/import_/$jobId'
     | '/api/public/kultunaut-import/process'
     | '/api/public/kultunaut-import/status'
+    | '/biograf_/$cinemaSlug/film/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -611,6 +637,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SeniorbioRoute: typeof SeniorbioRoute
+  SitemapCinemaMoviesDotxmlRoute: typeof SitemapCinemaMoviesDotxmlRoute
   SitemapCinemasDotxmlRoute: typeof SitemapCinemasDotxmlRoute
   SitemapCityMoviesDotxmlRoute: typeof SitemapCityMoviesDotxmlRoute
   SitemapCoreDotxmlRoute: typeof SitemapCoreDotxmlRoute
@@ -630,6 +657,7 @@ export interface RootRouteChildren {
   ApiPublicImportHealthRoute: typeof ApiPublicImportHealthRoute
   ApiPublicKultunautImportRoute: typeof ApiPublicKultunautImportRouteWithChildren
   ApiPublicTmdbEnrichRoute: typeof ApiPublicTmdbEnrichRoute
+  BiografCinemaSlugFilmSlugRoute: typeof BiografCinemaSlugFilmSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -709,6 +737,13 @@ declare module '@tanstack/react-router' {
       path: '/seniorbio'
       fullPath: '/seniorbio'
       preLoaderRoute: typeof SeniorbioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap-cinema-movies.xml': {
+      id: '/sitemap-cinema-movies.xml'
+      path: '/sitemap-cinema-movies.xml'
+      fullPath: '/sitemap-cinema-movies.xml'
+      preLoaderRoute: typeof SitemapCinemaMoviesDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap-cinemas.xml': {
@@ -963,6 +998,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicKultunautImportStatusRouteImport
       parentRoute: typeof ApiPublicKultunautImportRoute
     }
+    '/biograf_/$cinemaSlug/film/$slug': {
+      id: '/biograf_/$cinemaSlug/film/$slug'
+      path: '/biograf/$cinemaSlug/film/$slug'
+      fullPath: '/biograf/$cinemaSlug/film/$slug'
+      preLoaderRoute: typeof BiografCinemaSlugFilmSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1041,6 +1083,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SeniorbioRoute: SeniorbioRoute,
+  SitemapCinemaMoviesDotxmlRoute: SitemapCinemaMoviesDotxmlRoute,
   SitemapCinemasDotxmlRoute: SitemapCinemasDotxmlRoute,
   SitemapCityMoviesDotxmlRoute: SitemapCityMoviesDotxmlRoute,
   SitemapCoreDotxmlRoute: SitemapCoreDotxmlRoute,
@@ -1061,6 +1104,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicImportHealthRoute: ApiPublicImportHealthRoute,
   ApiPublicKultunautImportRoute: ApiPublicKultunautImportRouteWithChildren,
   ApiPublicTmdbEnrichRoute: ApiPublicTmdbEnrichRoute,
+  BiografCinemaSlugFilmSlugRoute: BiografCinemaSlugFilmSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

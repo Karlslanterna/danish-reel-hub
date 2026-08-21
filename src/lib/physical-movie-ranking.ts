@@ -6,6 +6,7 @@ import { windowEnd } from "@/lib/date-window";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const SHELL_CANDIDATE_MULTIPLIER = 4;
 const MAX_SHELL_CANDIDATES = 200;
+const PHYSICAL_STATS_BATCH_SIZE = 200;
 
 type PhysicalStatRow = {
   public_id: string;
@@ -67,22 +68,28 @@ export function applyPhysicalScreeningStatsFromIndex<T extends Movie>(
 async function fetchPhysicalStats<T extends Movie>(movies: T[]): Promise<T[]> {
   if (movies.length === 0) return movies;
   const client = supabase as unknown as PhysicalStatsRpcClient;
-  const groups = movies.map((movie) => ({
-    id: movie.id,
-    sourceIds: movie.sourceIds?.length ? movie.sourceIds : [movie.id],
-  }));
-  const { data, error } = await client.rpc("get_public_movie_physical_stats", {
-    p_groups: groups,
-    p_last_date: windowEnd(),
-  });
+  const allStats: PhysicalStatRow[] = [];
 
-  // Deployment-order fallback only. Once the migration is live, a real RPC
-  // failure must surface rather than silently re-introducing raw-source counts.
-  if (error && isMissingStatsRpc(error)) return movies;
-  if (error) throw error;
+  for (let index = 0; index < movies.length; index += PHYSICAL_STATS_BATCH_SIZE) {
+    const batch = movies.slice(index, index + PHYSICAL_STATS_BATCH_SIZE);
+    const groups = batch.map((movie) => ({
+      id: movie.id,
+      sourceIds: movie.sourceIds?.length ? movie.sourceIds : [movie.id],
+    }));
+    const { data, error } = await client.rpc("get_public_movie_physical_stats", {
+      p_groups: groups,
+      p_last_date: windowEnd(),
+    });
+
+    // Deployment-order fallback only. Once the migration is live, a real RPC
+    // failure must surface rather than silently re-introducing raw-source counts.
+    if (error && isMissingStatsRpc(error)) return movies;
+    if (error) throw error;
+    allStats.push(...(data ?? []));
+  }
 
   const byId = new Map(
-    (data ?? []).map((row) => [
+    allStats.map((row) => [
       row.public_id,
       {
         count: Number(row.screening_count) || 0,

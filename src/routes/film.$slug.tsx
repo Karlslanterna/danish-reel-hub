@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { type MovieDetailProgramme } from "@/components/MovieDetail";
 import { DeferredMovieDetail } from "@/components/DeferredMovieDetail";
 import { fetchMovieBySlug, fetchMovieProgramme, type Movie } from "@/lib/cinema-data";
+import { fetchMovieSchemaProgramme } from "@/lib/movie-schema-programme";
 import { cityOptionsFrom } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { movieSchemas } from "@/lib/jsonld";
@@ -16,17 +17,24 @@ export const Route = createFileRoute("/film/$slug")({
     const details = fetchMovieBySlug(params.slug);
     const movie = cachedMovie ?? (await details);
     if (!movie) throw notFound();
-    const programme: Promise<MovieDetailProgramme> = fetchMovieProgramme(
-      movie.sourceIds ?? movie.id,
-    ).then(({ cinemas, showtimes }) => ({
-      cinemas,
-      showtimes: compactShowtimes(showtimes),
-      cityOptions: cityOptionsFrom(cinemas),
-    }));
+
+    const movieIds = movie.sourceIds ?? movie.id;
+    // The full interactive programme stays deferred. Only a tiny representative
+    // set blocks the route so head() can publish useful ScreeningEvent schema.
+    const programme: Promise<MovieDetailProgramme> = fetchMovieProgramme(movieIds).then(
+      ({ cinemas, showtimes }) => ({
+        cinemas,
+        showtimes: compactShowtimes(showtimes),
+        cityOptions: cityOptionsFrom(cinemas),
+      }),
+    );
+    const schemaProgramme = await fetchMovieSchemaProgramme(movieIds, 3);
+
     return {
       movie,
       details: cachedMovie ? details : Promise.resolve(movie),
       programme,
+      schemaProgramme,
     };
   },
   head: ({ params, loaderData }) => {
@@ -38,7 +46,7 @@ export const Route = createFileRoute("/film/$slug")({
           { name: "robots", content: "noindex, follow" },
         ],
       };
-    const { movie } = loaderData;
+    const { movie, schemaProgramme } = loaderData;
     const hasScreenings = (movie.screeningCount ?? 0) > 0;
     const title = movieTitle(movie.title);
     const description = movieDescription(movie.title, 0, 0);
@@ -63,7 +71,7 @@ export const Route = createFileRoute("/film/$slug")({
         { name: "twitter:description", content: description },
       ],
       links: [{ rel: "canonical", href: hasScreenings ? href : canonicalUrl("/film") }],
-      scripts: movieSchemas(movie, [], []),
+      scripts: movieSchemas(movie, schemaProgramme.cinemas, schemaProgramme.showtimes),
     };
   },
   notFoundComponent: () => (

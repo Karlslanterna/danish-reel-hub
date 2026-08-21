@@ -24,10 +24,7 @@ import { movieSchemas } from "@/lib/jsonld";
 import { cinemaMovieDescription, cinemaMovieTitle } from "@/lib/seo";
 import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
 
-// TanStack's Vite plugin adds this new non-nested file route to routeTree.gen.ts
-// during build. CI intentionally typechecks before that code-generation step.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Route = createFileRoute("/biograf_/$cinemaSlug/film/$slug" as any)({
+export const Route = createFileRoute("/biograf_/$cinemaSlug/film/$slug")({
   loader: async ({ params }) => {
     const [cinema, movie] = await Promise.all([
       fetchCinemaBySlug(params.cinemaSlug),

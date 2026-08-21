@@ -21,6 +21,33 @@ import { LanguageProvider } from "../lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 
+const FILTER_STORAGE_KEY = "lanterna.filters.v1";
+
+/**
+ * Exact geolocation must never be reused across full page loads. Older builds
+ * persisted `userLoc` indefinitely, so one stale coordinate could make every
+ * finite radius look empty on one device while incognito/new devices worked.
+ *
+ * Run this synchronously before FiltersProvider mounts: preserve the harmless
+ * filter preferences, but force distance back to its neutral state and make the
+ * next distance interaction ask the browser for a current position.
+ */
+function discardPersistedGeolocation() {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
+    if (!("userLoc" in parsed) && parsed.radius === "all") return;
+    delete parsed.userLoc;
+    parsed.radius = "all";
+    window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(parsed));
+  } catch {
+    // FiltersProvider already treats malformed persisted state as empty.
+  }
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -135,6 +162,10 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
+  // This is intentionally synchronous. FiltersProvider reads localStorage in
+  // its first client effect, so stale coordinates must be removed beforehand.
+  discardPersistedGeolocation();
+
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const navigating = useRouterState({ select: (state) => state.status === "pending" });

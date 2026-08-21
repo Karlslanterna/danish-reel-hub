@@ -22,7 +22,7 @@ test("film index is bounded and exposes self-canonical crawlable pages", async (
     "https://lanterna.dk/film?side=2",
   );
   await expect(page.locator('link[rel="prev"]')).toHaveAttribute("href", "https://lanterna.dk/film");
-  await expect(page.locator("title")).toContainText("side 2");
+  await expect(page).toHaveTitle(/side 2/u);
   await expect(page.getByText(/Side 2 af/)).toBeVisible();
 
   const pageTwoLinks = page.locator('section a[href^="/film/"]');

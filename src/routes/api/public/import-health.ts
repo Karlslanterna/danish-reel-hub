@@ -10,7 +10,10 @@ import { createFileRoute } from "@tanstack/react-router";
  * During the transition the response also preserves the legacy Kultunaut
  * metrics/scheduler fields consumed by the existing Admin page.
  *
- * ?monitor=1 returns HTTP 503 only when canonical health is critical.
+ * `?monitor=1` is intentionally stricter than the public headline. It returns
+ * 503 if either source is operationally stale/broken even when the other source
+ * keeps the public site usable. Data-quality warnings such as unresolved entity
+ * mappings alone do not page.
  */
 export const Route = createFileRoute("/api/public/import-health")({
   server: {
@@ -18,6 +21,7 @@ export const Route = createFileRoute("/api/public/import-health")({
       GET: async ({ request }) => {
         try {
           const { getCanonicalPipelineHealth } = await import("@/lib/pipeline/health.server");
+          const { operationalImportFailures } = await import("@/lib/pipeline/operational-monitor");
           const canonical = await getCanonicalPipelineHealth();
 
           // Legacy fields remain compatibility-only. Failure to produce them
@@ -32,7 +36,8 @@ export const Route = createFileRoute("/api/public/import-health")({
           ]);
 
           const monitorMode = new URL(request.url).searchParams.get("monitor") === "1";
-          const httpStatus = monitorMode && canonical.status === "critical" ? 503 : 200;
+          const monitorFailures = operationalImportFailures(canonical);
+          const httpStatus = monitorMode && monitorFailures.length > 0 ? 503 : 200;
 
           return Response.json(
             {
@@ -42,6 +47,14 @@ export const Route = createFileRoute("/api/public/import-health")({
               sources: canonical.sources,
               parity: canonical.parity,
               checkedAt: canonical.checkedAt,
+              ...(monitorMode
+                ? {
+                    monitor: {
+                      status: monitorFailures.length > 0 ? "failing" : "healthy",
+                      failures: monitorFailures,
+                    },
+                  }
+                : {}),
 
               // Transitional fields expected by the current Admin dashboard.
               importStatus: legacyImport?.status ?? "unknown",
@@ -73,6 +86,14 @@ export const Route = createFileRoute("/api/public/import-health")({
               importStatus: "unknown",
               metrics: null,
               scheduler: null,
+              ...(new URL(request.url).searchParams.get("monitor") === "1"
+                ? {
+                    monitor: {
+                      status: "failing",
+                      failures: ["Import health check is unavailable"],
+                    },
+                  }
+                : {}),
             },
             {
               status: 500,

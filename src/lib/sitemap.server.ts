@@ -24,6 +24,7 @@ export type SitemapData = {
   movies: SitemapEntry[];
   cinemas: SitemapEntry[];
   cityMovies: SitemapEntry[];
+  cinemaMovies: SitemapEntry[];
 };
 
 const day = (v: unknown) => (v ? String(v).slice(0, 10) : undefined);
@@ -95,6 +96,7 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
   const cinemaMod = new Map<string, string | undefined>();
   const cityMod = new Map<string, string | undefined>();
   const cityMovieMod = new Map<string, string | undefined>();
+  const cinemaMovieMod = new Map<string, string | undefined>();
   const cityChildMovies = new Map<string, Map<string, string | undefined>>();
   const specialMod = new Map<string, string | undefined>();
   let siteMod: string | undefined;
@@ -137,7 +139,11 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
         specialMod.set(event.tag, newer(specialMod.get(event.tag), mod));
       }
     }
-    if (cinema) cinemaMod.set(cinema.slug, newer(cinemaMod.get(cinema.slug), mod));
+    if (cinema) {
+      cinemaMod.set(cinema.slug, newer(cinemaMod.get(cinema.slug), mod));
+      const cinemaMovieKey = `${cinema.slug}/${mSlug}`;
+      cinemaMovieMod.set(cinemaMovieKey, newer(cinemaMovieMod.get(cinemaMovieKey), mod));
+    }
     if (!cinema?.city) continue;
     const city = citySlug(cinema.city);
     if (!city) continue;
@@ -208,7 +214,16 @@ export async function loadSitemapData(baseUrl: string): Promise<SitemapData> {
       priority: "0.7",
     }));
 
-  return { core, movies, cinemas, cityMovies };
+  const cinemaMovies: SitemapEntry[] = [...cinemaMovieMod.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, lastmod]) => ({
+      loc: `${baseUrl}/biograf/${key.split("/")[0]}/film/${key.split("/").slice(1).join("/")}`,
+      lastmod,
+      changefreq: "daily" as const,
+      priority: "0.7",
+    }));
+
+  return { core, movies, cinemas, cityMovies, cinemaMovies };
 }
 
 export function renderUrlset(entries: SitemapEntry[]): string {

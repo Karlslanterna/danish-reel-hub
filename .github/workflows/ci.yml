@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, lint, test, build
+    name: Build, typecheck, lint, test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -30,6 +30,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Vite/TanStack owns routeTree.gen.ts. Build once first so newly added
+      # file routes are generated before TypeScript checks the route registry.
+      - name: Build
+        run: npm run build
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -38,9 +43,6 @@ jobs:
 
       - name: Unit tests
         run: npm test
-
-      - name: Build
-        run: npm run build
 
   parity:
     name: Production canonical/legacy parity
@@ -57,15 +59,24 @@ jobs:
 
       - name: Compare production screenings with legacy showtimes
         id: parity
-        continue-on-error: true
+        # A pull request cannot repair already deployed production data. Keep
+        # the finding visible on PRs; manual post-deploy runs remain blocking.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         run: node scripts/check-screening-parity.mjs
 
       - name: Diagnose eBillet gaps against upstream
         if: steps.parity.outcome == 'failure'
         run: node scripts/diagnose-ebillet-parity.mjs
 
+      - name: Explain production-only parity finding
+        if: steps.parity.outcome == 'failure' && github.event_name == 'pull_request'
+        run: |
+          echo "::warning::The canonical/legacy parity check found an issue on the currently deployed lanterna.dk. It is advisory on pull requests and blocking on manual post-deploy runs."
+          echo "### Production parity finding" >> "$GITHUB_STEP_SUMMARY"
+          echo "The parity check found an issue on the currently deployed **lanterna.dk**. This PR cannot change production data before merge/deploy. Run this workflow manually after deployment; the same check is then blocking." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Fail on parity mismatch
-        if: steps.parity.outcome == 'failure'
+        if: steps.parity.outcome == 'failure' && github.event_name != 'pull_request'
         run: exit 1
 
   catalog-audit:

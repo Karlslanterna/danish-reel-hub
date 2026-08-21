@@ -1,6 +1,6 @@
 # Lanterna delivery rules
 
-Read `FILTER_PRINCIPLES.md` and `MISTAKES.md` before changing filters, imports, analytics, SEO, or the admin area.
+Read `FILTER_PRINCIPLES.md` and `MISTAKES.md` before changing filters, imports, analytics, SEO, or the admin area. For broad cross-system work, also read `CURRENT_STATE.md` for the latest dated architecture/audit orientation; re-verify its mutable production facts before relying on them.
 
 ## Completion gate
 

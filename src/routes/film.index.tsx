@@ -8,7 +8,7 @@ import { fetchPhysicallyRankedMovies } from "@/lib/physical-movie-ranking";
 import { CANONICAL_HOST, canonicalUrl } from "@/lib/canonical";
 import { indexTitle, indexDescription } from "@/lib/seo";
 
-export const FILM_INDEX_PAGE_SIZE = 50;
+export const FILM_INDEX_PAGE_SIZE = 30;
 
 export function paginateFilmIndex<T>(items: T[], requestedPage: number, pageSize = FILM_INDEX_PAGE_SIZE) {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));

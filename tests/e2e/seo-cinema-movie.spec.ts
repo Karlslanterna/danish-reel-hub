@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
-async function firstCinemaMoviePath(request: Parameters<typeof test>[0] extends never ? never : any) {
+async function firstCinemaMoviePath(request: APIRequestContext) {
   const sitemapResponse = await request.get("/sitemap-cinema-movies.xml");
   expect(sitemapResponse.ok()).toBeTruthy();
   const sitemapXml = await sitemapResponse.text();

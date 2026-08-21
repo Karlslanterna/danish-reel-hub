@@ -20,6 +20,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           { loc: `${BASE_URL}/sitemap-movies.xml`, lastmod: newest(data.movies) },
           { loc: `${BASE_URL}/sitemap-cinemas.xml`, lastmod: newest(data.cinemas) },
           { loc: `${BASE_URL}/sitemap-city-movies.xml`, lastmod: newest(data.cityMovies) },
+          { loc: `${BASE_URL}/sitemap-cinema-movies.xml`, lastmod: newest(data.cinemaMovies) },
         ];
 
         const body = [

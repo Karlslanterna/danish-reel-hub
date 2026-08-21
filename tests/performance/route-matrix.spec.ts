@@ -98,7 +98,7 @@ async function measureRoute(browser: Browser, path: string) {
 }
 
 test("audit cold mobile performance across public route families", async ({ browser, request }, testInfo) => {
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   const [movies, cinemas, cityMovies, cinemaMovies, core] = await Promise.all([
     sitemapPaths(request, "movies"),
     sitemapPaths(request, "cinemas"),
@@ -109,17 +109,23 @@ test("audit cold mobile performance across public route families", async ({ brow
 
   const reserved = new Set(["/", "/for-boern", "/film", "/biograf", "/babybio", "/seniorbio", "/filmporten", "/biografklub-danmark"]);
   const city = core.find((path) => /^\/[^/]+$/.test(path) && !reserved.has(path));
-  const routes = [
+  const candidates = [
     "/",
     "/for-boern",
+    "/babybio",
+    "/filmporten",
     "/film",
     "/biograf",
+    "/koebenhavn",
+    "/film/dobbeltspil-2026",
+    "/biograf/empire-bio",
     movies[0],
     cinemas[0],
     city,
     cityMovies[0],
     cinemaMovies[0],
   ].filter((path): path is string => Boolean(path));
+  const routes = [...new Set(candidates)];
 
   const results = [];
   for (const path of routes) results.push(await measureRoute(browser, path));

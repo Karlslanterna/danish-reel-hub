@@ -37,11 +37,18 @@ test("movie and cinema pages link into the live cinema-movie layer", async ({ re
   expect(cinemaSlug).toBeTruthy();
   expect(movieSlug).toBeTruthy();
 
+  // Every cinema programme row is rendered, so the specific sitemap pair must
+  // be linked from its cinema page.
   await page.goto(`/biograf/${cinemaSlug}`, { waitUntil: "domcontentloaded" });
-  const cinemaLink = page.locator(`a[href="${path}"]`).first();
-  await expect(cinemaLink).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(`a[href="${path}"]`).first()).toBeVisible({ timeout: 20_000 });
 
+  // National movie pages intentionally render only the first 24 cinemas until
+  // the visitor asks for more. Require that the visible programme injects the
+  // movie into the combined SEO layer, rather than requiring an arbitrary
+  // sitemap cinema to fall inside that first UI batch.
   await page.goto(`/film/${movieSlug}`, { waitUntil: "domcontentloaded" });
-  const movieLink = page.locator(`a[href="${path}"]`).first();
-  await expect(movieLink).toBeVisible({ timeout: 30_000 });
+  const movieLayerLink = page.locator(
+    `a[href^="/biograf/"][href$="/film/${movieSlug}"]`,
+  ).first();
+  await expect(movieLayerLink).toBeVisible({ timeout: 30_000 });
 });

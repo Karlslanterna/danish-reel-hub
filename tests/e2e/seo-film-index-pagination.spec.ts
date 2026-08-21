@@ -1,8 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-const filmCards = (page: import("@playwright/test").Page) =>
-  page.locator('main a[href^="/film/"], section a[href^="/film/"]').filter({ hasNotText: "Film" });
-
 test("film index is bounded and exposes self-canonical crawlable pages", async ({ page }) => {
   const response = await page.goto("/film", { waitUntil: "domcontentloaded" });
   expect(response?.ok()).toBeTruthy();

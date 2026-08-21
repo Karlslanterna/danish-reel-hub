@@ -4,10 +4,10 @@ import { isMovieForChildren } from "@/lib/children-filter";
 import { childrenMoviesSchemas } from "@/lib/jsonld";
 import { expandShowtimeIndex } from "@/lib/public-catalog";
 import { HomePage } from "./index";
-import { loadCachedHomeCatalog } from "@/lib/home-catalog";
+import { loadChildrenHomeShell } from "@/lib/home-catalog";
 
 export const Route = createFileRoute("/for-boern")({
-  loader: ({ context }) => loadCachedHomeCatalog(context.queryClient),
+  loader: () => loadChildrenHomeShell(),
   head: ({ loaderData }) => {
     const title = "Børnefilm i biografen – Find spilletider | Lanterna";
     const description =

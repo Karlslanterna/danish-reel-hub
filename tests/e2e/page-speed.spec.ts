@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const FILTERED_LANDING_HTML_BUDGET = 300 * 1024;
+const FILTERED_LANDING_HTML_BUDGET = 160 * 1024;
 
 test.describe("Public page-speed boundaries", () => {
   test("homepage renders a bounded mobile batch and progressively reveals the catalogue", async ({
@@ -38,7 +38,7 @@ test.describe("Public page-speed boundaries", () => {
       const body = await response.body();
       expect(
         body.byteLength,
-        `${path} must not serialize the complete national catalogue into first-paint HTML`,
+        `${path} must not serialize national showtime history into first-paint HTML`,
       ).toBeLessThanOrEqual(FILTERED_LANDING_HTML_BUDGET);
     }
   });

@@ -125,18 +125,20 @@ export async function loadHomeCatalog(): Promise<HomeCatalogData> {
 function boundedFilteredShell(
   catalog: HomeCatalogData,
   matchingMovies: Movie[],
-  rowsForShell: ShowtimeIndexRow[],
 ): HomeCatalogData {
   const movies = matchingMovies.slice(0, HOME_SHELL_MOVIE_COUNT);
-  const movieIds = new Set(movies.map((movie) => movie.id));
-  const relevantRows = rowsForShell.filter((row) => movieIds.has(row.movieId));
   return {
     movies: movies.map(compactMovieForHome),
     // The cinema section is secondary on these landings. Keeping only a bounded
     // first set prevents venue metadata from re-inflating the first HTML payload;
     // the complete catalogue replaces it on interaction / deferred hydration.
     cinemas: catalog.cinemas.slice(0, HOME_SHELL_CINEMA_COUNT).map(compactCinemaForHome),
-    showtimeIndex: compactShowtimeIndex(relevantRows),
+    // The server has already used the complete canonical index to decide which
+    // movies belong on this landing. HomePage deliberately does not filter an
+    // incomplete shell, so serializing those films' entire 30-day showtime
+    // history only delays the first poster/LCP. Route head() functions treat
+    // `complete:false` movies as the already-validated landing set.
+    showtimeIndex: compactShowtimeIndex([]),
     complete: false,
     totalMovies: matchingMovies.length,
     totalCinemas: catalog.totalCinemas,
@@ -146,8 +148,8 @@ function boundedFilteredShell(
 /**
  * Build the first-paint `/for-boern` payload from an already loaded national
  * catalogue. Classification uses the exact same movie + screening signals as
- * the full interactive page, but only the first 12 matching cards and their
- * lightweight showtime rows are serialized to the browser.
+ * the full interactive page, but only the first 12 validated movie cards are
+ * serialized to the browser.
  */
 export function buildChildrenHomeShell(catalog: HomeCatalogData): HomeCatalogData {
   const rows = expandShowtimeIndex(catalog.showtimeIndex);
@@ -160,14 +162,13 @@ export function buildChildrenHomeShell(catalog: HomeCatalogData): HomeCatalogDat
   const matchingMovies = catalog.movies.filter((movie) =>
     isMovieForChildren(movie, byMovie.get(movie.id) ?? []),
   );
-  return boundedFilteredShell(catalog, matchingMovies, rows);
+  return boundedFilteredShell(catalog, matchingMovies);
 }
 
 /**
  * Build a bounded first-paint payload for one curated/sourced special programme.
- * Only screenings explicitly carrying the requested event tag are serialized,
- * so SEO indexability and ItemList data remain truthful without embedding the
- * entire national catalogue in the document.
+ * The complete canonical index is consulted server-side to identify the films;
+ * the resulting validated movie slice is sufficient for first paint and SEO.
  */
 export function buildSpecialEventHomeShell(
   catalog: HomeCatalogData,
@@ -178,7 +179,7 @@ export function buildSpecialEventHomeShell(
   );
   const movieIds = new Set(eventRows.map((row) => row.movieId));
   const matchingMovies = catalog.movies.filter((movie) => movieIds.has(movie.id));
-  return boundedFilteredShell(catalog, matchingMovies, eventRows);
+  return boundedFilteredShell(catalog, matchingMovies);
 }
 
 /** Fast SSR shell for the national children landing; full filters hydrate later. */

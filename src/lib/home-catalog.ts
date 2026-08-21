@@ -4,7 +4,6 @@ import {
   fetchMovies,
   fetchShowtimeIndex,
   fetchTopCinemas,
-  fetchTopMovies,
   type Cinema,
   type Movie,
 } from "@/lib/cinema-data";
@@ -13,6 +12,11 @@ import {
   remapShowtimeIndexToMovies,
   type CompactShowtimeIndex,
 } from "@/lib/public-catalog";
+import { sortConsolidatedMovies } from "@/lib/movie-sort";
+import {
+  applyPhysicalScreeningStatsFromIndex,
+  fetchPhysicallyRankedTopMovies,
+} from "@/lib/physical-movie-ranking";
 import { HOME_CATALOG_QUERY_KEY } from "@/lib/home-catalog-cache";
 
 /** Cards rendered before the visitor scrolls or interacts. */
@@ -56,10 +60,14 @@ export const compactMovieForHome = (movie: Movie): Movie => {
  * rendered on first paint, and nothing else. No national showtime index is
  * read here — it is the single largest part of the catalogue and only filters
  * and search need it, both of which wait for the complete catalogue.
+ *
+ * Ranking is still based on physical screenings: a small oversampled candidate
+ * set is re-counted by the physical-stats RPC before the first 12 cards are
+ * selected, so cross-source overlap cannot decide the initial order.
  */
 export async function loadHomeShell(): Promise<HomeCatalogData> {
   const [movies, cinemas] = await Promise.all([
-    fetchTopMovies(HOME_SHELL_MOVIE_COUNT),
+    fetchPhysicallyRankedTopMovies(HOME_SHELL_MOVIE_COUNT),
     fetchTopCinemas(HOME_SHELL_CINEMA_COUNT),
   ]);
   return {
@@ -80,12 +88,18 @@ export async function loadHomeCatalog(): Promise<HomeCatalogData> {
   if (homeCatalogCache && homeCatalogCache.expiresAt > now) return homeCatalogCache.promise;
 
   const promise = (async () => {
-    const [movies, cinemas, rawShowtimeIndex] = await Promise.all([
+    const [rawMovies, cinemas, rawShowtimeIndex] = await Promise.all([
       fetchMovies(),
       fetchCinemas(),
       fetchShowtimeIndex(),
     ]);
-    const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, movies);
+    const showtimeIndex = remapShowtimeIndexToMovies(rawShowtimeIndex, rawMovies);
+    const movies = sortConsolidatedMovies(
+      applyPhysicalScreeningStatsFromIndex(rawMovies, showtimeIndex).filter(
+        (movie) => (movie.screeningCount ?? 0) > 0,
+      ),
+      "most-screenings",
+    );
     return {
       movies: movies.map(compactMovieForHome),
       cinemas: cinemas.map(compactCinemaForHome),

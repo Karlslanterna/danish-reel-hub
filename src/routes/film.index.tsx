@@ -3,13 +3,14 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
-import { fetchMovies, fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
+import { fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
+import { fetchPhysicallyRankedMovies } from "@/lib/physical-movie-ranking";
 import { canonicalUrl } from "@/lib/canonical";
 import { indexTitle, indexDescription } from "@/lib/seo";
 
 export const Route = createFileRoute("/film/")({
   loader: async () => {
-    const [movies, cinemas] = await Promise.all([fetchMovies(), fetchCinemas()]);
+    const [movies, cinemas] = await Promise.all([fetchPhysicallyRankedMovies(), fetchCinemas()]);
     return { movies, cinemas };
   },
   head: ({ loaderData }) => {

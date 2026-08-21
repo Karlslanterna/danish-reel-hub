@@ -24,7 +24,9 @@ import { movieSchemas } from "@/lib/jsonld";
 import { cinemaMovieDescription, cinemaMovieTitle } from "@/lib/seo";
 import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
 
-export const Route = createFileRoute("/biograf_/$cinemaSlug/film/$slug")({
+// TanStack's Vite plugin adds this new non-nested file route to routeTree.gen.ts
+// during build. CI intentionally typechecks before that code-generation step.
+export const Route = createFileRoute("/biograf_/$cinemaSlug/film/$slug" as any)({
   loader: async ({ params }) => {
     const [cinema, movie] = await Promise.all([
       fetchCinemaBySlug(params.cinemaSlug),
@@ -205,7 +207,11 @@ function CinemaMoviePage() {
     0,
   );
   const city = baseCityOf(cinema.city);
-  const facts = [formatRuntime(movie.runtime), movie.genre.join(", "), movie.year > 0 ? String(movie.year) : ""].filter(Boolean);
+  const facts = [
+    formatRuntime(movie.runtime),
+    movie.genre.join(", "),
+    movie.year > 0 ? String(movie.year) : "",
+  ].filter(Boolean);
 
   useTrackZeroResults(
     filteredCount,

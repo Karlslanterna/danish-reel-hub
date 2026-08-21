@@ -12,12 +12,17 @@ const TARGET_ARRANGEMENTS = [
   "20255649",
 ];
 
-test("the deployed outbound attribution sample is present on live ticket links", async ({ page }) => {
+test("the deployed outbound attribution sample is present on Dagmar ticket links", async ({
+  page,
+}) => {
   test.setTimeout(60_000);
 
-  const response = await page.goto("/film/dobbeltspil", { waitUntil: "domcontentloaded" });
+  const response = await page.goto(
+    "/biograf/nordisk-film-biografer-dagmar-teatret/film/dobbeltspil-2026",
+    { waitUntil: "domcontentloaded" },
+  );
   expect(response?.ok()).toBeTruthy();
-  await expect(page.getByRole("heading", { name: /Dobbeltspil/i }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Dobbeltspil \(2026\)/i }).first()).toBeVisible();
 
   const selector = TARGET_ARRANGEMENTS.map((id) => `a[href*="ArrNr=${id}"]`).join(", ");
   const targetLinks = page.locator(selector);

@@ -5,7 +5,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { Poster } from "@/components/Poster";
 import { fetchCinemas, type Movie, type Cinema } from "@/lib/cinema-data";
 import { fetchPhysicallyRankedMovies } from "@/lib/physical-movie-ranking";
-import { canonicalUrl } from "@/lib/canonical";
+import { CANONICAL_HOST, canonicalUrl } from "@/lib/canonical";
 import { indexTitle, indexDescription } from "@/lib/seo";
 
 export const FILM_INDEX_PAGE_SIZE = 50;
@@ -31,6 +31,9 @@ const normalizePage = (value: unknown): number | undefined => {
   return page > 1 ? page : undefined;
 };
 
+const filmIndexUrl = (page: number) =>
+  page > 1 ? `${CANONICAL_HOST}/film?side=${page}` : canonicalUrl("/film");
+
 export const Route = createFileRoute("/film/")({
   validateSearch: (search: Record<string, unknown>): FilmIndexSearch => ({
     side: normalizePage(search.side),
@@ -50,19 +53,14 @@ export const Route = createFileRoute("/film/")({
   },
   head: ({ loaderData }) => {
     const page = loaderData?.page ?? 1;
-    const pageSuffix = page > 1 ? ` – side ${page}` : "";
-    const href = canonicalUrl(page > 1 ? `/film?side=${page}` : "/film");
+    const href = filmIndexUrl(page);
     const baseTitle = indexTitle("film");
     const title = page > 1 ? `${baseTitle.replace(/\s*\|\s*Lanterna$/u, "")} – side ${page} | Lanterna` : baseTitle;
     const baseDescription = indexDescription("film");
     const description = page > 1 ? `${baseDescription} Side ${page}.` : baseDescription;
     const links: Array<{ rel: string; href: string }> = [{ rel: "canonical", href }];
-    if (loaderData && page > 1) {
-      links.push({ rel: "prev", href: canonicalUrl(page === 2 ? "/film" : `/film?side=${page - 1}`) });
-    }
-    if (loaderData && page < loaderData.totalPages) {
-      links.push({ rel: "next", href: canonicalUrl(`/film?side=${page + 1}`) });
-    }
+    if (loaderData && page > 1) links.push({ rel: "prev", href: filmIndexUrl(page - 1) });
+    if (loaderData && page < loaderData.totalPages) links.push({ rel: "next", href: filmIndexUrl(page + 1) });
     return {
       meta: [
         { title },

@@ -27,7 +27,12 @@ export default defineConfig({
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
       : {},
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Audit-only branch: exercise the existing production flows in both the
+  // normal Chromium gate and WebKit with an iPhone-sized Safari profile.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit-iphone", use: { ...devices["iPhone 13"] } },
+  ],
   // When targeting a deployed URL (SMOKE_BASE_URL) no local server is started.
   webServer: isExternalTarget
     ? undefined

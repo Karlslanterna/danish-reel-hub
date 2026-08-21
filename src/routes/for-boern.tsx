@@ -14,15 +14,25 @@ export const Route = createFileRoute("/for-boern")({
       "Find aktuelle børnefilm i biografen og se spilletider i hele Danmark. Filtrér på dato, tidspunkt, by og biograf.";
     const url = canonicalUrl("/for-boern");
     const image = "https://lanterna.dk/og-image.jpg";
-    const screeningsByMovie = new Map<string, ReturnType<typeof expandShowtimeIndex>>();
-    for (const screening of loaderData ? expandShowtimeIndex(loaderData.showtimeIndex) : []) {
-      const rows = screeningsByMovie.get(screening.movieId) ?? [];
-      rows.push(screening);
-      screeningsByMovie.set(screening.movieId, rows);
-    }
-    const movies = (loaderData?.movies ?? []).filter((movie: import("@/lib/cinema-data").Movie) =>
-      isMovieForChildren(movie, screeningsByMovie.get(movie.id) ?? []),
-    );
+
+    // `loadChildrenHomeShell` has already classified the bounded movie set
+    // against the complete canonical showtime index. Do not force that index
+    // into the first HTML just so head() can repeat the same classification.
+    const movies =
+      loaderData?.complete === false
+        ? (loaderData.movies ?? [])
+        : (() => {
+            const screeningsByMovie = new Map<string, ReturnType<typeof expandShowtimeIndex>>();
+            for (const screening of loaderData ? expandShowtimeIndex(loaderData.showtimeIndex) : []) {
+              const rows = screeningsByMovie.get(screening.movieId) ?? [];
+              rows.push(screening);
+              screeningsByMovie.set(screening.movieId, rows);
+            }
+            return (loaderData?.movies ?? []).filter((movie: import("@/lib/cinema-data").Movie) =>
+              isMovieForChildren(movie, screeningsByMovie.get(movie.id) ?? []),
+            );
+          })();
+
     return {
       meta: [
         { title },

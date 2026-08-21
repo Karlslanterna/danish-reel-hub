@@ -6,6 +6,7 @@ import {
   type HomeCatalogData,
 } from "./home-catalog";
 import { compactShowtimeIndex, expandShowtimeIndex } from "./public-catalog";
+import { specialEventMovies } from "./special-event-seo";
 
 const movie = (id: string, genre: string[] = ["Drama"]): Movie => ({
   id,
@@ -59,7 +60,7 @@ const catalog = (movies: Movie[], rows: ShowtimeIndexRow[]): HomeCatalogData => 
 });
 
 describe("filtered landing shells", () => {
-  it("serializes only the first 12 correctly classified child movies", () => {
+  it("serializes only the first 12 correctly classified child movies and no showtime history", () => {
     const childMovies = Array.from({ length: 14 }, (_, index) => movie(`child-${index + 1}`, ["Familie"]));
     const adult = movie("adult", ["Drama"]);
     const full = catalog(
@@ -68,20 +69,17 @@ describe("filtered landing shells", () => {
     );
 
     const shell = buildChildrenHomeShell(full);
-    const rows = expandShowtimeIndex(shell.showtimeIndex);
 
     expect(shell.complete).toBe(false);
     expect(shell.totalMovies).toBe(14);
     expect(shell.movies).toHaveLength(12);
     expect(shell.movies.every((item) => item.id.startsWith("child-"))).toBe(true);
-    expect(new Set(rows.map((row) => row.movieId))).toEqual(
-      new Set(childMovies.slice(0, 12).map((item) => item.id)),
-    );
+    expect(expandShowtimeIndex(shell.showtimeIndex)).toEqual([]);
     expect(shell.cinemas).toHaveLength(24);
     expect(shell.totalCinemas).toBe(30);
   });
 
-  it("keeps only explicitly tagged rows on a special-event first paint", () => {
+  it("selects only explicitly tagged special-event movies without serializing their 30-day rows", () => {
     const baby = movie("baby");
     const baby2 = movie("baby-2");
     const regular = movie("regular");
@@ -96,13 +94,16 @@ describe("filtered landing shells", () => {
     );
 
     const shell = buildSpecialEventHomeShell(full, "Babybio");
-    const rows = expandShowtimeIndex(shell.showtimeIndex);
 
     expect(shell.complete).toBe(false);
     expect(shell.totalMovies).toBe(2);
     expect(shell.movies.map((item) => item.id)).toEqual(["baby", "baby-2"]);
-    expect(rows).toHaveLength(2);
-    expect(rows.every((row) => row.events.includes("Babybio"))).toBe(true);
-    expect(rows.map((row) => row.cinemaId).sort()).toEqual(["c1", "c3"]);
+    expect(expandShowtimeIndex(shell.showtimeIndex)).toEqual([]);
+    // Head/JSON-LD must still use the server-validated bounded set even though
+    // the browser payload no longer includes the showtime history.
+    expect(specialEventMovies(shell, "Babybio").map((item) => item.id)).toEqual([
+      "baby",
+      "baby-2",
+    ]);
   });
 });

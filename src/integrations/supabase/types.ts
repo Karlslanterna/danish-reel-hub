@@ -1127,6 +1127,14 @@ export type Database = {
         }
         Returns: Json
       }
+      get_public_movie_physical_stats: {
+        Args: { p_groups: Json; p_last_date?: string }
+        Returns: {
+          next_screening_date: string
+          public_id: string
+          screening_count: number
+        }[]
+      }
       get_public_showtime_index: {
         Args: {
           p_cinema_ids?: string[]

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -8,16 +8,61 @@ import { fetchPhysicallyRankedMovies } from "@/lib/physical-movie-ranking";
 import { canonicalUrl } from "@/lib/canonical";
 import { indexTitle, indexDescription } from "@/lib/seo";
 
+export const FILM_INDEX_PAGE_SIZE = 50;
+
+export function paginateFilmIndex<T>(items: T[], requestedPage: number, pageSize = FILM_INDEX_PAGE_SIZE) {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const page = Math.min(Math.max(1, requestedPage), totalPages);
+  const start = (page - 1) * pageSize;
+  return {
+    page,
+    totalPages,
+    totalItems: items.length,
+    items: items.slice(start, start + pageSize),
+  };
+}
+
+type FilmIndexSearch = { side?: number };
+
+const normalizePage = (value: unknown): number | undefined => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  const page = Math.floor(parsed);
+  return page > 1 ? page : undefined;
+};
+
 export const Route = createFileRoute("/film/")({
-  loader: async () => {
-    const [movies, cinemas] = await Promise.all([fetchPhysicallyRankedMovies(), fetchCinemas()]);
-    return { movies, cinemas };
+  validateSearch: (search: Record<string, unknown>): FilmIndexSearch => ({
+    side: normalizePage(search.side),
+  }),
+  loaderDeps: ({ search }) => ({ page: search.side ?? 1 }),
+  loader: async ({ deps: { page } }) => {
+    const [allMovies, cinemas] = await Promise.all([fetchPhysicallyRankedMovies(), fetchCinemas()]);
+    const paginated = paginateFilmIndex(allMovies, page);
+    if (page > paginated.totalPages) {
+      throw redirect({
+        to: "/film",
+        search: paginated.totalPages > 1 ? { side: paginated.totalPages } : {},
+        replace: true,
+      });
+    }
+    return { ...paginated, cinemas };
   },
   head: ({ loaderData }) => {
-    const href = canonicalUrl("/film");
-    const title = indexTitle("film");
-    const description = indexDescription("film");
-    void loaderData;
+    const page = loaderData?.page ?? 1;
+    const pageSuffix = page > 1 ? ` – side ${page}` : "";
+    const href = canonicalUrl(page > 1 ? `/film?side=${page}` : "/film");
+    const baseTitle = indexTitle("film");
+    const title = page > 1 ? `${baseTitle.replace(/\s*\|\s*Lanterna$/u, "")} – side ${page} | Lanterna` : baseTitle;
+    const baseDescription = indexDescription("film");
+    const description = page > 1 ? `${baseDescription} Side ${page}.` : baseDescription;
+    const links: Array<{ rel: string; href: string }> = [{ rel: "canonical", href }];
+    if (loaderData && page > 1) {
+      links.push({ rel: "prev", href: canonicalUrl(page === 2 ? "/film" : `/film?side=${page - 1}`) });
+    }
+    if (loaderData && page < loaderData.totalPages) {
+      links.push({ rel: "next", href: canonicalUrl(`/film?side=${page + 1}`) });
+    }
     return {
       meta: [
         { title },
@@ -29,7 +74,7 @@ export const Route = createFileRoute("/film/")({
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
       ],
-      links: [{ rel: "canonical", href }],
+      links,
     };
   },
   errorComponent: ({ reset }) => (
@@ -40,8 +85,18 @@ export const Route = createFileRoute("/film/")({
   component: FilmIndexPage,
 });
 
+function pageSearch(page: number): FilmIndexSearch {
+  return page > 1 ? { side: page } : {};
+}
+
 function FilmIndexPage() {
-  const { movies, cinemas } = Route.useLoaderData() as { movies: Movie[]; cinemas: Cinema[] };
+  const { items: movies, cinemas, page, totalPages, totalItems } = Route.useLoaderData() as {
+    items: Movie[];
+    cinemas: Cinema[];
+    page: number;
+    totalPages: number;
+    totalItems: number;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,8 +107,8 @@ function FilmIndexPage() {
           Alle film i biografen
         </h1>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          {movies.length} film på plakaten i danske biografer. Vælg en film for at se spilletider og
-          købe billetter.
+          {totalItems} film på plakaten i danske biografer. Vælg en film for at se spilletider og
+          købe billetter.{page > 1 ? ` Side ${page} af ${totalPages}.` : ""}
         </p>
 
         <div className="mt-10 grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:grid-cols-5">
@@ -66,6 +121,46 @@ function FilmIndexPage() {
             </Link>
           ))}
         </div>
+
+        {totalPages > 1 && (
+          <nav aria-label="Sider med film" className="mt-12 flex flex-wrap items-center justify-center gap-2">
+            {page > 1 && (
+              <Link
+                to="/film"
+                search={pageSearch(page - 1)}
+                className="rounded-full border border-border px-4 py-2 text-sm text-foreground hover:border-primary hover:text-primary"
+                rel="prev"
+              >
+                ← Forrige
+              </Link>
+            )}
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => (
+              <Link
+                key={number}
+                to="/film"
+                search={pageSearch(number)}
+                aria-current={number === page ? "page" : undefined}
+                className={`inline-flex h-9 min-w-9 items-center justify-center rounded-full border px-3 text-sm ${
+                  number === page
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-foreground hover:border-primary hover:text-primary"
+                }`}
+              >
+                {number}
+              </Link>
+            ))}
+            {page < totalPages && (
+              <Link
+                to="/film"
+                search={pageSearch(page + 1)}
+                className="rounded-full border border-border px-4 py-2 text-sm text-foreground hover:border-primary hover:text-primary"
+                rel="next"
+              >
+                Næste →
+              </Link>
+            )}
+          </nav>
+        )}
       </section>
       <SiteFooter cinemas={cinemas} />
     </div>

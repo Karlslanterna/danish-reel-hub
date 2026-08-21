@@ -1,34 +1,68 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addOutboundTicketAttribution } from "./outbound-ticket-attribution";
 import { normalizeTicketUrl } from "./screening-read-model";
 
-const ATTRIBUTION_FRAGMENT = "#lref-p5xw4utdpfy";
-const TARGET_ARRANGEMENTS = [
-  "20238093",
-  "20238096",
-  "20238184",
-  "20238194",
-  "20238230",
-  "20255503",
-  "20255560",
-  "20255649",
-];
+const NOW = new Date("2026-08-21T10:00:00.000Z");
+const ATTRIBUTION_FRAGMENT = "#lref-v7m2q9k4dx";
+
+const startEpoch = (date: string): number =>
+  Math.floor(new Date(`${date}T12:00:00+02:00`).getTime() / 1000);
+
+const ticketUrl = ({
+  arrangementId = "20255503",
+  date = "2026-08-23",
+  host = "www.kultunaut.dk",
+  path = "/perl/billet/type-nynaut",
+}: {
+  arrangementId?: string;
+  date?: string;
+  host?: string;
+  path?: string;
+} = {}) =>
+  `http://${host}${path}?ArrNr=${arrangementId}&start=${startEpoch(date)}`;
 
 describe("outbound ticket attribution", () => {
-  it("adds the browser-only fragment to every selected Kultunaut arrangement", () => {
-    for (const arrangementId of TARGET_ARRANGEMENTS) {
-      const raw =
-        `http://www.kultunaut.dk/perl/billet/type-nynaut?ArrNr=${arrangementId}` +
-        "&start=1787401200";
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("marks current sampled Kultunaut arrangements without a fixed id allowlist", () => {
+    const raw = ticketUrl({ arrangementId: "20999993", date: "2026-08-23" });
+
+    expect(addOutboundTicketAttribution(raw)).toBe(`${raw}${ATTRIBUTION_FRAGMENT}`);
+    expect(normalizeTicketUrl(raw)).toBe(`${raw}${ATTRIBUTION_FRAGMENT}`);
+  });
+
+  it("marks only screenings two through nine Danish calendar days ahead", () => {
+    for (const date of ["2026-08-23", "2026-08-30"]) {
+      const raw = ticketUrl({ date });
       expect(addOutboundTicketAttribution(raw)).toBe(`${raw}${ATTRIBUTION_FRAGMENT}`);
-      expect(normalizeTicketUrl(raw)).toBe(`${raw}${ATTRIBUTION_FRAGMENT}`);
+    }
+
+    for (const date of ["2026-08-22", "2026-08-31"]) {
+      const raw = ticketUrl({ date });
+      expect(addOutboundTicketAttribution(raw)).toBe(raw);
     }
   });
 
+  it("leaves non-sampled arrangements, other hosts and other paths unchanged", () => {
+    const nonSampled = ticketUrl({ arrangementId: "20255504" });
+    const otherHost = ticketUrl({ host: "example.com" });
+    const otherPath = ticketUrl({ path: "/perl/billet/other" });
+
+    expect(addOutboundTicketAttribution(nonSampled)).toBe(nonSampled);
+    expect(addOutboundTicketAttribution(otherHost)).toBe(otherHost);
+    expect(addOutboundTicketAttribution(otherPath)).toBe(otherPath);
+    expect(normalizeTicketUrl(nonSampled)).toBe(nonSampled);
+  });
+
   it("does not change the provider request URL or query parameters", () => {
-    const raw =
-      "http://www.kultunaut.dk/perl/billet/type-nynaut" +
-      "?ArrNr=20238093&start=1787401200";
+    const raw = ticketUrl();
     const attributed = addOutboundTicketAttribution(raw);
     const before = new URL(raw);
     const after = new URL(attributed);
@@ -39,16 +73,10 @@ describe("outbound ticket attribution", () => {
     expect(after.hash).toBe(ATTRIBUTION_FRAGMENT);
   });
 
-  it("leaves other arrangements and hosts byte-for-byte unchanged", () => {
-    const otherArrangement =
-      "http://www.kultunaut.dk/perl/billet/type-nynaut" +
-      "?ArrNr=20238094&start=1787401200";
-    const otherHost =
-      "https://example.com/perl/billet/type-nynaut" +
-      "?ArrNr=20238093&start=1787401200";
+  it("stops attributing automatically after the short-lived canary period", () => {
+    const raw = ticketUrl({ date: "2026-09-10" });
+    const afterExpiry = new Date("2026-09-08T10:00:00.000Z");
 
-    expect(addOutboundTicketAttribution(otherArrangement)).toBe(otherArrangement);
-    expect(addOutboundTicketAttribution(otherHost)).toBe(otherHost);
-    expect(normalizeTicketUrl(otherArrangement)).toBe(otherArrangement);
+    expect(addOutboundTicketAttribution(raw, afterExpiry)).toBe(raw);
   });
 });

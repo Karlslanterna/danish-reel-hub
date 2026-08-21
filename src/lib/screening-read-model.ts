@@ -1,3 +1,4 @@
+import { addOutboundTicketAttribution } from "@/lib/outbound-ticket-attribution";
 import { sortShowtimes } from "@/lib/showtime-sort";
 
 /**
@@ -80,7 +81,7 @@ export function normalizeTicketUrl(value: string | null | undefined): string | n
   try {
     const url = new URL(raw);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    if (url.hostname !== "flow.ebillet.dk") return raw;
+    if (url.hostname !== "flow.ebillet.dk") return addOutboundTicketAttribution(raw);
 
     const match = url.pathname.match(/^\/booking\/(\d+)\/(\d+)\/?$/);
     const organizerId = url.searchParams.get("organizerIds");

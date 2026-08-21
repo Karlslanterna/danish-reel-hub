@@ -317,7 +317,13 @@ function CinemaPage() {
         ) : (
           <div className="space-y-6 sm:space-y-8">
             {withShows.map(({ movie, shows }) => (
-              <MovieRow key={movie.id} movie={movie} shows={shows} showDateLabels={!selectedDate} />
+              <MovieRow
+                key={movie.id}
+                movie={movie}
+                shows={shows}
+                showDateLabels={!selectedDate}
+                cinemaSlug={cinema.slug}
+              />
             ))}
           </div>
         )}
@@ -368,11 +374,13 @@ function MovieRow({
   movie,
   shows,
   showDateLabels,
+  cinemaSlug,
   dim = false,
 }: {
   movie: Movie;
   shows: Showtime[];
   showDateLabels: boolean;
+  cinemaSlug: string;
   dim?: boolean;
 }) {
   const facts = [formatRuntime(movie.runtime), movie.genre.join(", ")].filter(Boolean);
@@ -383,14 +391,18 @@ function MovieRow({
       className={`rounded-xl border border-border/60 bg-card/30 p-4 sm:p-6 ${dim ? "opacity-60" : ""}`}
     >
       <div className="grid grid-cols-[96px_1fr] gap-4 sm:grid-cols-[150px_1fr] sm:gap-8">
-        <Link to="/film/$slug" params={{ slug: movie.slug }} className="block">
+        <Link
+          to="/biograf/$cinemaSlug/film/$slug"
+          params={{ cinemaSlug, slug: movie.slug }}
+          className="block"
+        >
           <Poster movie={movie} showTitle={false} />
         </Link>
 
         <div className="min-w-0">
           <Link
-            to="/film/$slug"
-            params={{ slug: movie.slug }}
+            to="/biograf/$cinemaSlug/film/$slug"
+            params={{ cinemaSlug, slug: movie.slug }}
             className="font-display text-xl leading-tight tracking-tight text-foreground hover:text-primary sm:text-2xl"
           >
             {movie.title}

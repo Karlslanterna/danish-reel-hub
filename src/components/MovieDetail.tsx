@@ -400,8 +400,8 @@ export function MovieDetail({
                       {displayCityOf(cinema.city)}
                     </div>
                     <Link
-                      to="/biograf/$slug"
-                      params={{ slug: cinema.slug }}
+                      to="/biograf/$cinemaSlug/film/$slug"
+                      params={{ cinemaSlug: cinema.slug, slug: movie.slug }}
                       className="mt-1 inline-block font-display text-xl tracking-tight text-foreground hover:text-primary sm:text-2xl"
                     >
                       {cinema.name}

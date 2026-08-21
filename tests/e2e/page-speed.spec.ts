@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const FILTERED_LANDING_HTML_BUDGET = 300 * 1024;
+
 test.describe("Public page-speed boundaries", () => {
   test("homepage renders a bounded mobile batch and progressively reveals the catalogue", async ({
     page,
@@ -21,6 +23,24 @@ test.describe("Public page-speed boundaries", () => {
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("filtered SEO landings keep the first HTML document bounded", async ({ request }) => {
+    for (const path of [
+      "/for-boern",
+      "/babybio",
+      "/seniorbio",
+      "/filmporten",
+      "/biografklub-danmark",
+    ]) {
+      const response = await request.get(path);
+      expect(response.status(), `${path} HTTP status`).toBe(200);
+      const body = await response.body();
+      expect(
+        body.byteLength,
+        `${path} must not serialize the complete national catalogue into first-paint HTML`,
+      ).toBeLessThanOrEqual(FILTERED_LANDING_HTML_BUDGET);
+    }
   });
 
   test("the hosting cache policy is explicit while authentication stays private", async ({

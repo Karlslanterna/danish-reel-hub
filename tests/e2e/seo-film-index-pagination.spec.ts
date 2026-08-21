@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const FILM_INDEX_PAGE_SIZE = 30;
+
 test("film index is bounded and exposes self-canonical crawlable pages", async ({ page }) => {
   const response = await page.goto("/film", { waitUntil: "domcontentloaded" });
   expect(response?.ok()).toBeTruthy();
@@ -9,7 +11,7 @@ test("film index is bounded and exposes self-canonical crawlable pages", async (
   const pageOneLinks = page.locator('section a[href^="/film/"]');
   const pageOneCount = await pageOneLinks.count();
   expect(pageOneCount).toBeGreaterThan(0);
-  expect(pageOneCount).toBeLessThanOrEqual(50);
+  expect(pageOneCount).toBeLessThanOrEqual(FILM_INDEX_PAGE_SIZE);
   const firstHref = await pageOneLinks.first().getAttribute("href");
 
   const next = page.getByRole("link", { name: /Næste/ });
@@ -28,6 +30,6 @@ test("film index is bounded and exposes self-canonical crawlable pages", async (
   const pageTwoLinks = page.locator('section a[href^="/film/"]');
   const pageTwoCount = await pageTwoLinks.count();
   expect(pageTwoCount).toBeGreaterThan(0);
-  expect(pageTwoCount).toBeLessThanOrEqual(50);
+  expect(pageTwoCount).toBeLessThanOrEqual(FILM_INDEX_PAGE_SIZE);
   expect(await pageTwoLinks.first().getAttribute("href")).not.toBe(firstHref);
 });

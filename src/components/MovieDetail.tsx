@@ -19,7 +19,7 @@ import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
 import { buildFilterFacets, retainPendingFacetOption } from "@/lib/filter-facets";
 import { cinemaProgramShowtimesByMovie } from "@/lib/cinema-program";
 import { expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
-import { detailBackdropSources } from "@/lib/poster-url";
+import { cardPosterSources, detailBackdropSources } from "@/lib/poster-url";
 
 export type MovieDetailCity = { name: string; slug: string };
 export type MovieDetailProgramme = {
@@ -197,6 +197,7 @@ export function MovieDetail({
     count: c.count,
   }));
   const backdropSources = detailBackdropSources(movie.backdropUrl);
+  const fallbackBackdropSources = cardPosterSources(movie.poster.url);
 
   return (
     <div className="min-h-screen bg-background">
@@ -229,13 +230,16 @@ export function MovieDetail({
               className="absolute inset-0 h-full w-full object-cover object-center opacity-30"
             />
           ) : (
-            movie.poster.url && (
+            fallbackBackdropSources.src && (
               <img
-                src={movie.poster.url}
+                src={fallbackBackdropSources.src}
+                {...(fallbackBackdropSources.srcSet ? { srcSet: fallbackBackdropSources.srcSet } : {})}
+                sizes="(min-width: 1024px) 200px, 130px"
                 alt=""
                 aria-hidden
                 loading="lazy"
                 decoding="async"
+                {...{ fetchPriority: "low" as const }}
                 className="absolute inset-0 h-full w-full object-cover opacity-15 blur-2xl"
               />
             )

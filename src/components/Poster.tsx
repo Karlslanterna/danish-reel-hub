@@ -1,5 +1,5 @@
 import type { Movie } from "@/lib/cinema-data";
-import { cardPosterSources, toHttpsUrl } from "@/lib/poster-url";
+import { cardPosterSources, listingPosterSources, toHttpsUrl } from "@/lib/poster-url";
 
 type Props = {
   movie: Movie;
@@ -7,6 +7,7 @@ type Props = {
   showTitle?: boolean;
   priority?: boolean;
   sizes?: string;
+  listing?: boolean;
 };
 
 export function Poster({
@@ -15,11 +16,16 @@ export function Poster({
   showTitle = true,
   priority = false,
   sizes,
+  listing = false,
 }: Props) {
   const posterUrl = toHttpsUrl(movie.poster.url);
-  const cardSources = sizes ? cardPosterSources(posterUrl) : { src: posterUrl };
+  const posterSources = listing
+    ? listingPosterSources(posterUrl)
+    : sizes
+      ? cardPosterSources(posterUrl)
+      : { src: posterUrl };
 
-  if (!cardSources.src) {
+  if (!posterSources.src) {
     return (
       <div
         className={`relative aspect-[2/3] w-full overflow-hidden rounded-md border border-border/40 bg-card ${className}`}
@@ -47,8 +53,8 @@ export function Poster({
       className={`poster-gradient grain grain-overlay relative aspect-[2/3] w-full overflow-hidden rounded-md ${className}`}
     >
       <img
-        src={cardSources.src}
-        {...(cardSources.srcSet ? { srcSet: cardSources.srcSet } : {})}
+        src={posterSources.src}
+        {...(posterSources.srcSet ? { srcSet: posterSources.srcSet } : {})}
         alt={movie.poster.alt ?? movie.title}
         width={400}
         height={600}
@@ -56,14 +62,14 @@ export function Poster({
         decoding="async"
         {...(priority ? { fetchPriority: "high" as const } : { fetchPriority: "low" as const })}
         {...(sizes ? { sizes } : {})}
-        {...(cardSources.fallbackSrc
+        {...(posterSources.fallbackSrc
           ? {
               onError: (event: React.SyntheticEvent<HTMLImageElement>) => {
                 const image = event.currentTarget;
                 if (image.dataset.posterFallback === "1") return;
                 image.dataset.posterFallback = "1";
                 image.removeAttribute("srcset");
-                image.src = cardSources.fallbackSrc!;
+                image.src = posterSources.fallbackSrc!;
               },
             }
           : {})}

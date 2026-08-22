@@ -177,6 +177,7 @@ function FilmIndexPoster({ movie, index }: { movie: Movie; index: number }) {
         showTitle={false}
         sizes={FILM_INDEX_POSTER_SIZES}
         priority
+        listing
       />
     );
   }
@@ -216,7 +217,7 @@ function DeferredFilmIndexPoster({ movie }: { movie: Movie }) {
       className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-card"
     >
       {shouldLoad ? (
-        <Poster movie={movie} showTitle={false} sizes={FILM_INDEX_POSTER_SIZES} />
+        <Poster movie={movie} showTitle={false} sizes={FILM_INDEX_POSTER_SIZES} listing />
       ) : (
         <div
           aria-hidden="true"

@@ -65,6 +65,31 @@ export function cardPosterSources(url: string | null | undefined): CardPosterSou
 }
 
 /**
+ * Kultunaut exposes only the original `/images/film/.../plakat.jpg` asset for
+ * these feed posters. Their byte size is unbounded and can be hundreds of KB on
+ * a small card, with no proven resize endpoint. Listing surfaces therefore use
+ * Lanterna's branded placeholder for that raw path instead of downloading it.
+ * Detail surfaces keep using `cardPosterSources`, so the original poster remains
+ * available where the extra transfer is justified.
+ */
+export function listingPosterSources(url: string | null | undefined): CardPosterSources {
+  const value = toHttpsUrl(url);
+  if (!value) return {};
+
+  try {
+    const parsed = new URL(value);
+    const isRawKultunautPoster =
+      (parsed.hostname === "www.kultunaut.dk" || parsed.hostname === "kultunaut.dk") &&
+      /^\/images\/film\/[^/]+\/plakat\.jpg$/u.test(parsed.pathname);
+    if (isRawKultunautPoster) return {};
+  } catch {
+    return { src: value };
+  }
+
+  return cardPosterSources(value);
+}
+
+/**
  * Movie-detail backdrops are decorative, heavily dimmed artwork. The TMDb
  * enrichment record stores w1280, but sending that full asset to a phone can
  * dominate LCP while adding no useful detail. Keep desktop fidelity reasonable

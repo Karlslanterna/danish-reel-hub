@@ -65,7 +65,12 @@ export function applyPhysicalScreeningStatsFromIndex<T extends Movie>(
   });
 }
 
-async function fetchPhysicalStats<T extends Movie>(movies: T[]): Promise<T[]> {
+/**
+ * Re-count a caller-supplied public movie set by deduplicated physical
+ * screenings. Keeping this helper public lets bounded SSR landings re-rank one
+ * candidate batch without first loading/ranking the complete national catalog.
+ */
+export async function fetchPhysicalScreeningStats<T extends Movie>(movies: T[]): Promise<T[]> {
   if (movies.length === 0) return movies;
   const client = supabase as unknown as PhysicalStatsRpcClient;
   const allStats: PhysicalStatRow[] = [];
@@ -117,7 +122,7 @@ export async function fetchPhysicallyRankedMovies(): Promise<Movie[]> {
 
   const promise = (async () => {
     const movies = await fetchMovies();
-    const withStats = await fetchPhysicalStats(movies);
+    const withStats = await fetchPhysicalScreeningStats(movies);
     return sortConsolidatedMovies(
       withStats.filter((movie) => (movie.screeningCount ?? 0) > 0),
       "most-screenings",
@@ -146,7 +151,7 @@ export async function fetchPhysicallyRankedTopMovies(
     Math.max(limit, limit * SHELL_CANDIDATE_MULTIPLIER),
   );
   const candidates = await fetchTopMovies(candidateLimit);
-  const withStats = await fetchPhysicalStats(candidates.movies);
+  const withStats = await fetchPhysicalScreeningStats(candidates.movies);
   const movies = sortConsolidatedMovies(
     withStats.filter((movie) => (movie.screeningCount ?? 0) > 0),
     "most-screenings",

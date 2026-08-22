@@ -4,6 +4,7 @@ import {
   fetchMovies,
   fetchShowtimeIndex,
   fetchTopCinemas,
+  fetchTopMovies,
   type Cinema,
   type Movie,
   type ShowtimeIndexRow,
@@ -17,7 +18,7 @@ import {
 import { sortConsolidatedMovies } from "@/lib/movie-sort";
 import {
   applyPhysicalScreeningStatsFromIndex,
-  fetchPhysicallyRankedMovies,
+  fetchPhysicalScreeningStats,
   fetchPhysicallyRankedTopMovies,
 } from "@/lib/physical-movie-ranking";
 import { isMovieForChildren } from "@/lib/children-filter";
@@ -31,6 +32,7 @@ import { HOME_CATALOG_QUERY_KEY } from "@/lib/home-catalog-cache";
 /** Cards rendered before the visitor scrolls or interacts. */
 export const HOME_SHELL_MOVIE_COUNT = 12;
 export const HOME_SHELL_CINEMA_COUNT = 24;
+const CHILDREN_SHELL_CANDIDATE_COUNT = 100;
 
 export type HomeCatalogData = {
   movies: Movie[];
@@ -230,28 +232,47 @@ export function buildSpecialEventHomeShell(
 }
 
 /**
- * Fast SSR shell for the national children landing. Physical ranking stays
- * exact, but a cold first paint no longer waits for the national 30-day
- * showtime index. Warm navigations still reuse a complete catalogue if one is
- * already cached, preserving the instant filter-toggle path.
+ * Fast SSR shell for the national children landing. A cold first paint uses a
+ * bounded 100-film candidate pool, then runs its physical-screening recount and
+ * narrow child-signal lookup in parallel. The exact complete catalogue remains
+ * deferred for filtering/search and replaces the shell shortly after hydration.
+ * Warm navigations still reuse it immediately when available.
  */
 export async function loadChildrenHomeShell(): Promise<HomeCatalogData> {
   const warmCatalog = warmHomeCatalog();
   if (warmCatalog) return buildChildrenHomeShell(await warmCatalog);
 
-  const moviesPromise = fetchPhysicallyRankedMovies();
-  const cinemasPromise = fetchCinemas();
-  const movies = await moviesPromise;
+  const [candidateResult, cinemaResult] = await Promise.all([
+    fetchTopMovies(CHILDREN_SHELL_CANDIDATE_COUNT),
+    fetchTopCinemas(HOME_SHELL_CINEMA_COUNT),
+  ]);
+  const candidates = candidateResult.movies;
   const signalMovieIds = [
     ...new Set(
-      movies
+      candidates
         .filter((movie) => !isMovieForChildren(movie))
         .flatMap((movie) => sourceIdsForMovie(movie)),
     ),
   ];
-  const signalsPromise = fetchChildrenScreeningSignals(signalMovieIds);
-  const [cinemas, signals] = await Promise.all([cinemasPromise, signalsPromise]);
-  return buildChildrenHomeShellFromSignals(movies, cinemas, signals);
+  const [withPhysicalStats, signals] = await Promise.all([
+    fetchPhysicalScreeningStats(candidates),
+    fetchChildrenScreeningSignals(signalMovieIds),
+  ]);
+  const rankedCandidates = sortConsolidatedMovies(
+    withPhysicalStats.filter((movie) => (movie.screeningCount ?? 0) > 0),
+    "most-screenings",
+  );
+  const shell = buildChildrenHomeShellFromSignals(
+    rankedCandidates,
+    cinemaResult.cinemas,
+    signals,
+  );
+  return {
+    ...shell,
+    // As on the generic bounded home shell, this cheap source-row total is only
+    // an interim desktop headline until the complete consolidated catalogue loads.
+    totalCinemas: cinemaResult.total,
+  };
 }
 
 /** Fast SSR shell for Babybio/Seniorbio/Filmporten/Biografklub Danmark landings. */

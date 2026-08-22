@@ -14,15 +14,6 @@
 - Read-only investigations must remain read-only. Do not modify tracked files, generated plans, `.lovable/plan.md`, project settings, database state, or deployment state while merely auditing or diagnosing. If a write becomes necessary, create the branch/checkpoint first and make the write explicit.
 - Keep `main` releasable. Never merge a branch that still contains unresolved TODO work required by the agreed scope, known failing required checks, unreviewed accidental file changes, or an incomplete deployment prerequisite.
 
-## Active protected experiment: outbound canary
-
-- The current outbound attribution canary merged in PR #75 is protected until its designed expiry after **2026-09-07**. Unless the user explicitly asks to change or remove the canary, do not edit, rename, delete, regenerate, or overwrite:
-  - `src/lib/outbound-ticket-attribution.ts`
-  - `src/lib/outbound-ticket-attribution.test.ts`
-  - `tests/e2e/outbound-canary.spec.ts`
-- Broad work touching ticket URLs, screening normalization, booking links, URL serialization, or public ticket rendering must explicitly verify that the canary semantics are preserved. A refactor is not allowed to silently bypass or strip the fragment.
-- Do not alter canary selection dates, sampling, marker value, provider URL/query behavior, or tests as collateral work. After the expiry, removal/retirement must be a dedicated scoped task with explicit user approval rather than incidental cleanup.
-
 Read `FILTER_PRINCIPLES.md` and `MISTAKES.md` before changing filters, imports, analytics, SEO, or the admin area. For broad cross-system work, also read `CURRENT_STATE.md` for the latest dated architecture/audit orientation; re-verify its mutable production facts before relying on them.
 
 ## Completion gate

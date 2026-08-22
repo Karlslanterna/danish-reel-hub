@@ -22,6 +22,7 @@ export function MovieCard({
         movie={movie}
         showTitle={false}
         priority={priority}
+        listing
         {...(sizes ? { sizes } : {})}
         className="transition-transform duration-500 ease-out group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-black/50"
       />

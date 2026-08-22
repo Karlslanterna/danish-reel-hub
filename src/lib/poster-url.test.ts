@@ -3,6 +3,7 @@ import {
   cardPosterSources,
   detailBackdropSources,
   isPlaceholderPosterUrl,
+  listingPosterSources,
   toHttpsUrl,
 } from "./poster-url";
 
@@ -37,6 +38,19 @@ describe("poster URLs", () => {
     });
   });
 
+  it("omits raw Kultunaut posters on listings while retaining them for detail surfaces", () => {
+    const poster = "https://www.kultunaut.dk/images/film/7106751/plakat.jpg";
+    expect(listingPosterSources(poster)).toEqual({});
+    expect(cardPosterSources(poster)).toEqual({ src: poster });
+  });
+
+  it("still optimizes known providers on listing surfaces", () => {
+    expect(listingPosterSources("https://poster.ebillet.dk/100LITER-GULD-2026.hd.jpg")).toEqual({
+      src: "https://poster.ebillet.dk/100LITER-GULD-2026.large.jpg",
+      fallbackSrc: "https://poster.ebillet.dk/100LITER-GULD-2026.hd.jpg",
+    });
+  });
+
   it("caps decorative TMDb detail backdrops below the stored w1280 asset", () => {
     const sources = detailBackdropSources(
       "https://image.tmdb.org/t/p/w1280/blfhMP7g9M54gujSbd4EC8VOIxU.jpg",
@@ -49,9 +63,9 @@ describe("poster URLs", () => {
     expect(sources.srcSet).not.toContain("/w1280/");
   });
 
-  it("leaves non-TMDb poster URLs untouched", () => {
-    expect(cardPosterSources("https://www.kultunaut.dk/images/film/1/plakat.jpg")).toEqual({
-      src: "https://www.kultunaut.dk/images/film/1/plakat.jpg",
+  it("leaves other non-TMDb poster URLs untouched", () => {
+    expect(cardPosterSources("https://example.com/poster.jpg")).toEqual({
+      src: "https://example.com/poster.jpg",
     });
     expect(detailBackdropSources("https://example.com/backdrop.jpg")).toEqual({
       src: "https://example.com/backdrop.jpg",

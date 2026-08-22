@@ -396,7 +396,7 @@ function MovieRow({
           params={{ cinemaSlug, slug: movie.slug }}
           className="block"
         >
-          <Poster movie={movie} showTitle={false} />
+          <Poster movie={movie} showTitle={false} listing />
         </Link>
 
         <div className="min-w-0">

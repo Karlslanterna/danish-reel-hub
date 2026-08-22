@@ -74,7 +74,7 @@ describe("filtered landing shells", () => {
     expect(shell.complete).toBe(false);
     expect(shell.totalMovies).toBe(14);
     expect(shell.movies).toHaveLength(12);
-    expect(shell.movies.every((item) => item.id.startsWith("child-")).toBe(true);
+    expect(shell.movies.every((item) => item.id.startsWith("child-"))).toBe(true);
     expect(expandShowtimeIndex(shell.showtimeIndex)).toEqual([]);
     expect(shell.cinemas).toHaveLength(24);
     expect(shell.totalCinemas).toBe(30);

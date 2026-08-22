@@ -39,6 +39,19 @@ Read `FILTER_PRINCIPLES.md` and `MISTAKES.md` before changing filters, imports, 
 - After merge, deploy the frontend through Lovable's **Update** publish flow. Deploy Supabase migrations/functions separately through Lovable, then manually run the GitHub CI workflow. In that post-deploy run, production audit and smoke jobs are blocking and must pass.
 - A task is complete only when the states are reported separately: implemented, locally verified, published in a PR, merged, deployed, and production-verified.
 
+## Efficient implementation and release loop
+
+- Separate **diagnosis**, **implementation**, and **release verification**. Do not repeatedly run the full production pipeline while the root cause or candidate fix is still changing.
+- During diagnosis, collect the smallest evidence that can identify the bottleneck or failure. For performance work, inspect one representative route/trace and the concrete transferred resources before editing. Do not infer byte savings from one removed request when browser scheduling can change which other requests complete.
+- During implementation, use the narrowest relevant checks first (targeted unit/spec, typecheck/build as needed). Run the full PR verification suite once the candidate solution is coherent, not after every exploratory edit.
+- Do not poll queued or in-progress GitHub/Lovable work repeatedly. Re-check only when a meaningful stage could have changed or another useful task has completed. Status polling is observation, not progress.
+- On PRs, production smoke/performance jobs are **advisory even when the GitHub job wrapper is green**. Never infer a production-performance pass from the job conclusion alone. Read the `Performance gate summary` and its concrete metrics; `ADVISORY FAIL` is not a pass.
+- A rerun of a pull-request workflow remains a pull-request workflow and therefore remains advisory. It is **not** the blocking post-deploy gate, even if it is rerun after production changed. After deployment, use a fresh manual `workflow_dispatch` run for blocking production verification.
+- Before any Lovable frontend publish, confirm that Lovable has registered the **exact merged `main` commit** as a `developer_update` with status `completed`, and verify the current project code/ref resolves to that commit. Never publish while the matching developer update is `pending`, and never assume GitHub merge implies Lovable sync has finished.
+- One intended merge gets one intended Lovable publish. If a publish was started from a stale Lovable ref, treat it as invalid evidence and do not compound it with further speculative deploys; wait for exact-commit sync, then publish once.
+- After deployment, run one fresh blocking production verification cycle. If a timing-only metric misses narrowly while transfer/content/functionality are stable, one clean rerun is allowed to distinguish measurement variance from regression. Repeated reruns are not a substitute for diagnosis.
+- Performance completion requires the concrete measured budgets to pass, not merely a green wrapper/check. Once the acceptance criteria and required gates pass, stop; do not continue optimizing or rerunning without a new objective.
+
 ## Lovable token / credit usage
 
 - **Never use Lovable AI tokens or credits.** Do not invoke Lovable's AI agent for implementation, debugging, analysis, testing, planning, code edits, or repository work.

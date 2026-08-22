@@ -180,22 +180,64 @@ jobs:
       - name: Measure production mobile performance
         id: performance
         # PRs can only measure the currently deployed site. The same test is
-        # blocking when the workflow is dispatched after Lovable deployment.
+        # blocking only in a fresh workflow_dispatch run after Lovable deployment.
         continue-on-error: ${{ github.event_name == 'pull_request' }}
-        run: npm run test:performance
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:performance 2>&1 | tee performance-output.log
 
       - name: Upload performance report on failure
         if: steps.performance.outcome == 'failure'
         uses: actions/upload-artifact@v6
         with:
           name: playwright-report-performance
-          path: playwright-report-performance/
+          path: |
+            playwright-report-performance/
+            performance-output.log
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Explain production-only performance findings
-        if: steps.performance.outcome == 'failure' && github.event_name == 'pull_request'
+      - name: Performance gate summary
+        if: always()
+        shell: bash
+        env:
+          PERFORMANCE_OUTCOME: ${{ steps.performance.outcome }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "::warning::The mobile performance budgets failed on the currently deployed lanterna.dk. This is advisory on pull requests and blocking on the manual post-deploy run."
-          echo "### Production performance finding" >> "$GITHUB_STEP_SUMMARY"
-          echo "The performance test measured the currently deployed **lanterna.dk**, not the pull-request code. Re-run this workflow manually after Lovable deployment; the performance budgets are then blocking." >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            if [[ "$PERFORMANCE_OUTCOME" == "success" ]]; then
+              GATE_STATUS="ADVISORY PASS"
+              ANNOTATION="notice"
+              DETAIL="Current production passes the measured budgets, but this does not validate the pull-request code."
+            else
+              GATE_STATUS="ADVISORY FAIL"
+              ANNOTATION="warning"
+              DETAIL="Current production exceeds one or more measured budgets. This is visible but not a PR merge blocker."
+            fi
+          else
+            if [[ "$PERFORMANCE_OUTCOME" == "success" ]]; then
+              GATE_STATUS="BLOCKING PASS"
+              ANNOTATION="notice"
+              DETAIL="Post-deploy production passes the measured budgets."
+            else
+              GATE_STATUS="BLOCKING FAIL"
+              ANNOTATION="error"
+              DETAIL="Post-deploy production exceeds one or more measured budgets."
+            fi
+          fi
+
+          echo "::${ANNOTATION} title=PERFORMANCE GATE: ${GATE_STATUS}::${DETAIL}"
+          {
+            echo "### PERFORMANCE GATE: ${GATE_STATUS}"
+            echo
+            echo "$DETAIL"
+            echo
+            echo "Event: \`${EVENT_NAME}\` · step outcome: \`${PERFORMANCE_OUTCOME}\`"
+            echo
+            echo '```text'
+            grep -E '\[(key-route-performance|performance-metrics)\]' performance-output.log \
+              | sed -E 's/^.*\[(key-route-performance|performance-metrics)\] /\1: /' \
+              || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

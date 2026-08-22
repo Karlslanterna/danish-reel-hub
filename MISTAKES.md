@@ -169,3 +169,38 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: Resume was prohibited from ever creating fresh work, so recovery still depended entirely on two fixed-time start requests.
 - Rule: eBillet resume stays drain-only while data is fresh, but when no organizer work is active it may start one recovery cycle only after the newest completed organizer is at least 24 hours old.
 - Test: Runner tests cover strict resume, pre-threshold recovery, threshold recovery and no-history bootstrap; production verification must confirm a fresh completed cycle, zero active/dead-letter jobs and a healthy strict import monitor.
+
+## M-025 — Published Lovable before the exact merge commit had synced
+
+- What happened: After PR #88 merged, a Lovable publish was started while its matching `developer_update` was still pending and the project code still resolved to the previous #87 commit. That publish could not be valid evidence for the new code.
+- Why: GitHub merge completion was treated as if Lovable repository synchronization were instantaneous.
+- Rule: Before publishing, require the exact merged `main` SHA to appear in Lovable as a `developer_update` with status `completed`, then verify the current project code/ref is that revision. Never publish a pending or stale ref.
+- Test: Release evidence records the merged SHA, matching completed Lovable developer update, current Lovable ref/code verification, and only then the publish/deployment id.
+
+## M-026 — Green PR wrapper was mistaken for a passed performance gate
+
+- What happened: A performance test process exited non-zero, but `continue-on-error` correctly kept the pull-request job wrapper green. The green wrapper was initially read as if the measured performance budgets had passed.
+- Why: GitHub job conclusion and the inner performance-step outcome were conflated, despite PR production checks being intentionally advisory.
+- Rule: Never infer performance success from a PR job's green wrapper. Read the explicit performance gate summary and concrete route metrics. A PR `ADVISORY FAIL` remains a failure of the measured production state, just not a merge blocker.
+- Test: CI always writes `PERFORMANCE GATE: PASS`, `ADVISORY FAIL`, or `BLOCKING FAIL` plus the concrete metric lines to the step summary.
+
+## M-027 — PR workflow rerun was treated as blocking post-deploy verification
+
+- What happened: A pull-request CI workflow was rerun after a production deployment and used as post-deploy evidence. Its event type was still `pull_request`, so live failures remained advisory by design.
+- Why: Rerunning a job was assumed to change its release semantics; GitHub preserves the original workflow event.
+- Rule: A blocking post-deploy gate must be a fresh manual `workflow_dispatch` run after Lovable deployment. Rerunning a PR workflow never substitutes for it.
+- Test: Final release evidence links a post-deploy `workflow_dispatch` CI run whose production catalog, parity, smoke and performance checks are blocking.
+
+## M-028 — Polling and repeated full-pipeline loops inflated delivery time
+
+- What happened: External job status was checked repeatedly while unchanged, and full smoke/performance cycles were repeated during an evolving diagnosis. The extra calls did not make GitHub runners, Lovable synchronization, or tests complete sooner.
+- Why: Observation was treated as progress, and diagnosis/implementation/release verification were not kept as separate stages.
+- Rule: Use targeted evidence and narrow checks while diagnosing and implementing; run one full PR verification for a coherent candidate; after exact-commit Lovable sync publish once; then run one fresh blocking production cycle. Permit at most one clean rerun for a narrow timing-only miss unless new evidence justifies further diagnosis.
+- Test: The PR/release record shows the targeted check, coherent PR verification, exact synced SHA, one intended publish and one blocking post-deploy run; any extra rerun states the specific variance being tested.
+
+## M-029 — Assumed one removed image would subtract the same bytes from total transfer
+
+- What happened: Removing a ~756 KB raw Kultunaut poster was expected to reduce total `/koebenhavn` transfer by roughly the same amount, but the browser then had time to complete additional native-lazy TMDb poster requests, so total transfer fell much less on the first fix.
+- Why: Network scheduling and lazy-loading behaviour were ignored; request-level arithmetic was used as a proxy for a new end-to-end trace.
+- Rule: For performance work, measure the complete post-change request set. Never predict the final transfer budget solely by subtracting one known resource from the previous total.
+- Test: Performance release evidence includes a fresh trace or resource breakdown when request scheduling can materially change, plus the final measured route totals.

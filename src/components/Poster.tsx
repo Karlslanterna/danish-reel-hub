@@ -56,6 +56,17 @@ export function Poster({
         decoding="async"
         {...(priority ? { fetchPriority: "high" as const } : { fetchPriority: "low" as const })}
         {...(sizes ? { sizes } : {})}
+        {...(cardSources.fallbackSrc
+          ? {
+              onError: (event: React.SyntheticEvent<HTMLImageElement>) => {
+                const image = event.currentTarget;
+                if (image.dataset.posterFallback === "1") return;
+                image.dataset.posterFallback = "1";
+                image.removeAttribute("srcset");
+                image.src = cardSources.fallbackSrc!;
+              },
+            }
+          : {})}
         className={`absolute inset-0 h-full w-full bg-black ${
           movie.poster.fit === "contain" ? "object-contain" : "object-cover"
         }`}

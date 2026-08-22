@@ -25,8 +25,7 @@ export type CardPosterSources = {
  * Homepage/card posters do not need TMDb's 500 px asset. On a two-column mobile
  * grid a 342 px source is already around 2 CSS pixels per displayed pixel, and
  * capping the card srcset prevents a high-DPR phone from downloading the much
- * heavier w500 image for every near-viewport card. Detail pages keep their
- * original source because they do not pass card `sizes` to Poster.
+ * heavier w500 image for every near-viewport card.
  */
 export function cardPosterSources(url: string | null | undefined): CardPosterSources {
   const value = toHttpsUrl(url);
@@ -49,6 +48,39 @@ export function cardPosterSources(url: string | null | undefined): CardPosterSou
     return {
       src: w342,
       srcSet: `${w185} 185w, ${w342} 342w`,
+    };
+  } catch {
+    return { src: value };
+  }
+}
+
+/**
+ * Movie-detail backdrops are decorative, heavily dimmed artwork. The TMDb
+ * enrichment record stores w1280, but sending that full asset to a phone can
+ * dominate LCP while adding no useful detail. Keep desktop fidelity reasonable
+ * while capping every client at w780 and letting narrow/1x viewports choose w500.
+ */
+export function detailBackdropSources(url: string | null | undefined): CardPosterSources {
+  const value = toHttpsUrl(url);
+  if (!value) return {};
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.hostname !== "image.tmdb.org") return { src: value };
+
+    const match = parsed.pathname.match(/^\/t\/p\/(?:w\d+|original)(\/.+)$/u);
+    if (!match) return { src: value };
+
+    const variant = (width: 500 | 780) => {
+      const next = new URL(parsed.toString());
+      next.pathname = `/t/p/w${width}${match[1]}`;
+      return next.toString();
+    };
+    const w500 = variant(500);
+    const w780 = variant(780);
+    return {
+      src: w780,
+      srcSet: `${w500} 500w, ${w780} 780w`,
     };
   } catch {
     return { src: value };

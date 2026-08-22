@@ -1,4 +1,10 @@
-import { expect, test, type CDPSession, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type CDPSession,
+  type Page,
+} from "@playwright/test";
 
 const NETWORK = {
   offline: false,
@@ -40,6 +46,24 @@ const ROUTES: RouteSpec[] = [
     budget: { h1Ms: 4_000, ttfbMs: 3_000, fcpMs: 3_000, lcpMs: 4_500, totalBytes: 2_000_000 },
   },
 ];
+const MOVIE_DETAIL_BUDGET: Budget = {
+  h1Ms: 5_000,
+  ttfbMs: 3_000,
+  fcpMs: 4_000,
+  lcpMs: 5_000,
+  totalBytes: 1_500_000,
+};
+
+async function currentMoviePath(request: APIRequestContext): Promise<string> {
+  // Use only the relevant child sitemap. Do not crawl unrelated sitemap
+  // sections just to discover one representative movie fixture.
+  const response = await request.get("/sitemap-movies.xml");
+  expect(response.ok(), "movie sitemap").toBeTruthy();
+  const xml = await response.text();
+  const match = xml.match(/<loc>(https:\/\/lanterna\.dk\/film\/[^<]+)<\/loc>/u);
+  expect(match?.[1], "current movie path in sitemap").toBeTruthy();
+  return new URL(match![1]!).pathname;
+}
 
 async function throttle(page: Page): Promise<CDPSession> {
   const cdp = await page.context().newCDPSession(page);
@@ -113,13 +137,17 @@ function budgetFailures(route: RouteSpec, result: Result): string[] {
   return failures;
 }
 
-test("key public landing routes stay inside mobile budgets", async ({ browser }, testInfo) => {
-  test.setTimeout(180_000);
+test("key public routes stay inside mobile budgets", async ({ browser, request }, testInfo) => {
+  test.setTimeout(240_000);
+  const routes: RouteSpec[] = [
+    ...ROUTES,
+    { path: await currentMoviePath(request), budget: MOVIE_DETAIL_BUDGET },
+  ];
   const results: Result[] = [];
 
   // Measure every route before asserting. A slow first route must never hide
   // diagnostics for the remaining pages.
-  for (const route of ROUTES) {
+  for (const route of routes) {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       isMobile: true,
@@ -140,7 +168,7 @@ test("key public landing routes stay inside mobile budgets", async ({ browser },
     contentType: "application/json",
   });
 
-  const failures = ROUTES.flatMap((route) => {
+  const failures = routes.flatMap((route) => {
     const result = results.find((item) => item.path === route.path)!;
     return budgetFailures(route, result);
   });

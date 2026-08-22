@@ -19,6 +19,7 @@ import { trackAnalyticsEvent, useTrackZeroResults } from "@/lib/analytics";
 import { buildFilterFacets, retainPendingFacetOption } from "@/lib/filter-facets";
 import { cinemaProgramShowtimesByMovie } from "@/lib/cinema-program";
 import { expandShowtimes, type CompactShowtimes } from "@/lib/public-catalog";
+import { detailBackdropSources } from "@/lib/poster-url";
 
 export type MovieDetailCity = { name: string; slug: string };
 export type MovieDetailProgramme = {
@@ -195,6 +196,7 @@ export function MovieDetail({
     value: c.name,
     count: c.count,
   }));
+  const backdropSources = detailBackdropSources(movie.backdropUrl);
 
   return (
     <div className="min-h-screen bg-background">
@@ -214,13 +216,16 @@ export function MovieDetail({
             }
             className="poster-gradient absolute inset-0 scale-110 opacity-25 blur-3xl"
           />
-          {movie.backdropUrl ? (
+          {backdropSources.src ? (
             <img
-              src={movie.backdropUrl}
+              src={backdropSources.src}
+              {...(backdropSources.srcSet ? { srcSet: backdropSources.srcSet } : {})}
+              sizes="(max-width: 767px) 500px, 780px"
               alt=""
               aria-hidden
               loading="eager"
               decoding="async"
+              {...{ fetchPriority: "low" as const }}
               className="absolute inset-0 h-full w-full object-cover object-center opacity-30"
             />
           ) : (

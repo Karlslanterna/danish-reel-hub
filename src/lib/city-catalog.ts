@@ -54,7 +54,6 @@ export type CityShellScreeningRow = {
 };
 
 type CityContext = {
-  allCinemas: Cinema[];
   cinemas: Cinema[];
   cityName: string;
   canonicalSlug: string;
@@ -70,7 +69,7 @@ async function loadCityContext(cityParam: string): Promise<CityContext | null> {
   const cityName = baseCityOf(cinemas[0]!.city);
   const canonicalSlug = citySlug(cinemas[0]!.city);
   const otherCities = cityOptionsFrom(allCinemas).filter((city) => city.slug !== canonicalSlug);
-  return { allCinemas, cinemas, cityName, canonicalSlug, otherCities };
+  return { cinemas, cityName, canonicalSlug, otherCities };
 }
 
 async function fetchCityShellScreenings(cinemaIds: string[]): Promise<CityShellScreeningRow[]> {

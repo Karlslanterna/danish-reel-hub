@@ -1,7 +1,12 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { Movie } from "@/lib/cinema-data";
 import { formatRuntime } from "@/lib/cinema-data";
 import { Poster } from "./Poster";
+
+const POSTER_ROOT_MARGIN = "400px 0px";
+const POSTER_CLASS_NAME =
+  "transition-transform duration-500 ease-out group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-black/50";
 
 export function MovieCard({
   movie,
@@ -18,14 +23,7 @@ export function MovieCard({
   const facts = [formatRuntime(movie.runtime), movie.genre.join(", ")].filter(Boolean);
   const inner = (
     <>
-      <Poster
-        movie={movie}
-        showTitle={false}
-        priority={priority}
-        listing
-        {...(sizes ? { sizes } : {})}
-        className="transition-transform duration-500 ease-out group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-black/50"
-      />
+      <ListingPoster movie={movie} priority={priority} sizes={sizes} />
 
       <div className="mt-3">
         <h3 className="font-display text-base leading-snug text-foreground line-clamp-2 transition-colors group-hover:text-primary">
@@ -58,5 +56,62 @@ export function MovieCard({
     <Link to="/film/$slug" params={{ slug: movie.slug }} preload="intent" className="group block">
       {inner}
     </Link>
+  );
+}
+
+function ListingPoster({
+  movie,
+  priority,
+  sizes,
+}: {
+  movie: Movie;
+  priority: boolean;
+  sizes?: string;
+}) {
+  const placeholderRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(priority);
+
+  useEffect(() => {
+    if (priority || shouldLoad) return;
+    const element = placeholderRef.current;
+    if (!element) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        setShouldLoad(true);
+      },
+      { rootMargin: POSTER_ROOT_MARGIN },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [priority, shouldLoad]);
+
+  if (!shouldLoad) {
+    return (
+      <div
+        ref={placeholderRef}
+        aria-hidden="true"
+        className={`relative aspect-[2/3] w-full overflow-hidden rounded-md border border-border/40 bg-card ${POSTER_CLASS_NAME}`}
+      />
+    );
+  }
+
+  return (
+    <Poster
+      movie={movie}
+      showTitle={false}
+      priority={priority}
+      listing
+      {...(sizes ? { sizes } : {})}
+      className={POSTER_CLASS_NAME}
+    />
   );
 }

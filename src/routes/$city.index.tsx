@@ -1,5 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { MovieCard } from "@/components/MovieCard";
@@ -12,21 +13,7 @@ import {
   fmtDateLabel,
 } from "@/lib/filters";
 import { showtimeMatchesTags } from "@/lib/showtime-tags";
-import {
-  fetchCinemas,
-  fetchMoviesAndShowtimeIndexForCinemas,
-  type Cinema,
-  type Movie,
-  type Showtime,
-} from "@/lib/cinema-data";
-import {
-  baseCityOf,
-  cityMatchesSlug,
-  cityOptionsFrom,
-  citySlug,
-  displayCityOf,
-  type CityOption,
-} from "@/lib/city-slug";
+import { displayCityOf } from "@/lib/city-slug";
 import { canonicalUrl } from "@/lib/canonical";
 import { citySchemas } from "@/lib/jsonld";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -36,41 +23,39 @@ import { showtimeMatchesTimePeriod } from "@/lib/time-filter";
 import { isMovieForChildren } from "@/lib/children-filter";
 import { buildFilterFacets } from "@/lib/filter-facets";
 import { useTrackZeroResults } from "@/lib/analytics";
+import { expandShowtimeIndex, type CompactShowtimeIndex } from "@/lib/public-catalog";
 import {
-  compactShowtimeIndex,
-  expandShowtimeIndex,
-  type CompactShowtimeIndex,
-} from "@/lib/public-catalog";
+  cityCatalogQueryKey,
+  loadCityCatalogData,
+  loadCityShellData,
+  type CityCatalogData,
+} from "@/lib/city-catalog";
 
 const INITIAL_MOVIE_CARD_COUNT = 40;
 const MOVIE_CARD_BATCH_SIZE = 40;
+const FULL_CATALOG_FALLBACK_MS = 8_000;
+const LCP_PRIORITY_POSTERS = 2;
+const MOVIE_CARD_SIZES =
+  "(min-width: 1280px) 18vw, (min-width: 1024px) 23vw, (min-width: 640px) 31vw, 46vw";
 
-export async function loadCityCatalog(cityParam: string) {
-  const slug = cityParam.toLowerCase();
-  const all = await fetchCinemas();
-  const cinemas = all.filter((c) => cityMatchesSlug(c.city, slug));
-  if (cinemas.length === 0) throw notFound();
-  const { movies, showtimes } = await fetchMoviesAndShowtimeIndexForCinemas(
-    cinemas.map((c) => c.id),
-  );
-  movies.sort((a, b) => a.title.localeCompare(b.title, "da"));
-  const cityName = baseCityOf(cinemas[0].city);
-  const canonicalSlug = citySlug(cinemas[0].city);
-  const otherCities = cityOptionsFrom(all).filter((c) => c.slug !== canonicalSlug);
-  return {
-    cityName,
-    canonicalSlug,
-    cinemas,
-    movies,
-    showtimes: compactShowtimeIndex(showtimes),
-    otherCities,
-  };
+export async function loadCityCatalog(cityParam: string): Promise<CityCatalogData> {
+  const catalog = await loadCityCatalogData(cityParam);
+  if (!catalog) throw notFound();
+  return catalog;
 }
 
-export type CityCatalogData = Awaited<ReturnType<typeof loadCityCatalog>>;
+async function loadCityShell(cityParam: string): Promise<CityCatalogData> {
+  const catalog = await loadCityShellData(cityParam);
+  if (!catalog) throw notFound();
+  return catalog;
+}
+
+export type { CityCatalogData };
 
 export const Route = createFileRoute("/$city/")({
-  loader: ({ params }) => loadCityCatalog(params.city),
+  // The city route used to await and serialize the complete 30-day programme.
+  // First paint now gets a bounded card shell; filters hydrate the full index later.
+  loader: ({ params }) => loadCityShell(params.city),
   head: ({ loaderData }) => {
     if (!loaderData)
       return {
@@ -78,12 +63,10 @@ export const Route = createFileRoute("/$city/")({
       };
     const href = canonicalUrl(`/${loaderData.canonicalSlug}`);
     const title = cityTitle(loaderData.cityName);
-    const description = cityDescription(
-      loaderData.cityName,
-      loaderData.cinemas.length,
-      loaderData.movies.length,
-    );
-    const hasScreenings = loaderData.showtimes.rows.length > 0;
+    const description = loaderData.totalMoviesExact
+      ? cityDescription(loaderData.cityName, loaderData.cinemas.length, loaderData.totalMovies)
+      : `Biografprogram for ${loaderData.cityName}: aktuelle film i ${loaderData.cinemas.length} biografer. Se spilletider i dag og de kommende dage og køb billetter.`;
+    const hasScreenings = loaderData.hasScreenings;
     return {
       meta: [
         { title },
@@ -135,7 +118,35 @@ export function CityPage({
   data: CityCatalogData;
   fixedChildrenOnly?: boolean;
 }) {
-  const { cityName, canonicalSlug, cinemas, movies, showtimes: compact, otherCities } = data;
+  const [loadFull, setLoadFull] = useState(data.complete);
+  const requestFullCatalog = useCallback(() => setLoadFull(true), []);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setLoadFull(data.complete);
+  }, [data.canonicalSlug, data.complete]);
+
+  useEffect(() => {
+    if (data.complete) return;
+    const id = setTimeout(requestFullCatalog, FULL_CATALOG_FALLBACK_MS);
+    return () => clearTimeout(id);
+  }, [data.complete, data.canonicalSlug, requestFullCatalog]);
+
+  const fullCatalogQuery = useQuery({
+    queryKey: cityCatalogQueryKey(data.canonicalSlug),
+    queryFn: async () => {
+      const catalog = await loadCityCatalogData(data.canonicalSlug);
+      if (!catalog) throw new Error(`City catalogue disappeared: ${data.canonicalSlug}`);
+      return catalog;
+    },
+    enabled: loadFull,
+    staleTime: 5 * 60 * 1000,
+    ...(data.complete ? { initialData: data } : {}),
+  });
+  const activeCatalog = fullCatalogQuery.data?.complete ? fullCatalogQuery.data : data;
+  const catalogReady = activeCatalog.complete;
+  const { cityName, canonicalSlug, cinemas, movies, showtimes: compact, otherCities } =
+    activeCatalog;
   const showtimes = useMemo(() => expandShowtimeIndex(compact as CompactShowtimeIndex), [compact]);
   const [visibleMovieCount, setVisibleMovieCount] = useState(INITIAL_MOVIE_CARD_COUNT);
   const {
@@ -173,6 +184,39 @@ export function CityPage({
 
   const activeChildrenOnly = fixedChildrenOnly || childrenOnly;
 
+  // A persisted screening constraint means the visitor already expressed
+  // filter intent before this navigation, so hydrate the complete programme now.
+  useEffect(() => {
+    if (!filtersHydrated || catalogReady) return;
+    if (
+      selectedDate ||
+      selectedTime ||
+      selectedGenre ||
+      selectedFormat ||
+      selectedLanguage ||
+      selectedEvent ||
+      activeChildrenOnly ||
+      selectedCinemaId ||
+      (radius !== "all" && userLoc)
+    ) {
+      requestFullCatalog();
+    }
+  }, [
+    filtersHydrated,
+    catalogReady,
+    selectedDate,
+    selectedTime,
+    selectedGenre,
+    selectedFormat,
+    selectedLanguage,
+    selectedEvent,
+    activeChildrenOnly,
+    selectedCinemaId,
+    radius,
+    userLoc,
+    requestFullCatalog,
+  ]);
+
   const tagSel = useMemo(
     () => ({ format: selectedFormat, language: selectedLanguage, event: selectedEvent }),
     [selectedFormat, selectedLanguage, selectedEvent],
@@ -196,7 +240,7 @@ export function CityPage({
   );
   const childMovieIds = useMemo(
     () =>
-      activeChildrenOnly
+      activeChildrenOnly && catalogReady
         ? new Set(
             movies
               .filter((movie) =>
@@ -208,7 +252,7 @@ export function CityPage({
               .map((movie) => movie.id),
           )
         : null,
-    [activeChildrenOnly, movies, showtimes],
+    [activeChildrenOnly, catalogReady, movies, showtimes],
   );
   const facets = useMemo(
     () =>
@@ -240,6 +284,10 @@ export function CityPage({
   );
 
   const filtered = useMemo(() => {
+    // The shell has no 30-day index. Keep its pre-ranked cards stable until the
+    // complete programme arrives instead of treating empty filter data as zero results.
+    if (!catalogReady) return movies;
+
     const allowed = selectedCinemaId
       ? new Set([selectedCinemaId])
       : (nearbyCinemaIds ?? cityCinemaIds);
@@ -259,6 +307,7 @@ export function CityPage({
     );
     return rankMoviesByScreenings(visible, matching);
   }, [
+    catalogReady,
     movies,
     showtimes,
     selectedDate,
@@ -279,22 +328,45 @@ export function CityPage({
     () => filtered.slice(0, visibleMovieCount),
     [filtered, visibleMovieCount],
   );
+  const hasMoreMovies = !catalogReady || visibleMovies.length < filtered.length;
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMoreMovies || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        if (!catalogReady) {
+          requestFullCatalog();
+          return;
+        }
+        setVisibleMovieCount((count) => Math.min(count + MOVIE_CARD_BATCH_SIZE, filtered.length));
+      },
+      { rootMargin: "1200px 0px" },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [catalogReady, filtered.length, hasMoreMovies, requestFullCatalog]);
 
   useTrackZeroResults(
-    filtered.length,
-    Boolean(
-      selectedDate ||
-      selectedTime ||
-      selectedGenre ||
-      selectedFormat ||
-      selectedLanguage ||
-      selectedEvent ||
-      activeChildrenOnly ||
-      selectedCinemaId ||
-      (radius !== "all" && userLoc),
-    ),
+    catalogReady ? filtered.length : 1,
+    catalogReady &&
+      Boolean(
+        selectedDate ||
+          selectedTime ||
+          selectedGenre ||
+          selectedFormat ||
+          selectedLanguage ||
+          selectedEvent ||
+          activeChildrenOnly ||
+          selectedCinemaId ||
+          (radius !== "all" && userLoc),
+      ),
     [
       canonicalSlug,
+      catalogReady,
       selectedDate,
       selectedTime,
       selectedGenre,
@@ -306,6 +378,10 @@ export function CityPage({
       radius,
     ],
   );
+
+  const movieCountLabel = catalogReady
+    ? String(movies.length)
+    : `${activeCatalog.totalMovies}${activeCatalog.totalMoviesExact ? "" : "+"}`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -327,7 +403,7 @@ export function CityPage({
             {activeChildrenOnly ? `Børnefilm i ${cityName}` : `Film i ${cityName}`}
           </h1>
           <p className="mt-5 text-sm text-muted-foreground">
-            {cinemas.length} {cinemas.length === 1 ? "biograf" : "biografer"} · {movies.length} film
+            {cinemas.length} {cinemas.length === 1 ? "biograf" : "biografer"} · {movieCountLabel} film
           </p>
         </div>
       </section>
@@ -335,9 +411,15 @@ export function CityPage({
       <section className="mx-auto max-w-[1400px] px-6 py-10 sm:px-8 sm:py-14">
         <GeoNotice className="mb-6" />
         <div className="mb-6 flex flex-wrap items-end justify-between gap-6">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div
+            className="flex flex-wrap items-center gap-x-6 gap-y-3"
+            onPointerEnter={requestFullCatalog}
+            onPointerDown={requestFullCatalog}
+            onFocusCapture={requestFullCatalog}
+          >
             <h2 className="font-display text-2xl tracking-tight">Aktuelle film</h2>
             <FilterBar
+              loading={!catalogReady}
               showChildrenFilter
               childrenOnly={fixedChildrenOnly}
               childrenRouteEnabled
@@ -360,7 +442,8 @@ export function CityPage({
           <div className="text-right text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {geoLoading && <div>Finder din placering…</div>}
             <div>
-              {filtered.length} film{selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
+              {catalogReady ? filtered.length : movieCountLabel} film
+              {selectedDate ? ` · ${fmtDateLabel(selectedDate)}` : ""}
               {radius !== "all" && userLoc ? ` · inden for ${radius} km` : ""}
               {selectedGenre ? ` · ${selectedGenre}` : ""}
             </div>
@@ -377,19 +460,31 @@ export function CityPage({
         ) : (
           <>
             <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {visibleMovies.map((m) => (
-                <MovieCard key={m.id} movie={m} citySlug={canonicalSlug} />
+              {visibleMovies.map((m, index) => (
+                <MovieCard
+                  key={m.id}
+                  movie={m}
+                  citySlug={canonicalSlug}
+                  priority={index < LCP_PRIORITY_POSTERS}
+                  sizes={MOVIE_CARD_SIZES}
+                />
               ))}
             </div>
-            {visibleMovies.length < filtered.length && (
-              <div className="mt-12 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setVisibleMovieCount((count) => count + MOVIE_CARD_BATCH_SIZE)}
-                  className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
-                >
-                  Vis flere film ({filtered.length - visibleMovies.length})
-                </button>
+            {hasMoreMovies && (
+              <div
+                ref={loadMoreRef}
+                data-testid="city-movie-load-sentinel"
+                className="mt-12 flex min-h-px justify-center"
+              >
+                {catalogReady && visibleMovies.length < filtered.length && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleMovieCount((count) => count + MOVIE_CARD_BATCH_SIZE)}
+                    className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                  >
+                    Vis flere film ({filtered.length - visibleMovies.length})
+                  </button>
+                )}
               </div>
             )}
           </>

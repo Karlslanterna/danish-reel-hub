@@ -32,27 +32,26 @@ type Result = {
   totalBytes: number;
 };
 
-const ROUTES: RouteSpec[] = [
-  {
-    path: "/for-boern",
-    budget: { h1Ms: 5_000, ttfbMs: 3_000, fcpMs: 4_000, lcpMs: 5_000, totalBytes: 1_500_000 },
-  },
-  {
-    path: "/babybio",
-    budget: { h1Ms: 5_000, ttfbMs: 3_000, fcpMs: 4_000, lcpMs: 5_000, totalBytes: 1_500_000 },
-  },
-  {
-    path: "/film",
-    budget: { h1Ms: 4_000, ttfbMs: 3_000, fcpMs: 3_000, lcpMs: 4_500, totalBytes: 2_000_000 },
-  },
-];
-const MOVIE_DETAIL_BUDGET: Budget = {
+const STANDARD_LANDING_BUDGET: Budget = {
   h1Ms: 5_000,
   ttfbMs: 3_000,
   fcpMs: 4_000,
   lcpMs: 5_000,
   totalBytes: 1_500_000,
 };
+
+const ROUTES: RouteSpec[] = [
+  { path: "/for-boern", budget: STANDARD_LANDING_BUDGET },
+  { path: "/babybio", budget: STANDARD_LANDING_BUDGET },
+  // The largest city is the city-route canary: it must not regress to awaiting
+  // or serializing the complete 30-day programme before first paint.
+  { path: "/koebenhavn", budget: STANDARD_LANDING_BUDGET },
+  {
+    path: "/film",
+    budget: { h1Ms: 4_000, ttfbMs: 3_000, fcpMs: 3_000, lcpMs: 4_500, totalBytes: 2_000_000 },
+  },
+];
+const MOVIE_DETAIL_BUDGET: Budget = STANDARD_LANDING_BUDGET;
 
 async function currentMoviePath(request: APIRequestContext): Promise<string> {
   // Use only the relevant child sitemap. Do not crawl unrelated sitemap
@@ -138,7 +137,7 @@ function budgetFailures(route: RouteSpec, result: Result): string[] {
 }
 
 test("key public routes stay inside mobile budgets", async ({ browser, request }, testInfo) => {
-  test.setTimeout(240_000);
+  test.setTimeout(300_000);
   const routes: RouteSpec[] = [
     ...ROUTES,
     { path: await currentMoviePath(request), budget: MOVIE_DETAIL_BUDGET },

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -9,6 +10,9 @@ import { CANONICAL_HOST, canonicalUrl } from "@/lib/canonical";
 import { indexTitle, indexDescription } from "@/lib/seo";
 
 export const FILM_INDEX_PAGE_SIZE = 30;
+const FILM_INDEX_IMMEDIATE_POSTERS = 2;
+const FILM_INDEX_POSTER_ROOT_MARGIN = "400px 0px";
+const FILM_INDEX_POSTER_SIZES = "(min-width: 1024px) 220px, 45vw";
 
 export function paginateFilmIndex<T>(items: T[], requestedPage: number, pageSize = FILM_INDEX_PAGE_SIZE) {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
@@ -110,9 +114,9 @@ function FilmIndexPage() {
         </p>
 
         <div className="mt-10 grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:grid-cols-5">
-          {movies.map((m) => (
+          {movies.map((m, index) => (
             <Link key={m.id} to="/film/$slug" params={{ slug: m.slug }} className="group block">
-              <Poster movie={m} showTitle={false} sizes="(min-width: 1024px) 220px, 45vw" />
+              <FilmIndexPoster movie={m} index={index} />
               <div className="mt-2 line-clamp-2 text-sm text-foreground group-hover:text-primary">
                 {m.title}
               </div>
@@ -161,6 +165,64 @@ function FilmIndexPage() {
         )}
       </section>
       <SiteFooter cinemas={cinemas} />
+    </div>
+  );
+}
+
+function FilmIndexPoster({ movie, index }: { movie: Movie; index: number }) {
+  if (index < FILM_INDEX_IMMEDIATE_POSTERS) {
+    return (
+      <Poster
+        movie={movie}
+        showTitle={false}
+        sizes={FILM_INDEX_POSTER_SIZES}
+        priority
+      />
+    );
+  }
+
+  return <DeferredFilmIndexPoster movie={movie} />;
+}
+
+function DeferredFilmIndexPoster({ movie }: { movie: Movie }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setShouldLoad(true);
+        observer.disconnect();
+      },
+      { rootMargin: FILM_INDEX_POSTER_ROOT_MARGIN },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-card"
+    >
+      {shouldLoad ? (
+        <Poster movie={movie} showTitle={false} sizes={FILM_INDEX_POSTER_SIZES} />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 border border-border/40 bg-card"
+        />
+      )}
     </div>
   );
 }

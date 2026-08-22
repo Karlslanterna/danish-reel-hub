@@ -17,9 +17,14 @@ import {
 import { sortConsolidatedMovies } from "@/lib/movie-sort";
 import {
   applyPhysicalScreeningStatsFromIndex,
+  fetchPhysicallyRankedMovies,
   fetchPhysicallyRankedTopMovies,
 } from "@/lib/physical-movie-ranking";
 import { isMovieForChildren } from "@/lib/children-filter";
+import {
+  fetchChildrenScreeningSignals,
+  type ChildScreeningSignal,
+} from "@/lib/children-screening-signals";
 import type { SpecialEventTag } from "@/lib/special-events";
 import { HOME_CATALOG_QUERY_KEY } from "@/lib/home-catalog-cache";
 
@@ -122,6 +127,12 @@ export async function loadHomeCatalog(): Promise<HomeCatalogData> {
   }
 }
 
+function warmHomeCatalog(): Promise<HomeCatalogData> | null {
+  return homeCatalogCache && homeCatalogCache.expiresAt > Date.now()
+    ? homeCatalogCache.promise
+    : null;
+}
+
 function boundedFilteredShell(
   catalog: HomeCatalogData,
   matchingMovies: Movie[],
@@ -133,11 +144,10 @@ function boundedFilteredShell(
     // first set prevents venue metadata from re-inflating the first HTML payload;
     // the complete catalogue replaces it on interaction / deferred hydration.
     cinemas: catalog.cinemas.slice(0, HOME_SHELL_CINEMA_COUNT).map(compactCinemaForHome),
-    // The server has already used the complete canonical index to decide which
-    // movies belong on this landing. HomePage deliberately does not filter an
-    // incomplete shell, so serializing those films' entire 30-day showtime
-    // history only delays the first poster/LCP. Route head() functions treat
-    // `complete:false` movies as the already-validated landing set.
+    // The server has already validated which movies belong on this landing.
+    // HomePage deliberately does not filter an incomplete shell, so serializing
+    // those films' entire 30-day showtime history only delays the first poster/LCP.
+    // Route head() functions treat `complete:false` movies as the validated set.
     showtimeIndex: compactShowtimeIndex([]),
     complete: false,
     totalMovies: matchingMovies.length,
@@ -165,6 +175,43 @@ export function buildChildrenHomeShell(catalog: HomeCatalogData): HomeCatalogDat
   return boundedFilteredShell(catalog, matchingMovies);
 }
 
+const sourceIdsForMovie = (movie: Movie): string[] =>
+  movie.sourceIds?.length ? movie.sourceIds : [movie.id];
+
+/**
+ * Build the same bounded children shell from narrow source-level screening
+ * signals. This is equivalent to classifying against the full remapped index:
+ * only `events` and `languages` are consumed by `isMovieForChildren`.
+ */
+export function buildChildrenHomeShellFromSignals(
+  movies: Movie[],
+  cinemas: Cinema[],
+  signals: ChildScreeningSignal[],
+): HomeCatalogData {
+  const signalBySourceMovie = new Map(signals.map((signal) => [signal.movieId, signal] as const));
+  const matchingMovies = movies.filter((movie) =>
+    isMovieForChildren(
+      movie,
+      sourceIdsForMovie(movie).flatMap((sourceId) => {
+        const signal = signalBySourceMovie.get(sourceId);
+        return signal ? [signal] : [];
+      }),
+    ),
+  );
+
+  return boundedFilteredShell(
+    {
+      movies,
+      cinemas,
+      showtimeIndex: compactShowtimeIndex([]),
+      complete: false,
+      totalMovies: movies.length,
+      totalCinemas: cinemas.length,
+    },
+    matchingMovies,
+  );
+}
+
 /**
  * Build a bounded first-paint payload for one curated/sourced special programme.
  * The complete canonical index is consulted server-side to identify the films;
@@ -182,9 +229,29 @@ export function buildSpecialEventHomeShell(
   return boundedFilteredShell(catalog, matchingMovies);
 }
 
-/** Fast SSR shell for the national children landing; full filters hydrate later. */
+/**
+ * Fast SSR shell for the national children landing. Physical ranking stays
+ * exact, but a cold first paint no longer waits for the national 30-day
+ * showtime index. Warm navigations still reuse a complete catalogue if one is
+ * already cached, preserving the instant filter-toggle path.
+ */
 export async function loadChildrenHomeShell(): Promise<HomeCatalogData> {
-  return buildChildrenHomeShell(await loadHomeCatalog());
+  const warmCatalog = warmHomeCatalog();
+  if (warmCatalog) return buildChildrenHomeShell(await warmCatalog);
+
+  const moviesPromise = fetchPhysicallyRankedMovies();
+  const cinemasPromise = fetchCinemas();
+  const movies = await moviesPromise;
+  const signalMovieIds = [
+    ...new Set(
+      movies
+        .filter((movie) => !isMovieForChildren(movie))
+        .flatMap((movie) => sourceIdsForMovie(movie)),
+    ),
+  ];
+  const signalsPromise = fetchChildrenScreeningSignals(signalMovieIds);
+  const [cinemas, signals] = await Promise.all([cinemasPromise, signalsPromise]);
+  return buildChildrenHomeShellFromSignals(movies, cinemas, signals);
 }
 
 /** Fast SSR shell for Babybio/Seniorbio/Filmporten/Biografklub Danmark landings. */

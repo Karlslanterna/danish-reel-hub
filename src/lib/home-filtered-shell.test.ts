@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Cinema, Movie, ShowtimeIndexRow } from "./cinema-data";
 import {
   buildChildrenHomeShell,
+  buildChildrenHomeShellFromSignals,
   buildSpecialEventHomeShell,
   type HomeCatalogData,
 } from "./home-catalog";
@@ -73,10 +74,43 @@ describe("filtered landing shells", () => {
     expect(shell.complete).toBe(false);
     expect(shell.totalMovies).toBe(14);
     expect(shell.movies).toHaveLength(12);
-    expect(shell.movies.every((item) => item.id.startsWith("child-"))).toBe(true);
+    expect(shell.movies.every((item) => item.id.startsWith("child-")).toBe(true);
     expect(expandShowtimeIndex(shell.showtimeIndex)).toEqual([]);
     expect(shell.cinemas).toHaveLength(24);
     expect(shell.totalCinemas).toBe(30);
+  });
+
+  it("preserves source-level screening evidence in the fast children shell", () => {
+    const dubbed: Movie = {
+      ...movie("dubbed"),
+      rating: "F.u.7",
+      sourceIds: ["source-a", "source-b"],
+    };
+    const programme: Movie = {
+      ...movie("programme"),
+      sourceIds: ["programme-source"],
+    };
+    const adult: Movie = {
+      ...movie("adult"),
+      rating: "Fra 15 år",
+      sourceIds: ["adult-source"],
+    };
+
+    const shell = buildChildrenHomeShellFromSignals(
+      [dubbed, programme, adult],
+      Array.from({ length: 30 }, (_, index) => cinema(index + 1)),
+      [
+        { movieId: "source-b", events: [], languages: ["Dansk tale"] },
+        { movieId: "programme-source", events: ["Børnebiffen"], languages: [] },
+        { movieId: "adult-source", events: ["Børnebiffen"], languages: ["Dansk tale"] },
+      ],
+    );
+
+    expect(shell.movies.map((item) => item.id)).toEqual(["dubbed", "programme"]);
+    expect(shell.totalMovies).toBe(2);
+    expect(shell.cinemas).toHaveLength(24);
+    expect(shell.totalCinemas).toBe(30);
+    expect(expandShowtimeIndex(shell.showtimeIndex)).toEqual([]);
   });
 
   it("selects only explicitly tagged special-event movies without serializing their 30-day rows", () => {

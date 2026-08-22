@@ -1127,6 +1127,19 @@ export type Database = {
         }
         Returns: Json
       }
+      get_public_children_screening_signals: {
+        Args: {
+          p_first_date: string
+          p_last_date: string
+          p_movie_ids: string[]
+          p_starts_after: string
+        }
+        Returns: {
+          events: string[]
+          languages: string[]
+          movie_id: string
+        }[]
+      }
       get_public_movie_physical_stats: {
         Args: { p_groups: Json; p_last_date?: string }
         Returns: {

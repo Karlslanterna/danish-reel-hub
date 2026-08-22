@@ -24,6 +24,19 @@ describe("poster URLs", () => {
     expect(sources.srcSet).not.toContain("/w500/");
   });
 
+  it("uses eBillet's compact large poster with the stored HD asset as fallback", () => {
+    expect(cardPosterSources("https://poster.ebillet.dk/100LITER-GULD-2026.hd.jpg")).toEqual({
+      src: "https://poster.ebillet.dk/100LITER-GULD-2026.large.jpg",
+      fallbackSrc: "https://poster.ebillet.dk/100LITER-GULD-2026.hd.jpg",
+    });
+  });
+
+  it("does not rewrite an eBillet poster that is already compact", () => {
+    expect(cardPosterSources("https://poster.ebillet.dk/100LITER-GULD-2026.large.jpg")).toEqual({
+      src: "https://poster.ebillet.dk/100LITER-GULD-2026.large.jpg",
+    });
+  });
+
   it("caps decorative TMDb detail backdrops below the stored w1280 asset", () => {
     const sources = detailBackdropSources(
       "https://image.tmdb.org/t/p/w1280/blfhMP7g9M54gujSbd4EC8VOIxU.jpg",

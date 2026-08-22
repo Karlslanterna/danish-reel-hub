@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cardPosterSources, isPlaceholderPosterUrl, toHttpsUrl } from "./poster-url";
+import {
+  cardPosterSources,
+  detailBackdropSources,
+  isPlaceholderPosterUrl,
+  toHttpsUrl,
+} from "./poster-url";
 
 describe("poster URLs", () => {
   it("upgrades plain HTTP and protocol-relative URLs", () => {
@@ -19,9 +24,24 @@ describe("poster URLs", () => {
     expect(sources.srcSet).not.toContain("/w500/");
   });
 
+  it("caps decorative TMDb detail backdrops below the stored w1280 asset", () => {
+    const sources = detailBackdropSources(
+      "https://image.tmdb.org/t/p/w1280/blfhMP7g9M54gujSbd4EC8VOIxU.jpg",
+    );
+    expect(sources.src).toBe(
+      "https://image.tmdb.org/t/p/w780/blfhMP7g9M54gujSbd4EC8VOIxU.jpg",
+    );
+    expect(sources.srcSet).toContain("/w500/");
+    expect(sources.srcSet).toContain("/w780/");
+    expect(sources.srcSet).not.toContain("/w1280/");
+  });
+
   it("leaves non-TMDb poster URLs untouched", () => {
     expect(cardPosterSources("https://www.kultunaut.dk/images/film/1/plakat.jpg")).toEqual({
       src: "https://www.kultunaut.dk/images/film/1/plakat.jpg",
+    });
+    expect(detailBackdropSources("https://example.com/backdrop.jpg")).toEqual({
+      src: "https://example.com/backdrop.jpg",
     });
   });
 

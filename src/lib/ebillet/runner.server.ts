@@ -6,9 +6,9 @@
  * lease makes a crashed job reclaimable on the next scheduler tick.
  *
  * A sync cycle is finite: organizers are enqueued only when there are no
- * queued/running organizer jobs. Scheduled resume calls are explicitly unable
- * to create a fresh cycle, so a frequent resume cron can drain a long cycle
- * without turning into an accidental continuous sync loop.
+ * queued/running organizer jobs. Scheduled resume calls normally drain only
+ * existing work. They may opt into stale-only recovery so a missed daily HTTP
+ * start can self-heal without turning the resume cron into a continuous loop.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -45,30 +45,54 @@ type QueueRpcResult = {
 };
 
 export type EbilletQueueOptions = {
-  /** False for resume-only scheduler ticks: drain existing work, never enqueue. */
+  /** False for resume-only scheduler ticks. */
   allowStart?: boolean;
   /** Explicit operator action may bypass the normal freshness interval. */
   forceQueue?: boolean;
+  /**
+   * Resume-only callers may enqueue a fresh cycle only when the newest
+   * completed organizer is at least this old. Omit to keep strict drain-only
+   * behaviour.
+   */
+  recoverAfterMs?: number;
 };
 
 /** Avoid immediately starting a fresh full scan after the previous one drains. */
 export const EBILLET_MIN_CYCLE_INTERVAL_MS = 15 * 60 * 1000;
+
+/**
+ * The 26-hour import-health alarm leaves a two-hour recovery window after this
+ * threshold. A healthy daily 01:00 cycle refreshes the timestamp before a
+ * resume tick can reach this age.
+ */
+export const EBILLET_RECOVERY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export function shouldStartEbilletCycle(input: {
   activeRuns: number;
   lastCompletedAt: string | null;
   allowStart?: boolean;
   force?: boolean;
+  recoverAfterMs?: number;
   nowMs?: number;
   minIntervalMs?: number;
 }): boolean {
-  if (input.allowStart === false) return false;
   if (input.activeRuns > 0) return false;
+
+  const allowStart = input.allowStart ?? true;
+  const nowMs = input.nowMs ?? Date.now();
+
+  if (!allowStart) {
+    if (input.recoverAfterMs === undefined) return false;
+    if (!input.lastCompletedAt) return true;
+    const completedMs = Date.parse(input.lastCompletedAt);
+    if (!Number.isFinite(completedMs)) return true;
+    return nowMs - completedMs >= input.recoverAfterMs;
+  }
+
   if (input.force) return true;
   if (!input.lastCompletedAt) return true;
   const completedMs = Date.parse(input.lastCompletedAt);
   if (!Number.isFinite(completedMs)) return true;
-  const nowMs = input.nowMs ?? Date.now();
   const minIntervalMs = input.minIntervalMs ?? EBILLET_MIN_CYCLE_INTERVAL_MS;
   return nowMs - completedMs >= minIntervalMs;
 }
@@ -132,6 +156,7 @@ export async function runNextEbilletOrganizer(
         lastCompletedAt,
         allowStart: opts.allowStart ?? true,
         force: opts.forceQueue ?? false,
+        recoverAfterMs: opts.recoverAfterMs,
       })
     ) {
       queued = await enqueueEligibleOrganizers();
@@ -220,8 +245,9 @@ export async function runNextEbilletOrganizer(
 
 /**
  * Work through one finite organizer cycle until the request is close to its
- * wall-clock budget. Resume-only callers may drain an existing cycle but may
- * never create the next one.
+ * wall-clock budget. Resume-only callers drain existing work. If
+ * `recoverAfterMs` is set, they may also enqueue one fresh cycle after that
+ * stale threshold, but never while organizer work is already active.
  */
 export async function runEbilletQueueBatch(
   budgetMs = 55_000,

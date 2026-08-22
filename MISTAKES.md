@@ -162,3 +162,10 @@ This is a concise operational log. Each entry records the failure, cause, perman
 - Why: Those assertions describe DOM/payload boundaries. They cannot observe TTFB, FCP, LCP, or transferred bytes, so a regression in cold-start cost is invisible to them.
 - Rule: A performance gate must measure real timings and Core-Web-Vitals-like metrics (TTFB, FCP, LCP, navigation duration) plus transferred bytes under a documented CPU/network throttling profile. DOM- or header-only checks stay in the functional smoke suite and must never be described as page-speed coverage.
 - Test: `npm run test:performance` (`playwright.performance.config.ts`, mobile viewport, 4x CPU throttling, Slow-4G profile) attaches a JSON report and fails on explicit budgets; `npm run test:smoke` remains functional and deterministic.
+
+## M-024 — Fixed eBillet start attempts had no stale self-recovery
+
+- What happened: The 01:00 daily eBillet start and the 01:10 retry both dispatched, but neither created a new organizer cycle. The five-minute resume worker then kept finding no work to drain until the application-level freshness monitor paged.
+- Why: Resume was prohibited from ever creating fresh work, so recovery still depended entirely on two fixed-time start requests.
+- Rule: eBillet resume stays drain-only while data is fresh, but when no organizer work is active it may start one recovery cycle only after the newest completed organizer is at least 24 hours old.
+- Test: Runner tests cover strict resume, pre-threshold recovery, threshold recovery and no-history bootstrap; production verification must confirm a fresh completed cycle, zero active/dead-letter jobs and a healthy strict import monitor.

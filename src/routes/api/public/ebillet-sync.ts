@@ -12,7 +12,8 @@ import { createFileRoute } from "@tanstack/react-router";
  *
  *   x-ebillet-mode: discover | sync | resume
  *   - sync: may start a fresh finite organizer cycle and drain it
- *   - resume: may only drain an already queued/running cycle
+ *   - resume: drains queued/running work; when idle it may self-heal a missed
+ *     daily start only after the last completed organizer is at least 24h old
  *   - discover: registry discovery only
  */
 export const Route = createFileRoute("/api/public/ebillet-sync")({
@@ -49,9 +50,12 @@ export const Route = createFileRoute("/api/public/ebillet-sync")({
             });
           }
 
-          const { runEbilletQueueBatch } = await import("@/lib/ebillet/runner.server");
+          const { EBILLET_RECOVERY_INTERVAL_MS, runEbilletQueueBatch } = await import(
+            "@/lib/ebillet/runner.server"
+          );
           const result = await runEbilletQueueBatch(55_000, {
             allowStart: mode === "sync",
+            recoverAfterMs: mode === "resume" ? EBILLET_RECOVERY_INTERVAL_MS : undefined,
           });
           return Response.json(result, {
             status: result.status === "dead_letter" ? 500 : 200,

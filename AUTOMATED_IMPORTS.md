@@ -47,9 +47,11 @@ Current production topology at the audit snapshot:
 | --- | --- | --- |
 | `ebillet-canonical-daily-sync` | `0 1 * * *` | Start daily canonical organizer cycle |
 | `ebillet-canonical-daily-sync-retry` | `10 1 * * *` | Guarded recovery start at 01:10 UTC |
-| `ebillet-canonical-resume` | every 5 minutes | Drain queued organizer runs |
+| `ebillet-canonical-resume` | every 5 minutes | Drain queued organizer runs; when idle, self-heal a missed start only after 24h without a completed organizer |
 
 The 01:10 retry is safe because the eBillet application layer enforces a minimum interval between completed cycles; after a successful 01:00 cycle the retry is a no-op.
+
+The resume worker is also the durable fallback for missed one-shot starts. It never creates parallel work: active queued/running organizer jobs block a fresh cycle. When idle, it may enqueue a new cycle only when the newest completed organizer is at least 24 hours old. That threshold is below the strict 26-hour import-health alarm, so a missed 01:00 and 01:10 HTTP start has a recovery window before paging while a healthy daily cycle cannot be duplicated by ordinary resume ticks.
 
 ## Kultunaut application run flow
 

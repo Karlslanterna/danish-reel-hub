@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldStartEbilletCycle } from "./runner.server";
+import { EBILLET_RECOVERY_INTERVAL_MS, shouldStartEbilletCycle } from "./runner.server";
 
 const NOW = Date.parse("2026-08-17T14:30:00.000Z");
 
@@ -54,7 +54,7 @@ describe("shouldStartEbilletCycle", () => {
     ).toBe(true);
   });
 
-  it("never starts a new cycle from a resume-only scheduler tick", () => {
+  it("never starts a new cycle from a strict resume-only scheduler tick", () => {
     expect(
       shouldStartEbilletCycle({
         activeRuns: 0,
@@ -64,5 +64,41 @@ describe("shouldStartEbilletCycle", () => {
         nowMs: NOW,
       }),
     ).toBe(false);
+  });
+
+  it("does not self-heal from resume before the recovery threshold", () => {
+    expect(
+      shouldStartEbilletCycle({
+        activeRuns: 0,
+        lastCompletedAt: "2026-08-16T14:31:00.000Z",
+        allowStart: false,
+        recoverAfterMs: EBILLET_RECOVERY_INTERVAL_MS,
+        nowMs: NOW,
+      }),
+    ).toBe(false);
+  });
+
+  it("self-heals from resume once the previous success is one day old", () => {
+    expect(
+      shouldStartEbilletCycle({
+        activeRuns: 0,
+        lastCompletedAt: "2026-08-16T14:30:00.000Z",
+        allowStart: false,
+        recoverAfterMs: EBILLET_RECOVERY_INTERVAL_MS,
+        nowMs: NOW,
+      }),
+    ).toBe(true);
+  });
+
+  it("lets stale-only resume bootstrap when no completed history exists", () => {
+    expect(
+      shouldStartEbilletCycle({
+        activeRuns: 0,
+        lastCompletedAt: null,
+        allowStart: false,
+        recoverAfterMs: EBILLET_RECOVERY_INTERVAL_MS,
+        nowMs: NOW,
+      }),
+    ).toBe(true);
   });
 });
